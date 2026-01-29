@@ -9,9 +9,15 @@ import { apiRequest } from '../services/api';
 export default function TabTwoScreen() {
   const { token, clearAuthToken } = useAuth();
   const router = useRouter();
-
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role?: string;    // Optional, depending on your backend
+  avatar?: string;  // Optional
+}
   // Example: Fetch user data
-  const { data: userData, isLoading } = useQuery({
+  const { data: userData, isLoading } = useQuery<UserProfile, Error>({
     queryKey: ['currentUser'],
     queryFn: () => apiRequest('/auth/me'),
     enabled: !!token,

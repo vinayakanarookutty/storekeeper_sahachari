@@ -83,7 +83,7 @@ export function usePaginatedItems(page: number, limit: number = 10) {
       );
       return response.json();
     },
-    keepPreviousData: true, // Keep old data while fetching new
+    // keepPreviousData: true, // Keep old data while fetching new
   });
 }
 
@@ -95,6 +95,6 @@ export function useInfiniteItems() {
       const response = await fetch(`your-api-url/items?cursor=${pageParam}`);
       return response.json();
     },
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    // getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 }

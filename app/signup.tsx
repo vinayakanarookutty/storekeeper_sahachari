@@ -2,16 +2,16 @@ import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { apiRequest } from './services/api';
 
@@ -103,7 +103,7 @@ export default function SignupScreen() {
       password,
       address: address || '',
       serviceablePincodes,
-      role: 'USER', // Default role
+      role: 'ADMIN', // Default role
     });
   };
 

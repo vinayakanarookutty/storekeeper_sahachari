@@ -105,8 +105,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FDB515',
   },
   splashImage: {
-    width: '90%',
-    height: '90%',
+    width: '40%',
+    height: '40%',
     maxWidth: 500,
     maxHeight: 500,
   },
