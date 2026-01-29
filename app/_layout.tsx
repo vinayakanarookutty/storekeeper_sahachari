@@ -33,7 +33,7 @@ export default function RootLayout() {
     async function prepare() {
       try {
         // Wait for 5 seconds
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       } catch (e) {
         console.warn(e);
       } finally {
