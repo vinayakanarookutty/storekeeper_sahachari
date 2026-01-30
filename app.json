@@ -28,7 +28,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#FDB515"
       },
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
