@@ -4,15 +4,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { getToken } from './services/auth';
 
@@ -26,7 +26,7 @@ interface PresignedUrlResponse {
 interface ProductData {
   name: string;
   description: string;
-  price: number;
+  price: string;
   quantity: number;
   category: string;
   images: string[];
@@ -203,7 +203,7 @@ export default function EditProductScreen() {
     const productData: ProductData = {
       name,
       description,
-      price: parseFloat(price),
+      price: price,
       quantity: parseInt(quantity),
       category,
       images: allImages,

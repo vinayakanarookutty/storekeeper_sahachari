@@ -12,7 +12,7 @@ interface Product {
   _id: string;
   name: string;
   description: string;
-  price: number;
+  price: string;
   quantity: number;
   category: string;
   images: string[];

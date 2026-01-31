@@ -23,7 +23,7 @@ interface Product {
   _id: string;
   name: string;
   description: string;
-  price: number;
+  price: string;
   quantity: number;
   category: string;
   images: string[];
@@ -174,7 +174,7 @@ export default function ProductDetailScreen() {
           {/* Image Counter Badge */}
           {product.images && product.images.length > 1 && (
             <View style={styles.imageCountBadge}>
-              <FontAwesome name="images" size={14} color="#fff" />
+              <FontAwesome name="image" size={14} color="#fff" />
               <Text style={styles.imageCountText}>
                 {currentImageIndex + 1}/{product.images.length}
               </Text>
@@ -223,7 +223,9 @@ export default function ProductDetailScreen() {
           <View style={styles.statsContainer}>
             <View style={styles.statBox}>
               <FontAwesome name="rupee" size={24} color="#DAA520" />
-              <Text style={styles.statValue}>₹{(product.price * product.quantity).toLocaleString('en-IN')}</Text>
+            <Text style={styles.statValue}>
+  ₹{(Number(product.price.replace(/[^0-9.]/g, '')) * product.quantity).toLocaleString('en-IN')}
+</Text>
               <Text style={styles.statLabel}>Total Value</Text>
             </View>
             <View style={styles.statDivider} />
