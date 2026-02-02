@@ -1,19 +1,21 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    Image,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { getToken } from '../services/auth';
 
@@ -66,24 +68,25 @@ interface Order {
   updatedAt: string;
 }
 
-const STATUS_STEPS = ['PLACED', 'ACCEPTED', 'READY', 'PICKED_UP', 'DELIVERED'];
+const STATUS_STEPS = ['PLACED', 'READY', 'ACCEPTED', 'PICKED_UP', 'DELIVERED'];
 
 const STATUS_CONFIG = {
   PLACED: { color: '#DAA520', icon: 'shopping-cart', label: 'Order Placed' },
-  ACCEPTED: { color: '#2E7D32', icon: 'check-circle', label: 'Accepted' },
-  REJECTED: { color: '#D32F2F', icon: 'times-circle', label: 'Rejected' },
-  READY: { color: '#FF9800', icon: 'clock-o', label: 'Ready' },
+  READY: { color: '#FF9800', icon: 'clock-o', label: 'Ready for Pickup' },
+  ACCEPTED: { color: '#2E7D32', icon: 'check-circle', label: 'Accepted by Driver' },
   PICKED_UP: { color: '#9C27B0', icon: 'motorcycle', label: 'Picked Up' },
   DELIVERED: { color: '#4CAF50', icon: 'check-circle', label: 'Delivered' },
+  REJECTED: { color: '#D32F2F', icon: 'times-circle', label: 'Rejected' },
   FAILED: { color: '#D32F2F', icon: 'exclamation-circle', label: 'Failed' },
   CANCELLED: { color: '#757575', icon: 'ban', label: 'Cancelled' },
 };
 
 export default function OrdersScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [selectedFilter, setSelectedFilter] = useState<string>('ALL');
 
-  const { data: orders, isLoading, refetch } = useQuery({
+  const { data: orders, isLoading, refetch, isRefreshing } = useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
       const token = await getToken();
@@ -100,6 +103,55 @@ export default function OrdersScreen() {
       return response.json() as Promise<Order[]>;
     },
   });
+
+  // Mutation for marking order as ready (only action available to storekeeper)
+  const markOrderReadyMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/storekeeper/orders/${orderId}/ready`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to mark order as ready');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      Alert.alert('Success', 'Order marked as ready for pickup!');
+      // Invalidate and refetch orders
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (error: Error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  const handleMarkReady = (orderId: string) => {
+    Alert.alert(
+      'Mark Order as Ready',
+      'Mark this order as ready for pickup by delivery boy?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Mark Ready',
+          style: 'default',
+          onPress: () => {
+            markOrderReadyMutation.mutate(orderId);
+          },
+        },
+      ]
+    );
+  };
 
   const getStatusColor = (status: string) => {
     return STATUS_CONFIG[status as keyof typeof STATUS_CONFIG]?.color || '#999';
@@ -138,11 +190,47 @@ export default function OrdersScreen() {
     return isNaN(numericPrice) ? 0 : numericPrice;
   };
 
-  const filterOptions = ['ALL', 'PLACED', 'ACCEPTED', 'READY', 'PICKED_UP', 'DELIVERED', 'CANCELLED'];
+  const filterOptions = ['ALL', 'PLACED', 'READY', 'ACCEPTED', 'PICKED_UP', 'DELIVERED', 'CANCELLED'];
 
   const filteredOrders = orders?.filter(order => 
     selectedFilter === 'ALL' ? true : order.status === selectedFilter
   ) || [];
+
+  const renderActionButtons = (order: Order) => {
+    // Only show "Mark as Ready" button for PLACED status orders
+    // When clicked, it marks the order as READY for delivery boy to accept
+    if (order.status === 'PLACED') {
+      return (
+        <View style={styles.actionsSection}>
+          <Text style={styles.actionsSectionTitle}>Actions</Text>
+          <TouchableOpacity
+            style={styles.actionButton}
+            activeOpacity={0.8}
+            onPress={() => handleMarkReady(order._id)}
+            disabled={markOrderReadyMutation.isPending}
+          >
+            <LinearGradient
+              colors={['#FF9800', '#F57C00']}
+              style={styles.actionButtonGradient}
+            >
+              {markOrderReadyMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <FontAwesome name="check-circle" size={16} color="#fff" />
+                  <Text style={styles.actionButtonText}>Mark as Ready</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // No action buttons for other statuses
+    // READY → ACCEPTED → PICKED_UP → DELIVERED are handled by delivery boy
+    return null;
+  };
 
   const renderOrderItem = ({ item: order }: { item: Order }) => {
     const currentStep = getCurrentStepIndex(order.status);
@@ -342,6 +430,9 @@ export default function OrdersScreen() {
               <Text style={styles.pickupAddress}>{order.pickupAddress}</Text>
             </View>
           </View>
+
+          {/* Action Buttons */}
+          {renderActionButtons(order)}
         </LinearGradient>
       </TouchableOpacity>
     );
@@ -361,24 +452,6 @@ export default function OrdersScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       
-      {/* Header */}
-      <LinearGradient
-        colors={['#DAA520', '#B8860B']}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <FontAwesome name="shopping-cart" size={28} color="#fff" />
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle}>All Orders</Text>
-              <Text style={styles.headerSubtitle}>
-                {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </LinearGradient>
-
       {/* Filter Pills */}
       <View style={styles.filterContainer}>
         <ScrollView 
@@ -431,14 +504,14 @@ export default function OrdersScreen() {
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        // refreshControl={
-        //   <RefreshControl
-        //     refreshing={isRefreshing}
-        //     onRefresh={refetch}
-        //     colors={['#4A90E2']}
-        //     tintColor="#4A90E2"
-        //   />
-        // }
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={refetch}
+            colors={['#DAA520']}
+            tintColor="#DAA520"
+          />
+        }
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <FontAwesome name="shopping-cart" size={64} color="#E0E0E0" />
@@ -470,38 +543,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  headerTextContainer: {
-    gap: 4,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
   },
   filterContainer: {
     backgroundColor: '#fff',
@@ -844,6 +885,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
+    marginBottom: 16,
   },
   pickupIconRow: {
     flexDirection: 'row',
@@ -859,6 +901,40 @@ const styles = StyleSheet.create({
     color: '#2D2416',
     fontWeight: '600',
     flex: 1,
+  },
+  actionsSection: {
+    paddingTop: 16,
+    borderTopWidth: 2,
+    borderTopColor: '#E0E0E0',
+    gap: 12,
+  },
+  actionsSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2D2416',
+    marginBottom: 4,
+  },
+  actionButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  actionButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  actionButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
   emptyContainer: {
     flex: 1,

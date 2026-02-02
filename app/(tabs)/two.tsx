@@ -29,7 +29,7 @@ interface UserProfile {
   address2?: string;
   mobileNumber?: string;
   serviceablePincodes?: string[];
-  avatar?: string;
+  image?: string;
 }
 
 interface EditModalProps {
@@ -188,73 +188,96 @@ export default function TabTwoScreen() {
 
   // Upload avatar mutation
   const uploadAvatarMutation = useMutation({
-    mutationFn: async (imageUri: string) => {
-      const authToken = await getToken();
+  mutationFn: async (imageUri: string) => {
+    const authToken = await getToken();
 
-      // Get presigned URL
-      const fileExtension = imageUri.split('.').pop() || 'jpg';
-      const fileName = `avatar_${Date.now()}.${fileExtension}`;
-      const fileType = `image/${fileExtension}`;
+    // 1. CLEAN THE URI (avoid blob:http / localhost junk in S3 key)
+    let cleanPath = imageUri.split(':http')[0];
+    cleanPath = cleanPath.replace('blob:', '');
 
-      const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          fileName,
-          fileType,
-          folder: 'avatars',
-        }),
-      });
+    // 2. EXTRACT EXTENSION
+    const extensionMatch = cleanPath.match(/\.([a-zA-Z0-9]+)$/);
+    const fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg';
 
-      if (!presignedResponse.ok) {
-        throw new Error('Failed to get presigned URL');
-      }
+    // 3. GENERATE CLEAN FILENAME
+    const randomId = Math.random().toString(36).substring(7);
+    const fileName = `avatar_${Date.now()}_${randomId}.${fileExtension}`;
 
-      const { url: presignedUrl, key } = await presignedResponse.json();
+    // 4. SET VALID MIME TYPE
+    const fileType =
+      fileExtension === 'png'
+        ? 'image/png'
+        : fileExtension === 'webp'
+        ? 'image/webp'
+        : 'image/jpeg';
 
-      // Upload to S3
-      const imageResponse = await fetch(imageUri);
-      const blob = await imageResponse.blob();
+    console.log(`Uploading avatar: ${fileName} as ${fileType}`);
 
-      const uploadResponse = await fetch(presignedUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': fileType,
-        },
-        body: blob,
-      });
+    // 5. GET PRESIGNED URL
+    const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        fileName,
+        fileType,
+        folder: 'avatars',
+      }),
+    });
 
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload image');
-      }
+    if (!presignedResponse.ok) {
+      throw new Error('Failed to get presigned URL');
+    }
 
-      // Update profile with avatar key
-      const updateResponse = await fetch(`${API_BASE_URL}/users/update-me`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ avatar: key }),
-      });
+    const { url: presignedUrl, key } = await presignedResponse.json();
 
-      if (!updateResponse.ok) {
-        throw new Error('Failed to update profile with avatar');
-      }
+    // 6. CONVERT IMAGE URI → BLOB
+    const imageResponse = await fetch(imageUri);
+    const blob = await imageResponse.blob();
 
-      return updateResponse.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
-      Alert.alert('Success', 'Profile picture updated!');
-    },
-    onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to upload image');
-    },
-  });
+    // 7. UPLOAD TO S3
+    const uploadResponse = await fetch(presignedUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': fileType,
+      },
+      body: blob,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error('Failed to upload avatar to S3');
+    }
+
+    // 8. UPDATE USER PROFILE WITH KEY
+    const updateResponse = await fetch(`${API_BASE_URL}/users/update-me`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ image: key }),
+    });
+
+    if (!updateResponse.ok) {
+      throw new Error('Failed to update profile with avatar');
+    }
+
+    return updateResponse.json();
+  },
+
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    Alert.alert('Success', 'Profile picture updated!');
+  },
+
+  onError: (error: any) => {
+    console.error('Avatar upload error:', error);
+    Alert.alert('Error', error.message || 'Failed to upload avatar');
+  },
+});
+
 
   const handleEditField = (field: 'address' | 'address2' | 'mobileNumber' | 'serviceablePincodes') => {
     let value = '';
@@ -331,9 +354,9 @@ export default function TabTwoScreen() {
               <View style={styles.avatarLoading}>
                 <ActivityIndicator size="large" color="#FDB515" />
               </View>
-            ) : userData?.avatar ? (
+            ) : userData?.image ? (
               <Image 
-                source={{ uri: `${S3_BASE_URL}/${userData.avatar}` }}
+                source={{ uri: `${S3_BASE_URL}/${userData.image}` }}
                 style={styles.avatar}
               />
             ) : (
