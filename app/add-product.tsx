@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -44,7 +44,36 @@ export default function AddProductScreen() {
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [uploadedImageKeys, setUploadedImageKeys] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+const [categoryInputFocused, setCategoryInputFocused] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const PRODUCT_CATEGORIES = [
+  'Electronics',
+  'Clothing & Apparel',
+  'Home & Garden',
+  'Sports & Outdoors',
+  'Books & Media',
+  'Toys & Games',
+  'Food & Beverages',
+  'Health & Beauty',
+  'Automotive',
+  'Jewelry & Accessories',
+  'Pet Supplies',
+  'Office Supplies',
+  'Tools & Hardware',
+  'Art & Crafts',
+  'Musical Instruments',
+  'Service  ',
+  'Others'
+];
+const categories =PRODUCT_CATEGORIES 
 
+  // Filter categories based on user input
+  const filteredCategories = useMemo(() => {
+    if (!category) return categories;
+    return categories.filter(cat => 
+      cat.toLowerCase().includes(category.toLowerCase())
+    );
+  }, [category, categories]);
   // Create product mutation
   const createProductMutation = useMutation({
     mutationFn: async (productData: ProductData) => {
@@ -81,7 +110,10 @@ export default function AddProductScreen() {
       Alert.alert('Error', error.message || 'Failed to create product');
     },
   });
-
+ const handleSelectCategory = (selectedCategory: string) => {
+    setCategory(selectedCategory);
+    setShowCategoryDropdown(false);
+  };
   const pickImages = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -293,7 +325,7 @@ const uploadImages = async () => {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <TextInput
           style={styles.input}
-          placeholder="Product Name *"
+          placeholder="Product Name */Service Name"
           placeholderTextColor="#A89378"
           value={name}
           onChangeText={setName}
@@ -326,15 +358,61 @@ const uploadImages = async () => {
           onChangeText={setQuantity}
           keyboardType="numeric"
         />
+        <Text style={styles.fieldHint}>
+             Enter how many items are available/In case of service add how many services you can give in a month
+        </Text>
 
-        <TextInput
+        {/* <TextInput
           style={styles.input}
           placeholder="Category * (e.g., Electronics)"
           placeholderTextColor="#A89378"
           value={category}
           onChangeText={setCategory}
-        />
+        /> */}
 
+          <View style={styles.autocompleteContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Category * (Start typing...)"
+            placeholderTextColor="#A89378"
+            value={category}
+            onChangeText={(text) => {
+              setCategory(text);
+              setShowCategoryDropdown(true);
+            }}
+            onFocus={() => {
+              setCategoryInputFocused(true);
+              setShowCategoryDropdown(true);
+            }}
+            onBlur={() => {
+              // Delay to allow selecting from dropdown
+              setTimeout(() => setCategoryInputFocused(false), 200);
+            }}
+          />
+          
+          {showCategoryDropdown && categoryInputFocused && filteredCategories.length > 0 && (
+            <View style={styles.dropdown}>
+              <ScrollView 
+                style={styles.dropdownScroll}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled={true}
+              >
+                {filteredCategories.map((cat, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.dropdownItem}
+                    onPress={() => handleSelectCategory(cat)}
+                  >
+                    <Text style={styles.dropdownItemText}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+ <Text style={styles.fieldHint}>
+             Enter the catagory of the product/In case of all services Change catagory to Service
+        </Text>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Product Images</Text>
           
@@ -552,4 +630,45 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
+   dropdownScroll: {
+    maxHeight: 200,
+  },
+  dropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0D6C3',
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1001,
+  },
+   autocompleteContainer: {
+    position: 'relative',
+    zIndex: 1000,
+    marginBottom: 16,
+  },
+   dropdownItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#2D2416',
+  },
+  fieldHint: {
+  fontSize: 12,
+  color: '#856404',
+  marginBottom: 8,
+  marginTop: -6,
+}
+
 });
