@@ -9,13 +9,12 @@ import {
   Dimensions,
   FlatList,
   Image,
-  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { getToken } from '../services/auth';
 
@@ -86,7 +85,7 @@ export default function OrdersScreen() {
   const queryClient = useQueryClient();
   const [selectedFilter, setSelectedFilter] = useState<string>('ALL');
 
-  const { data: orders, isLoading, refetch, isRefreshing } = useQuery({
+  const { data: orders, isLoading, refetch, } = useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
       const token = await getToken();
@@ -504,14 +503,14 @@ export default function OrdersScreen() {
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={refetch}
-            colors={['#DAA520']}
-            tintColor="#DAA520"
-          />
-        }
+        // refreshControl={
+        //   <RefreshControl
+        //     refreshing={isRefreshing}
+        //     onRefresh={refetch}
+        //     colors={['#DAA520']}
+        //     tintColor="#DAA520"
+        //   />
+        // }
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <FontAwesome name="shopping-cart" size={64} color="#E0E0E0" />

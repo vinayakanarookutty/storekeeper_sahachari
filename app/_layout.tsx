@@ -32,7 +32,7 @@ export default function RootLayout() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Wait for 5 seconds
+        // Wait for 3 seconds (splash screen display time)
         await new Promise((resolve) => setTimeout(resolve, 3000));
       } catch (e) {
         console.warn(e);
@@ -85,6 +85,9 @@ function RootLayoutNav() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
+        {/* Initial index route - handles auth routing */}
+        <Stack.Screen name="index" />
+        
         {/* Auth screens */}
         <Stack.Screen name="signup" />
         <Stack.Screen name="login" />
@@ -92,6 +95,21 @@ function RootLayoutNav() {
         {/* Main app */}
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        
+        {/* Product screens */}
+        <Stack.Screen 
+          name="add-product" 
+          options={{ 
+            presentation: 'modal',
+          }} 
+        />
+        <Stack.Screen 
+          name="edit-product" 
+          options={{ 
+            presentation: 'modal',
+          }} 
+        />
+        <Stack.Screen name="product-detail" />
       </Stack>
     </ThemeProvider>
   );

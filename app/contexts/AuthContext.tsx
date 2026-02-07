@@ -1,10 +1,11 @@
+// app/contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Alert } from 'react-native/Libraries/Alert/Alert';
 import { getToken, removeToken, saveToken } from '../services/auth';
 
 interface AuthContextType {
   token: string | null;
   isLoading: boolean;
+  isAuthenticated: boolean;
   setAuthToken: (token: string) => Promise<void>;
   clearAuthToken: () => Promise<void>;
 }
@@ -17,35 +18,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Load token on mount
   useEffect(() => {
-    (async () => {
+    let isMounted = true;
+
+    const loadToken = async () => {
       try {
+        console.log('AuthContext: Loading token from AsyncStorage...');
         const storedToken = await getToken();
-        setToken(storedToken);
+        
+        if (isMounted) {
+          if (storedToken) {
+            console.log('AuthContext: Token found in storage');
+            setToken(storedToken);
+          } else {
+            console.log('AuthContext: No token found in storage');
+            setToken(null);
+          }
+        }
       } catch (error) {
-        console.error('Failed to load token:', error);
+        console.error('AuthContext: Failed to load token:', error);
+        if (isMounted) {
+          setToken(null);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          console.log('AuthContext: Loading complete');
+        }
       }
-    })();
+    };
+
+    loadToken();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Store token
   const setAuthToken = async (newToken: string) => {
-    await saveToken(newToken);
-    setToken(newToken);
+    try {
+      console.log('AuthContext: Saving new token...');
+      await saveToken(newToken);
+      setToken(newToken);
+      console.log('AuthContext: Token saved successfully');
+    } catch (error) {
+      console.error('AuthContext: Failed to save token:', error);
+      throw error;
+    }
   };
 
   // Clear token
-// AuthContext.tsx
-const clearAuthToken = async () => {
-    Alert.alert('Debug', 'clearAuthToken called');
-    await removeToken();
-    setToken(null);
-    Alert.alert('Debug', 'Token set to null');
-};
+  const clearAuthToken = async () => {
+    try {
+      console.log('AuthContext: Clearing token...');
+      await removeToken();
+      setToken(null);
+      console.log('AuthContext: Token cleared successfully');
+    } catch (error) {
+      console.error('AuthContext: Failed to clear token:', error);
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     token,
     isLoading,
+    isAuthenticated: !!token,
     setAuthToken,
     clearAuthToken,
   };
