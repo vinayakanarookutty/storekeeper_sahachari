@@ -43,7 +43,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.vinayak1937.storekeeper"
+      "package": "com.corestoneinnovations.sahachariadmin"
     },
     "web": {
       "bundler": "metro",
