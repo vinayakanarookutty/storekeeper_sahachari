@@ -36,36 +36,41 @@ export default function AddProductScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
   
+  const [category, setCategory] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
-  const [category, setCategory] = useState('');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [uploadedImageKeys, setUploadedImageKeys] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-const [categoryInputFocused, setCategoryInputFocused] = useState(false);
+  const [categoryInputFocused, setCategoryInputFocused] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
   const PRODUCT_CATEGORIES = [
-  'Electronics',
-  'Clothing & Apparel',
-  'Home & Garden',
-  'Sports & Outdoors',
-  'Books & Media',
-  'Toys & Games',
-  'Food & Beverages',
-  'Health & Beauty',
-  'Automotive',
-  'Jewelry & Accessories',
-  'Pet Supplies',
-  'Office Supplies',
-  'Tools & Hardware',
-  'Art & Crafts',
-  'Musical Instruments',
-  'Service  ',
-  'Others'
-];
-const categories =PRODUCT_CATEGORIES 
+    'Service',
+    'Electronics',
+    'Clothing & Apparel',
+    'Home & Garden',
+    'Sports & Outdoors',
+    'Books & Media',
+    'Toys & Games',
+    'Food & Beverages',
+    'Health & Beauty',
+    'Automotive',
+    'Jewelry & Accessories',
+    'Pet Supplies',
+    'Office Supplies',
+    'Tools & Hardware',
+    'Art & Crafts',
+    'Musical Instruments',
+    'Others'
+  ];
+
+  const categories = PRODUCT_CATEGORIES;
+
+  // Check if selected category is Service
+  const isService = category === 'Service';
 
   // Filter categories based on user input
   const filteredCategories = useMemo(() => {
@@ -74,6 +79,7 @@ const categories =PRODUCT_CATEGORIES
       cat.toLowerCase().includes(category.toLowerCase())
     );
   }, [category, categories]);
+
   // Create product mutation
   const createProductMutation = useMutation({
     mutationFn: async (productData: ProductData) => {
@@ -96,24 +102,32 @@ const categories =PRODUCT_CATEGORIES
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', 'Product created successfully!', [
+      Alert.alert('Success', isService ? 'Service created successfully!' : 'Product created successfully!', [
         {
           text: 'OK',
           onPress: () => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
-            router.back(); // Go back to product list
+            router.back();
           },
         },
       ]);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to create product');
+      Alert.alert('Error', error.message || `Failed to create ${isService ? 'service' : 'product'}`);
     },
   });
- const handleSelectCategory = (selectedCategory: string) => {
+
+  const handleSelectCategory = (selectedCategory: string) => {
     setCategory(selectedCategory);
     setShowCategoryDropdown(false);
+    // Reset quantity when switching to/from Service
+    if (selectedCategory === 'Service') {
+      setQuantity('100');
+    } else if (category === 'Service') {
+      setQuantity('');
+    }
   };
+
   const pickImages = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -145,153 +159,99 @@ const categories =PRODUCT_CATEGORIES
     setUploadedImageKeys(prev => prev.filter((_, i) => i !== index));
   };
 
-//   const uploadImages = async () => {
-//     if (selectedImages.length === 0) {
-//       Alert.alert('Error', 'Please select at least one image');
-//       return;
-//     }
-
-//     setIsUploading(true);
-//     const imageKeys: string[] = [];
-
-//     try {
-//       const token = await getToken();
-
-//       for (const imageUri of selectedImages) {
-//         const fileExtension = imageUri.split('.').pop() || 'jpg';
-//         const fileName = `product_${Date.now()}.${fileExtension}`;
-//         const fileType = `image/${fileExtension}`;
-
-//         // Get presigned URL
-//         const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
-//           method: 'POST',
-//           headers: {
-//             'Content-Type': 'application/json',
-//             'Authorization': `Bearer ${token}`,
-//           },
-//           body: JSON.stringify({
-//             fileName,
-//             fileType,
-//             folder: 'uploads',
-//           }),
-//         });
-
-//         if (!presignedResponse.ok) {
-//           throw new Error('Failed to get presigned URL');
-//         }
-
-//         const { url: presignedUrl, key }: PresignedUrlResponse = await presignedResponse.json();
-
-//         // Upload to S3
-//         const imageResponse = await fetch(imageUri);
-//         const blob = await imageResponse.blob();
-
-//         const uploadResponse = await fetch(presignedUrl, {
-//           method: 'PUT',
-//           headers: {
-//             'Content-Type': fileType,
-//           },
-//           body: blob,
-//         });
-
-//         if (!uploadResponse.ok) {
-//           throw new Error('Failed to upload image');
-//         }
-
-//         imageKeys.push(key);
-//       }
-
-//       setUploadedImageKeys(imageKeys);
-//       Alert.alert('Success', `${imageKeys.length} image(s) uploaded successfully!`);
-//     } catch (error: any) {
-//       console.error('Upload error:', error);
-//       Alert.alert('Upload Failed', error.message || 'Failed to upload images');
-//     } finally {
-//       setIsUploading(false);
-//     }
-//   };
-const uploadImages = async () => {
-  if (selectedImages.length === 0) {
-    Alert.alert('Error', 'Please select at least one image');
-    return;
-  }
-
-  setIsUploading(true);
-  const imageKeys: string[] = [];
-
-  try {
-    const token = await getToken();
-
-    for (const imageUri of selectedImages) {
-      // 1. STRIP METADATA: Remove 'blob:', ':http', and query params
-      // This prevents S3 from creating "http:" folders
-      let cleanPath = imageUri.split(':http')[0]; // Remove local server reference
-      cleanPath = cleanPath.replace('blob:', ''); // Remove blob prefix
-      
-      // 2. EXTRACT EXTENSION
-      const extensionMatch = cleanPath.match(/\.([a-zA-Z0-9]+)$/);
-      const fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg';
-      
-      // 3. GENERATE CLEAN FILENAME
-      // Using a random string + timestamp for uniqueness
-      const randomId = Math.random().toString(36).substring(7);
-      const fileName = `product_${Date.now()}_${randomId}.${fileExtension}`;
-      
-      // 4. SET VALID MIME TYPE
-      const fileType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
-
-      console.log(`Uploading: ${fileName} as ${fileType}`);
-
-      // 5. GET PRESIGNED URL FROM BACKEND
-      const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          fileName,
-          fileType,
-          folder: 'uploads',
-        }),
-      });
-
-      if (!presignedResponse.ok) throw new Error('Failed to get presigned URL');
-
-      const { url: presignedUrl, key }: PresignedUrlResponse = await presignedResponse.json();
-
-      // 6. CONVERT URI TO BLOB
-      const imageResponse = await fetch(imageUri);
-      const blob = await imageResponse.blob();
-
-      // 7. UPLOAD DIRECTLY TO S3
-      const uploadResponse = await fetch(presignedUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': fileType, // Essential for S3 to recognize it as an image
-        },
-        body: blob,
-      });
-
-      if (!uploadResponse.ok) throw new Error('Failed to upload image to S3');
-
-      // Save the key (e.g., "uploads/product_123.jpg") to push to your DB later
-      imageKeys.push(key);
+  const uploadImages = async () => {
+    if (selectedImages.length === 0) {
+      Alert.alert('Error', 'Please select at least one image');
+      return;
     }
 
-    setUploadedImageKeys(imageKeys);
-    Alert.alert('Success', `${imageKeys.length} image(s) uploaded successfully!`);
-  } catch (error: any) {
-    console.error('Upload error details:', error);
-    Alert.alert('Upload Failed', error.message || 'Check console for details');
-  } finally {
-    setIsUploading(false);
-  }
-};
+    setIsUploading(true);
+    const imageKeys: string[] = [];
+
+    try {
+      const token = await getToken();
+
+      for (const imageUri of selectedImages) {
+        // 1. STRIP METADATA: Remove 'blob:', ':http', and query params
+        // This prevents S3 from creating "http:" folders
+        let cleanPath = imageUri.split(':http')[0]; // Remove local server reference
+        cleanPath = cleanPath.replace('blob:', ''); // Remove blob prefix
+        
+        // 2. EXTRACT EXTENSION
+        const extensionMatch = cleanPath.match(/\.([a-zA-Z0-9]+)$/);
+        const fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg';
+        
+        // 3. GENERATE CLEAN FILENAME
+        // Using a random string + timestamp for uniqueness
+        const randomId = Math.random().toString(36).substring(7);
+        const fileName = `product_${Date.now()}_${randomId}.${fileExtension}`;
+        
+        // 4. SET VALID MIME TYPE
+        const fileType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
+
+        console.log(`Uploading: ${fileName} as ${fileType}`);
+
+        // 5. GET PRESIGNED URL FROM BACKEND
+        const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            fileName,
+            fileType,
+            folder: 'uploads',
+          }),
+        });
+
+        if (!presignedResponse.ok) throw new Error('Failed to get presigned URL');
+
+        const { url: presignedUrl, key }: PresignedUrlResponse = await presignedResponse.json();
+
+        // 6. CONVERT URI TO BLOB
+        const imageResponse = await fetch(imageUri);
+        const blob = await imageResponse.blob();
+
+        // 7. UPLOAD DIRECTLY TO S3
+        const uploadResponse = await fetch(presignedUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': fileType, // Essential for S3 to recognize it as an image
+          },
+          body: blob,
+        });
+
+        if (!uploadResponse.ok) throw new Error('Failed to upload image to S3');
+
+        // Save the key (e.g., "uploads/product_123.jpg") to push to your DB later
+        imageKeys.push(key);
+      }
+
+      setUploadedImageKeys(imageKeys);
+      Alert.alert('Success', `${imageKeys.length} image(s) uploaded successfully!`);
+    } catch (error: any) {
+      console.error('Upload error details:', error);
+      Alert.alert('Upload Failed', error.message || 'Check console for details');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleCreateProduct = () => {
-    if (!name.trim() || !description.trim() || !price || !quantity || !category.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!category.trim()) {
+      Alert.alert('Error', 'Please select a category');
+      return;
+    }
+
+    if (!name.trim() || !description.trim() || !price) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    // For non-service categories, quantity is required
+    if (!isService && !quantity) {
+      Alert.alert('Error', 'Please enter the quantity');
       return;
     }
 
@@ -304,7 +264,7 @@ const uploadImages = async () => {
       name,
       description,
       price: price,
-      quantity: parseInt(quantity),
+      quantity: isService ? 100 : parseInt(quantity),
       category,
       images: uploadedImageKeys,
     };
@@ -316,64 +276,18 @@ const uploadImages = async () => {
     <View style={styles.container}>
       {/* Header with close button */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Add New Product</Text>
+        <Text style={styles.headerTitle}>{isService ? 'Add New Service' : 'Add New Product'}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <FontAwesome name="times" size={24} color="#2D2416" />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        <TextInput
-          style={styles.input}
-          placeholder="Product Name */Service Name"
-          placeholderTextColor="#A89378"
-          value={name}
-          onChangeText={setName}
-        />
-
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Description *"
-          placeholderTextColor="#A89378"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Price *"
-          placeholderTextColor="#A89378"
-          value={price}
-          onChangeText={setPrice}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Quantity *"
-          placeholderTextColor="#A89378"
-          value={quantity}
-          onChangeText={setQuantity}
-          keyboardType="numeric"
-        />
-        <Text style={styles.fieldHint}>
-             Enter how many items are available/In case of service add how many services you can give in a month
-        </Text>
-
-        {/* <TextInput
-          style={styles.input}
-          placeholder="Category * (e.g., Electronics)"
-          placeholderTextColor="#A89378"
-          value={category}
-          onChangeText={setCategory}
-        /> */}
-
-          <View style={styles.autocompleteContainer}>
+        {/* CATEGORY FIELD - NOW FIRST */}
+        <View style={styles.autocompleteContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Category * (Start typing...)"
+            placeholder="Category * (Select: Service or Other)"
             placeholderTextColor="#A89378"
             value={category}
             onChangeText={(text) => {
@@ -410,11 +324,63 @@ const uploadImages = async () => {
             </View>
           )}
         </View>
- <Text style={styles.fieldHint}>
-             Enter the catagory of the product/In case of all services Change catagory to Service
+        <Text style={styles.fieldHint}>
+          {isService 
+            ? 'Service category selected - quantity will be set to 100 automatically'
+            : 'Select the category of your product'}
         </Text>
+
+        {/* NAME FIELD */}
+        <TextInput
+          style={styles.input}
+          placeholder={isService ? "Service Name *" : "Product Name *"}
+          placeholderTextColor="#A89378"
+          value={name}
+          onChangeText={setName}
+        />
+
+        {/* DESCRIPTION FIELD */}
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder={isService ? "Service Description *" : "Product Description *"}
+          placeholderTextColor="#A89378"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+        />
+
+        {/* PRICE FIELD */}
+        <TextInput
+          style={styles.input}
+          placeholder={isService ? "Service Price *" : "Price *"}
+          placeholderTextColor="#A89378"
+          value={price}
+          onChangeText={setPrice}
+          keyboardType="numeric"
+        />
+
+        {/* QUANTITY FIELD - ONLY SHOW FOR NON-SERVICE */}
+        {!isService && (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Quantity *"
+              placeholderTextColor="#A89378"
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+            />
+            <Text style={styles.fieldHint}>
+              Enter how many items are available in stock
+            </Text>
+          </>
+        )}
+
+        {/* IMAGES SECTION */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Product Images</Text>
+          <Text style={styles.sectionTitle}>{isService ? 'Service Images' : 'Product Images'}</Text>
           
           <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
             <FontAwesome name="image" size={24} color="#DAA520" />
@@ -464,6 +430,7 @@ const uploadImages = async () => {
           )}
         </View>
 
+        {/* CREATE BUTTON */}
         <TouchableOpacity
           style={[
             styles.createButton,
@@ -475,7 +442,9 @@ const uploadImages = async () => {
           {createProductMutation.isPending ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.createButtonText}>Create Product</Text>
+            <Text style={styles.createButtonText}>
+              {isService ? 'Create Service' : 'Create Product'}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -630,7 +599,7 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
-   dropdownScroll: {
+  dropdownScroll: {
     maxHeight: 200,
   },
   dropdown: {
@@ -650,12 +619,12 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 1001,
   },
-   autocompleteContainer: {
+  autocompleteContainer: {
     position: 'relative',
     zIndex: 1000,
     marginBottom: 16,
   },
-   dropdownItem: {
+  dropdownItem: {
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F5F5F5',
@@ -665,10 +634,9 @@ const styles = StyleSheet.create({
     color: '#2D2416',
   },
   fieldHint: {
-  fontSize: 12,
-  color: '#856404',
-  marginBottom: 8,
-  marginTop: -6,
-}
-
+    fontSize: 12,
+    color: '#856404',
+    marginBottom: 8,
+    marginTop: -6,
+  }
 });
