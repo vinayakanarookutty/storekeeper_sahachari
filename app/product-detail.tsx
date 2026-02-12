@@ -57,6 +57,9 @@ export default function ProductDetailScreen() {
   
   const product: Product = params.product ? JSON.parse(params.product as string) : null;
 
+  // Check if product is a service
+  const isService = product?.category === 'Service';
+
   // Extract numeric value from price string
   const extractNumericPrice = (price: number | string): number => {
     if (typeof price === 'number') return price;
@@ -166,7 +169,7 @@ export default function ProductDetailScreen() {
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', 'Product deleted successfully!', [
+      Alert.alert('Success', `${isService ? 'Service' : 'Product'} deleted successfully!`, [
         {
           text: 'OK',
           onPress: () => {
@@ -177,7 +180,7 @@ export default function ProductDetailScreen() {
       ]);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to delete product');
+      Alert.alert('Error', error.message || `Failed to delete ${isService ? 'service' : 'product'}`);
     },
   });
 
@@ -193,8 +196,8 @@ export default function ProductDetailScreen() {
 
   const handleDelete = () => {
     Alert.alert(
-      'Delete Product',
-      'Are you sure you want to delete this product? This action cannot be undone.',
+      `Delete ${isService ? 'Service' : 'Product'}`,
+      `Are you sure you want to delete this ${isService ? 'service' : 'product'}? This action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -398,12 +401,14 @@ export default function ProductDetailScreen() {
               <FontAwesome name="tag" size={12} color="#2E7D32" />
               <Text style={styles.categoryText}>{product.category}</Text>
             </View>
-            <View style={[styles.stockBadge, product.quantity < 10 && styles.lowStockBadge]}>
-              <FontAwesome name="cube" size={12} color={product.quantity < 10 ? '#D32F2F' : '#666'} />
-              <Text style={[styles.stockText, product.quantity < 10 && styles.lowStockText]}>
-                {product.quantity} in stock
-              </Text>
-            </View>
+            {!isService && (
+              <View style={[styles.stockBadge, product.quantity < 10 && styles.lowStockBadge]}>
+                <FontAwesome name="cube" size={12} color={product.quantity < 10 ? '#D32F2F' : '#666'} />
+                <Text style={[styles.stockText, product.quantity < 10 && styles.lowStockText]}>
+                  {product.quantity} in stock
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Product Name */}
@@ -515,7 +520,7 @@ export default function ProductDetailScreen() {
             <Text style={styles.productDescription}>{product.description}</Text>
           </View>
 
-          {/* Product Stats with Gradient */}
+          {/* Product Stats with Gradient - Hide quantity for services */}
           <LinearGradient
             colors={['#F8F9FA', '#FFFFFF']}
             style={styles.statsContainer}
@@ -531,25 +536,29 @@ export default function ProductDetailScreen() {
               </View>
               <Text style={styles.statValue}>
                 ₹{(activeOffer 
-                  ? Math.round(discountedPrice!) * product.quantity 
-                  : numericPrice * product.quantity
+                  ? Math.round(discountedPrice!) * (isService ? 1 : product.quantity)
+                  : numericPrice * (isService ? 1 : product.quantity)
                 ).toLocaleString('en-IN')}
               </Text>
-              <Text style={styles.statLabel}>Total Value</Text>
+              <Text style={styles.statLabel}>{isService ? 'Service Price' : 'Total Value'}</Text>
             </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <View style={styles.statIconContainer}>
-                <LinearGradient
-                  colors={['#4A90E2', '#357ABD']}
-                  style={styles.statIconGradient}
-                >
-                  <FontAwesome name="cubes" size={20} color="#fff" />
-                </LinearGradient>
-              </View>
-              <Text style={styles.statValue}>{product.quantity}</Text>
-              <Text style={styles.statLabel}>Units Available</Text>
-            </View>
+            {!isService && (
+              <>
+                <View style={styles.statDivider} />
+                <View style={styles.statBox}>
+                  <View style={styles.statIconContainer}>
+                    <LinearGradient
+                      colors={['#4A90E2', '#357ABD']}
+                      style={styles.statIconGradient}
+                    >
+                      <FontAwesome name="cubes" size={20} color="#fff" />
+                    </LinearGradient>
+                  </View>
+                  <Text style={styles.statValue}>{product.quantity}</Text>
+                  <Text style={styles.statLabel}>Units Available</Text>
+                </View>
+              </>
+            )}
           </LinearGradient>
         </View>
 

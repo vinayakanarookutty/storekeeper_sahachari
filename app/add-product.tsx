@@ -47,25 +47,14 @@ export default function AddProductScreen() {
   const [categoryInputFocused, setCategoryInputFocused] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
-  const PRODUCT_CATEGORIES = [
-    'Service',
-    'Electronics',
-    'Clothing & Apparel',
-    'Home & Garden',
-    'Sports & Outdoors',
-    'Books & Media',
-    'Toys & Games',
-    'Food & Beverages',
-    'Health & Beauty',
-    'Automotive',
-    'Jewelry & Accessories',
-    'Pet Supplies',
-    'Office Supplies',
-    'Tools & Hardware',
-    'Art & Crafts',
-    'Musical Instruments',
-    'Others'
-  ];
+const PRODUCT_CATEGORIES = [
+  'Food',
+  'Vegetables and Fruits',
+  'Groceries',
+  'Home Made',
+  'Service',
+  'Fish & Meat'
+];
 
   const categories = PRODUCT_CATEGORIES;
 
@@ -120,6 +109,7 @@ export default function AddProductScreen() {
   const handleSelectCategory = (selectedCategory: string) => {
     setCategory(selectedCategory);
     setShowCategoryDropdown(false);
+    setCategoryInputFocused(false);
     // Reset quantity when switching to/from Service
     if (selectedCategory === 'Service') {
       setQuantity('100');
@@ -299,8 +289,11 @@ export default function AddProductScreen() {
               setShowCategoryDropdown(true);
             }}
             onBlur={() => {
-              // Delay to allow selecting from dropdown
-              setTimeout(() => setCategoryInputFocused(false), 200);
+              // Longer delay for mobile touch events
+              setTimeout(() => {
+                setCategoryInputFocused(false);
+                setShowCategoryDropdown(false);
+              }, 300);
             }}
           />
           
@@ -351,14 +344,14 @@ export default function AddProductScreen() {
           textAlignVertical="top"
         />
 
-        {/* PRICE FIELD */}
+        {/* PRICE FIELD - Changed to default text keyboard */}
         <TextInput
           style={styles.input}
           placeholder={isService ? "Service Price *" : "Price *"}
           placeholderTextColor="#A89378"
           value={price}
           onChangeText={setPrice}
-          keyboardType="numeric"
+          keyboardType="default"
         />
 
         {/* QUANTITY FIELD - ONLY SHOW FOR NON-SERVICE */}
