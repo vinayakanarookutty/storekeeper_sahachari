@@ -49,7 +49,7 @@ console.log(products)
 // Define the S3 Base URL from your environment variables
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
   const renderProduct = ({ item }: { item: Product }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.productCard}
       onPress={() => handleProductPress(item)}
       activeOpacity={0.7}
@@ -71,10 +71,10 @@ const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-up
         </View>
       ) : (
         <View style={styles.noImageContainer}>
-          <FontAwesome name="image" size={48} color="#ccc" />
+          <FontAwesome name="image" size={40} color="#ccc" />
         </View>
       )}
-      
+
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.productDescription} numberOfLines={2}>
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   },
   productCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 16,
     overflow: 'hidden',
     borderWidth: 1,
@@ -180,30 +180,35 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    flexDirection: 'row',
+    minHeight: 140,
   },
   imageContainer: {
     position: 'relative',
+    width: '40%',
+    backgroundColor: '#f5f5f5',
+    overflow: 'hidden',
   },
   productImage: {
     width: '100%',
-    height: 200,
+    height: '100%',
   },
   noImageContainer: {
-    width: '100%',
-    height: 200,
+    width: '40%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
   },
   imageCountBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 10,
+    right: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
   },
@@ -213,28 +218,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   productInfo: {
-    padding: 16,
+    padding: 14,
+    width: '60%',
   },
   productName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2D2416',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   productDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
-    marginBottom: 12,
-    lineHeight: 20,
+    marginBottom: 10,
+    lineHeight: 18,
   },
   productDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   productPrice: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#DAA520',
   },
