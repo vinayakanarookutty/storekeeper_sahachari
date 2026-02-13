@@ -2,16 +2,19 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
+  Keyboard,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { getToken } from './services/auth';
@@ -35,6 +38,7 @@ interface ProductData {
 export default function AddProductScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const categoryInputRef = useRef<TextInput>(null);
   
   const [category, setCategory] = useState('');
   const [name, setName] = useState('');
@@ -44,7 +48,6 @@ export default function AddProductScreen() {
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [uploadedImageKeys, setUploadedImageKeys] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [categoryInputFocused, setCategoryInputFocused] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
 const PRODUCT_CATEGORIES = [
@@ -109,7 +112,7 @@ const PRODUCT_CATEGORIES = [
   const handleSelectCategory = (selectedCategory: string) => {
     setCategory(selectedCategory);
     setShowCategoryDropdown(false);
-    setCategoryInputFocused(false);
+    Keyboard.dismiss();
     // Reset quantity when switching to/from Service
     if (selectedCategory === 'Service') {
       setQuantity('100');
@@ -262,186 +265,192 @@ const PRODUCT_CATEGORIES = [
     createProductMutation.mutate(productData);
   };
 
-  return (
-    <View style={styles.container}>
-      {/* Header with close button */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{isService ? 'Add New Service' : 'Add New Product'}</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-          <FontAwesome name="times" size={24} color="#2D2416" />
-        </TouchableOpacity>
-      </View>
+  const renderCategoryItem = ({ item }: { item: string }) => (
+    <TouchableOpacity
+      style={styles.dropdownItem}
+      onPress={() => handleSelectCategory(item)}
+      activeOpacity={0.7}
+    >
+      <Text style={styles.dropdownItemText}>{item}</Text>
+    </TouchableOpacity>
+  );
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        {/* CATEGORY FIELD - NOW FIRST */}
-        <View style={styles.autocompleteContainer}>
+  return (
+    <TouchableWithoutFeedback onPress={() => setShowCategoryDropdown(false)}>
+      <View style={styles.container}>
+        {/* Header with close button */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>{isService ? 'Add New Service' : 'Add New Product'}</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+            <FontAwesome name="times" size={24} color="#2D2416" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* CATEGORY FIELD - NOW FIRST */}
+          <View style={styles.autocompleteContainer}>
+            <TextInput
+              ref={categoryInputRef}
+              style={styles.input}
+              placeholder="Category * (Select: Service or Other)"
+              placeholderTextColor="#A89378"
+              value={category}
+              onChangeText={(text) => {
+                setCategory(text);
+                setShowCategoryDropdown(true);
+              }}
+              onFocus={() => setShowCategoryDropdown(true)}
+            />
+            
+            {showCategoryDropdown && filteredCategories.length > 0 && (
+              <View style={styles.dropdown}>
+                <FlatList
+                  data={filteredCategories}
+                  renderItem={renderCategoryItem}
+                  keyExtractor={(item, index) => `${item}-${index}`}
+                  style={styles.dropdownScroll}
+                  keyboardShouldPersistTaps="always"
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={true}
+                />
+              </View>
+            )}
+          </View>
+          
+          <Text style={styles.fieldHint}>
+            {isService 
+              ? 'Service category selected - quantity will be set to 100 automatically'
+              : 'Select the category of your product'}
+          </Text>
+
+          {/* NAME FIELD */}
           <TextInput
             style={styles.input}
-            placeholder="Category * (Select: Service or Other)"
+            placeholder={isService ? "Service Name *" : "Product Name *"}
             placeholderTextColor="#A89378"
-            value={category}
-            onChangeText={(text) => {
-              setCategory(text);
-              setShowCategoryDropdown(true);
-            }}
-            onFocus={() => {
-              setCategoryInputFocused(true);
-              setShowCategoryDropdown(true);
-            }}
-            onBlur={() => {
-              // Longer delay for mobile touch events
-              setTimeout(() => {
-                setCategoryInputFocused(false);
-                setShowCategoryDropdown(false);
-              }, 300);
-            }}
+            value={name}
+            onChangeText={setName}
+            onFocus={() => setShowCategoryDropdown(false)}
           />
-          
-          {showCategoryDropdown && categoryInputFocused && filteredCategories.length > 0 && (
-            <View style={styles.dropdown}>
-              <ScrollView 
-                style={styles.dropdownScroll}
-                keyboardShouldPersistTaps="handled"
-                nestedScrollEnabled={true}
-              >
-                {filteredCategories.map((cat, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.dropdownItem}
-                    onPress={() => handleSelectCategory(cat)}
-                  >
-                    <Text style={styles.dropdownItemText}>{cat}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </View>
-        <Text style={styles.fieldHint}>
-          {isService 
-            ? 'Service category selected - quantity will be set to 100 automatically'
-            : 'Select the category of your product'}
-        </Text>
 
-        {/* NAME FIELD */}
-        <TextInput
-          style={styles.input}
-          placeholder={isService ? "Service Name *" : "Product Name *"}
-          placeholderTextColor="#A89378"
-          value={name}
-          onChangeText={setName}
-        />
+          {/* DESCRIPTION FIELD */}
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder={isService ? "Service Description *" : "Product Description *"}
+            placeholderTextColor="#A89378"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+            onFocus={() => setShowCategoryDropdown(false)}
+          />
 
-        {/* DESCRIPTION FIELD */}
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder={isService ? "Service Description *" : "Product Description *"}
-          placeholderTextColor="#A89378"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
+          {/* PRICE FIELD - Changed to default text keyboard */}
+          <TextInput
+            style={styles.input}
+            placeholder={isService ? "Service Price *" : "Price *"}
+            placeholderTextColor="#A89378"
+            value={price}
+            onChangeText={setPrice}
+            keyboardType="default"
+            onFocus={() => setShowCategoryDropdown(false)}
+          />
 
-        {/* PRICE FIELD - Changed to default text keyboard */}
-        <TextInput
-          style={styles.input}
-          placeholder={isService ? "Service Price *" : "Price *"}
-          placeholderTextColor="#A89378"
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="default"
-        />
-
-        {/* QUANTITY FIELD - ONLY SHOW FOR NON-SERVICE */}
-        {!isService && (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Quantity *"
-              placeholderTextColor="#A89378"
-              value={quantity}
-              onChangeText={setQuantity}
-              keyboardType="numeric"
-            />
-            <Text style={styles.fieldHint}>
-              Enter how many items are available in stock
-            </Text>
-          </>
-        )}
-
-        {/* IMAGES SECTION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{isService ? 'Service Images' : 'Product Images'}</Text>
-          
-          <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
-            <FontAwesome name="image" size={24} color="#DAA520" />
-            <Text style={styles.pickButtonText}>Pick Images from Gallery</Text>
-          </TouchableOpacity>
-
-          {selectedImages.length > 0 && (
-            <View style={styles.imagesContainer}>
-              {selectedImages.map((uri, index) => (
-                <View key={index} style={styles.imageWrapper}>
-                  <Image source={{ uri }} style={styles.imagePreview} />
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeImage(index)}
-                  >
-                    <Text style={styles.removeButtonText}>×</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {selectedImages.length > 0 && uploadedImageKeys.length === 0 && (
-            <TouchableOpacity
-              style={[styles.uploadButton, isUploading && styles.buttonDisabled]}
-              onPress={uploadImages}
-              disabled={isUploading}
-            >
-              {isUploading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <FontAwesome name="cloud-upload" size={20} color="#fff" />
-                  <Text style={styles.uploadButtonText}>Upload Images</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-
-          {uploadedImageKeys.length > 0 && (
-            <View style={styles.uploadStatus}>
-              <FontAwesome name="check-circle" size={20} color="#2E7D32" />
-              <Text style={styles.uploadStatusText}>
-                {uploadedImageKeys.length} image(s) uploaded
+          {/* QUANTITY FIELD - ONLY SHOW FOR NON-SERVICE */}
+          {!isService && (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Quantity *"
+                placeholderTextColor="#A89378"
+                value={quantity}
+                onChangeText={setQuantity}
+                keyboardType="numeric"
+                onFocus={() => setShowCategoryDropdown(false)}
+              />
+              <Text style={styles.fieldHint}>
+                Enter how many items are available in stock
               </Text>
-            </View>
+            </>
           )}
-        </View>
 
-        {/* CREATE BUTTON */}
-        <TouchableOpacity
-          style={[
-            styles.createButton,
-            (createProductMutation.isPending || uploadedImageKeys.length === 0) && styles.buttonDisabled
-          ]}
-          onPress={handleCreateProduct}
-          disabled={createProductMutation.isPending || uploadedImageKeys.length === 0}
-        >
-          {createProductMutation.isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.createButtonText}>
-              {isService ? 'Create Service' : 'Create Product'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+          {/* IMAGES SECTION */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{isService ? 'Service Images' : 'Product Images'}</Text>
+            
+            <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
+              <FontAwesome name="image" size={24} color="#DAA520" />
+              <Text style={styles.pickButtonText}>Pick Images from Gallery</Text>
+            </TouchableOpacity>
+
+            {selectedImages.length > 0 && (
+              <View style={styles.imagesContainer}>
+                {selectedImages.map((uri, index) => (
+                  <View key={index} style={styles.imageWrapper}>
+                    <Image source={{ uri }} style={styles.imagePreview} />
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => removeImage(index)}
+                    >
+                      <Text style={styles.removeButtonText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {selectedImages.length > 0 && uploadedImageKeys.length === 0 && (
+              <TouchableOpacity
+                style={[styles.uploadButton, isUploading && styles.buttonDisabled]}
+                onPress={uploadImages}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <FontAwesome name="cloud-upload" size={20} color="#fff" />
+                    <Text style={styles.uploadButtonText}>Upload Images</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+
+            {uploadedImageKeys.length > 0 && (
+              <View style={styles.uploadStatus}>
+                <FontAwesome name="check-circle" size={20} color="#2E7D32" />
+                <Text style={styles.uploadStatusText}>
+                  {uploadedImageKeys.length} image(s) uploaded
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* CREATE BUTTON */}
+          <TouchableOpacity
+            style={[
+              styles.createButton,
+              (createProductMutation.isPending || uploadedImageKeys.length === 0) && styles.buttonDisabled
+            ]}
+            onPress={handleCreateProduct}
+            disabled={createProductMutation.isPending || uploadedImageKeys.length === 0}
+          >
+            {createProductMutation.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.createButtonText}>
+                {isService ? 'Create Service' : 'Create Product'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -609,12 +618,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1001,
+    elevation: 10,
+    zIndex: 10000,
   },
   autocompleteContainer: {
     position: 'relative',
-    zIndex: 1000,
+    zIndex: 9999,
     marginBottom: 16,
   },
   dropdownItem: {
@@ -631,5 +640,5 @@ const styles = StyleSheet.create({
     color: '#856404',
     marginBottom: 8,
     marginTop: -6,
-  }
+  },
 });
