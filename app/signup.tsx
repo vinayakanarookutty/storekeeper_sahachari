@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import FontAwesome from '@expo/vector-icons/FontAwesome'; // Import for the eye icon
 import { apiRequest } from './services/api';
 
 interface SignupData {
@@ -40,7 +41,11 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [address, setAddress] = useState('');
-  const [pincodes, setPincodes] = useState(''); // Comma-separated pincodes
+  const [pincodes, setPincodes] = useState(''); 
+
+  // States for toggling password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const signupMutation = useMutation({
     mutationFn: async (data: SignupData) => {
@@ -51,32 +56,26 @@ export default function SignupScreen() {
       });
     },
     onSuccess: async (response) => {
-      console.log('Signup response:', response);
-      
-      // Show success message
-    Alert.alert(
-      'Account Created',
-      'Registration successful! Please log in.',
-      [{ 
-        text: 'OK', 
-        onPress: () => {
-          // Use absolute path to ensure expo-router finds it
-          router.replace('/login'); 
-        } 
-      }],
-      { cancelable: false }
-    );
+      Alert.alert(
+        'Account Created',
+        'Registration successful! Please log in.',
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            router.replace('/login'); 
+          } 
+        }],
+        { cancelable: false }
+      );
     },
     onError: (error: any) => {
-      console.error('Signup error:', error);
       Alert.alert('Signup Failed', error.message || 'Please try again');
     },
   });
 
   const handleSignup = () => {
-    // Validation
     if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields (Name, Email, Password)');
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -90,20 +89,18 @@ export default function SignupScreen() {
       return;
     }
 
-    // Parse pincodes
     const serviceablePincodes = pincodes
       .split(',')
       .map(code => code.trim())
       .filter(code => code.length > 0);
 
-    // Call signup mutation
     signupMutation.mutate({
       name,
       email,
       password,
       address: address || '',
       serviceablePincodes,
-      role: 'ADMIN', // Default role
+      role: 'ADMIN', 
     });
   };
 
@@ -142,25 +139,51 @@ export default function SignupScreen() {
               editable={!signupMutation.isPending}
             />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Password *"
-              placeholderTextColor="#A89378"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              editable={!signupMutation.isPending}
-            />
+            {/* Password Field */}
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password *"
+                placeholderTextColor="#A89378"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                editable={!signupMutation.isPending}
+              />
+              <TouchableOpacity 
+                style={styles.eyeIcon} 
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <FontAwesome 
+                  name={showPassword ? "eye" : "eye-slash"} 
+                  size={20} 
+                  color="#A89378" 
+                />
+              </TouchableOpacity>
+            </View>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm Password *"
-              placeholderTextColor="#A89378"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              editable={!signupMutation.isPending}
-            />
+            {/* Confirm Password Field */}
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Confirm Password *"
+                placeholderTextColor="#A89378"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
+                editable={!signupMutation.isPending}
+              />
+              <TouchableOpacity 
+                style={styles.eyeIcon} 
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                <FontAwesome 
+                  name={showConfirmPassword ? "eye" : "eye-slash"} 
+                  size={20} 
+                  color="#A89378" 
+                />
+              </TouchableOpacity>
+            </View>
 
             <TextInput
               style={[styles.input, styles.textArea]}
@@ -252,6 +275,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0D6C3',
     color: '#2D2416',
+  },
+  // Added for Password Toggle
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0D6C3',
+    marginBottom: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 16,
+    fontSize: 16,
+    color: '#2D2416',
+  },
+  eyeIcon: {
+    paddingHorizontal: 16,
   },
   textArea: {
     minHeight: 80,

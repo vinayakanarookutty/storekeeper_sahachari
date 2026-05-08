@@ -313,9 +313,6 @@ export default function ProductDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.floatingButton}>
           <FontAwesome name="arrow-left" size={20} color="#2D2416" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleEdit} style={styles.floatingButton}>
-          <FontAwesome name="edit" size={20} color="#2D2416" />
-        </TouchableOpacity>
       </View>
 
       <ScrollView 
