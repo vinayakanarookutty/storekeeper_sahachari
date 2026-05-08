@@ -19,25 +19,30 @@ import { getToken } from '../services/auth';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
 
+interface Offer {
+  _id?: string;
+  type: string;
+  value: number;
+  startDate: string;
+  endDate: string;
+}
+
 interface Product {
   _id: string;
   name: string;
   description: string;
-  price: string;
+  price: string | number;
   quantity: number;
   category: string;
   images: string[];
+  offers?: Offer[];
 }
 
 export default function TabOneScreen() {
   const { token } = useAuth();
   const router = useRouter();
-  
-  // 1. Get dynamic window width
   const { width } = useWindowDimensions();
 
-  // 2. Calculate columns dynamically based on width
-  // Mobile: 2 columns, Tablet: 3 columns, Desktop: 4+ columns
   const numColumns = useMemo(() => {
     if (width >= 1200) return 5;
     if (width >= 1024) return 4;
@@ -45,10 +50,9 @@ export default function TabOneScreen() {
     return 2;
   }, [width]);
 
-  // 3. Calculate card width based on current columns and horizontal padding
   const cardWidth = useMemo(() => {
-    const totalPadding = 40 + (numColumns - 1) * 15; // padding + gaps
-    const availableWidth = Math.min(width, 1200) - totalPadding; // Caps content width at 1200px
+    const totalPadding = 40 + (numColumns - 1) * 15;
+    const availableWidth = Math.min(width, 1200) - totalPadding;
     return availableWidth / numColumns;
   }, [width, numColumns]);
 
@@ -72,45 +76,80 @@ export default function TabOneScreen() {
     });
   };
 
-  const renderProduct = ({ item }: { item: Product }) => (
-    <TouchableOpacity 
-      style={[styles.productCard, { width: cardWidth }]}
-      onPress={() => handleProductPress(item)}
-      activeOpacity={0.8}
-    >
-      <View style={[styles.imageWrapper, { height: cardWidth }]}>
-        {item.images && item.images.length > 0 ? (
-          <Image
-            source={{ uri: `${S3_BASE_URL}/${item.images[0]}` }}
-            style={styles.productImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.noImagePlaceholder}>
-            <FontAwesome name="image" size={30} color="#E0D6C3" />
-          </View>
-        )}
-        <View style={styles.priceTag}>
-          <Text style={styles.priceText}>₹{item.price}</Text>
+  const renderProduct = ({ item }: { item: Product }) => {
+    const getActiveOffer = () => {
+      if (!item.offers || item.offers.length === 0) return null;
+      const now = new Date();
+      return item.offers.find(offer => {
+        const start = new Date(offer.startDate);
+        const end = new Date(offer.endDate);
+        return now >= start && now <= end;
+      });
+    };
+
+    const activeOffer = getActiveOffer();
+    const numericPrice = typeof item.price === 'string' 
+      ? parseFloat(item.price.replace(/[^0-9.]/g, '')) 
+      : item.price;
+    
+    const discountedPrice = activeOffer 
+      ? Math.round(numericPrice - (numericPrice * activeOffer.value / 100))
+      : null;
+
+    return (
+      <TouchableOpacity 
+        style={[styles.productCard, { width: cardWidth }]}
+        onPress={() => handleProductPress(item)}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.imageWrapper, { height: cardWidth }]}>
+          {item.images && item.images.length > 0 ? (
+            <Image
+              source={{ uri: `${S3_BASE_URL}/${item.images[0]}` }}
+              style={styles.productImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.noImagePlaceholder}>
+              <FontAwesome name="image" size={30} color="#E0D6C3" />
+            </View>
+          )}
+
+          {activeOffer && (
+            <View style={styles.offerBadge}>
+              <Text style={styles.offerBadgeText}>{activeOffer.value}% OFF</Text>
+            </View>
+          )}
         </View>
-      </View>
-      
-      <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-        <View style={styles.cardFooter}>
-          <View style={styles.stockInfo}>
-            <FontAwesome name="cube" size={10} color="#856404" />
-            <Text style={styles.stockText}>{item.quantity} left</Text>
-          </View>
+        
+        <View style={styles.productInfo}>
           <Text style={styles.categoryText} numberOfLines={1}>{item.category}</Text>
+          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+          
+          <View style={styles.priceRow}>
+            {activeOffer ? (
+              <View style={styles.priceContainer}>
+                <Text style={styles.discountedPrice}>₹{discountedPrice}</Text>
+                <Text style={styles.originalPriceText}>₹{numericPrice}</Text>
+              </View>
+            ) : (
+              <Text style={styles.priceText}>₹{item.price}</Text>
+            )}
+          </View>
+
+          <View style={styles.cardFooter}>
+            <View style={styles.stockInfo}>
+              <FontAwesome name="cube" size={10} color="#856404" />
+              <Text style={styles.stockText}>{item.quantity} in stock</Text>
+            </View>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {/* 4. Wrapped Header in a Max-Width container for Web */}
       <View style={styles.maxWidthWrapper}>
         <View style={styles.header}>
           <View>
@@ -121,7 +160,7 @@ export default function TabOneScreen() {
             style={styles.addButton}
             onPress={() => router.push('/add-product')}
           >
-            <FontAwesome name="plus" size={16} color="#fff" />
+            <FontAwesome name="plus" size={14} color="#fff" />
             <Text style={styles.addButtonText}>Add Product</Text>
           </TouchableOpacity>
         </View>
@@ -132,7 +171,7 @@ export default function TabOneScreen() {
           </View>
         ) : products && products.length > 0 ? (
           <FlatList
-            key={numColumns} // Force re-render when columns change
+            key={numColumns}
             data={products}
             renderItem={renderProduct}
             keyExtractor={(item) => item._id}
@@ -158,157 +197,65 @@ export default function TabOneScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF9E6',
-    alignItems: 'center', // Centers content on wide screens
-  },
-  maxWidthWrapper: {
-    width: '100%',
-    maxWidth: 1200, // Keeps the UI from stretching too wide on 4k monitors
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#FDFCF0', alignItems: 'center' },
+  maxWidthWrapper: { width: '100%', maxWidth: 1200, flex: 1 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 24,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    backgroundColor: '#FFF9E6',
   },
-  welcomeText: {
-    fontSize: 14,
-    color: '#856404',
-    fontWeight: '500',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2D2416',
-  },
+  welcomeText: { fontSize: 13, color: '#A89378', textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600', marginBottom: 4 },
+  title: { fontSize: 28, fontWeight: '800', color: '#1A140B' },
   addButton: {
     flexDirection: 'row',
     backgroundColor: '#DAA520',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
     alignItems: 'center',
     gap: 8,
-    ...Platform.select({
-      ios: { shadowColor: '#DAA520', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5 },
-      android: { elevation: 4 },
-      web: { cursor: 'pointer', transition: 'all 0.2s ease' }
-    }),
+    elevation: 4,
+    shadowColor: '#DAA520',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  list: {
-    padding: 20,
-  },
-  columnWrapper: {
-    justifyContent: 'flex-start', // Better for grids when the last row is incomplete
-    gap: 15,
-  },
+  addButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  list: { padding: 16, paddingBottom: 100 },
+  columnWrapper: { justifyContent: 'flex-start', gap: 16 },
   productCard: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginBottom: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E0D6C3',
+    borderColor: 'rgba(218, 165, 32, 0.1)',
     ...Platform.select({
-      web: { 
-        transition: 'transform 0.2s ease-in-out',
-        outlineStyle: 'none'
-      },
+      ios: { shadowColor: '#2D2416', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10 },
       android: { elevation: 3 },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5 }
     }),
   },
-  imageWrapper: {
-    backgroundColor: '#FDFCF0',
-    position: 'relative',
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
-  },
-  noImagePlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  priceTag: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    backgroundColor: '#DAA520',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  priceText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  productInfo: {
-    padding: 12,
-  },
-  productName: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#2D2416',
-    marginBottom: 4,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  stockInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  stockText: {
-    fontSize: 11,
-    color: '#856404',
-    fontWeight: '600',
-  },
-  categoryText: {
-    fontSize: 10,
-    color: '#A89378',
-    fontStyle: 'italic',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#A89378',
-    marginTop: 15,
-    fontWeight: '500',
-  },
-  emptyButton: {
-    marginTop: 20,
-    backgroundColor: '#FFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#DAA520',
-  },
-  emptyButtonText: {
-    color: '#DAA520',
-    fontWeight: '600',
-  },
+  imageWrapper: { backgroundColor: '#F9F9F9', position: 'relative', overflow: 'hidden' },
+  productImage: { width: '100%', height: '100%' },
+  noImagePlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9F9F9' },
+  offerBadge: { position: 'absolute', top: 12, left: 12, backgroundColor: '#E74C3C', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, zIndex: 10 },
+  offerBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  productInfo: { padding: 14 },
+  categoryText: { fontSize: 10, color: '#A89378', fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
+  productName: { fontSize: 15, fontWeight: '700', color: '#2D2416', marginBottom: 6 },
+  priceRow: { marginBottom: 10 },
+  priceContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  priceText: { color: '#1A140B', fontSize: 16, fontWeight: '800' },
+  discountedPrice: { color: '#E74C3C', fontSize: 16, fontWeight: '800' },
+  originalPriceText: { color: '#999', fontSize: 12, textDecorationLine: 'line-through' },
+  cardFooter: { borderTopWidth: 1, borderTopColor: '#F5F5F5', paddingTop: 10 },
+  stockInfo: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  stockText: { fontSize: 11, color: '#856404', fontWeight: '600' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  emptyText: { fontSize: 18, color: '#2D2416', marginTop: 20, fontWeight: '700' },
+  emptyButton: { marginTop: 20, backgroundColor: '#DAA520', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10 },
+  emptyButtonText: { color: '#FFFFFF', fontWeight: '700' },
 });

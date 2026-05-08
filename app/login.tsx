@@ -13,6 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import FontAwesome from '@expo/vector-icons/FontAwesome'; // Added for the eye icon
 import { useAuth } from './contexts/AuthContext';
 import { getCurrentUser, loginApi } from './services/api';
 
@@ -23,45 +24,33 @@ export default function LoginScreen() {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // State to toggle visibility
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
-      // Step 1: Login and get accessToken
       const loginResponse = await loginApi(credentials);
       return loginResponse;
     },
     onSuccess: async (data) => {
-      console.log('Login response:', data);
-      
-      // Step 2: Save the accessToken
       await setAuthToken(data.accessToken);
-      
-      // Step 3: Optionally fetch user data for cache
       try {
         const userData = await getCurrentUser();
         queryClient.setQueryData(['currentUser'], userData);
       } catch (error) {
         console.log('Could not fetch user data:', error);
-        // Continue anyway, user is logged in
       }
-      
-      // Step 4: Navigate to tabs
       router.replace('/(tabs)');
     },
     onError: (error: any) => {
-      console.error('Login error:', error);
       Alert.alert('Login Failed', error.message || 'Invalid email or password');
     },
   });
 
   const handleLogin = () => {
-    // Validation
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-
-    // Call login mutation
     loginMutation.mutate({ email, password });
   };
 
@@ -90,15 +79,28 @@ export default function LoginScreen() {
               editable={!loginMutation.isPending}
             />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#A89378"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              editable={!loginMutation.isPending}
-            />
+            {/* Password Input Container */}
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password"
+                placeholderTextColor="#A89378"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword} // Toggles secure entry
+                editable={!loginMutation.isPending}
+              />
+              <TouchableOpacity 
+                style={styles.eyeIcon} 
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <FontAwesome 
+                  name={showPassword ? "eye" : "eye-slash"} 
+                  size={20} 
+                  color="#A89378" 
+                />
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity style={styles.forgotPassword}>
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
@@ -169,6 +171,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0D6C3',
     color: '#2D2416',
+  },
+  // New styles for the password toggle
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0D6C3',
+    marginBottom: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 16,
+    fontSize: 16,
+    color: '#2D2416',
+  },
+  eyeIcon: {
+    paddingHorizontal: 16,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
