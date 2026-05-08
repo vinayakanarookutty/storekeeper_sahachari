@@ -1,12 +1,23 @@
-import { Text, View } from '@/components/Themed';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { FlatList, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import { 
+  FlatList, 
+  Image, 
+  StyleSheet, 
+  TouchableOpacity, 
+  View, 
+  Text, 
+  ActivityIndicator,
+  useWindowDimensions,
+  Platform
+} from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { getToken } from '../services/auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
 
 interface Product {
   _id: string;
@@ -21,74 +32,77 @@ interface Product {
 export default function TabOneScreen() {
   const { token } = useAuth();
   const router = useRouter();
+  
+  // 1. Get dynamic window width
+  const { width } = useWindowDimensions();
 
-  // Fetch products
+  // 2. Calculate columns dynamically based on width
+  // Mobile: 2 columns, Tablet: 3 columns, Desktop: 4+ columns
+  const numColumns = useMemo(() => {
+    if (width >= 1200) return 5;
+    if (width >= 1024) return 4;
+    if (width >= 768) return 3;
+    return 2;
+  }, [width]);
+
+  // 3. Calculate card width based on current columns and horizontal padding
+  const cardWidth = useMemo(() => {
+    const totalPadding = 40 + (numColumns - 1) * 15; // padding + gaps
+    const availableWidth = Math.min(width, 1200) - totalPadding; // Caps content width at 1200px
+    return availableWidth / numColumns;
+  }, [width, numColumns]);
+
   const { data: products, isLoading, refetch } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       const authToken = await getToken();
       const response = await fetch(`${API_BASE_URL}/storekeeper/products`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-        },
+        headers: { 'Authorization': `Bearer ${authToken}` },
       });
       if (!response.ok) throw new Error('Failed to fetch products');
       return response.json() as Promise<Product[]>;
     },
     enabled: !!token,
   });
-console.log(products)
+
   const handleProductPress = (product: Product) => {
     router.push({
       pathname: '/product-detail',
-      params: {
-        product: JSON.stringify(product),
-      },
+      params: { product: JSON.stringify(product) },
     });
   };
-// Define the S3 Base URL from your environment variables
-const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
+
   const renderProduct = ({ item }: { item: Product }) => (
     <TouchableOpacity 
-      style={styles.productCard}
+      style={[styles.productCard, { width: cardWidth }]}
       onPress={() => handleProductPress(item)}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
-      {/* Single Image */}
-      {item.images && item.images.length > 0 ? (
-        <View style={styles.imageContainer}>
+      <View style={[styles.imageWrapper, { height: cardWidth }]}>
+        {item.images && item.images.length > 0 ? (
           <Image
             source={{ uri: `${S3_BASE_URL}/${item.images[0]}` }}
             style={styles.productImage}
             resizeMode="cover"
           />
-          {item.images.length > 1 && (
-            <View style={styles.imageCountBadge}>
-              <FontAwesome name="image" size={12} color="#fff" />
-              <Text style={styles.imageCountText}>{item.images.length}</Text>
-            </View>
-          )}
+        ) : (
+          <View style={styles.noImagePlaceholder}>
+            <FontAwesome name="image" size={30} color="#E0D6C3" />
+          </View>
+        )}
+        <View style={styles.priceTag}>
+          <Text style={styles.priceText}>₹{item.price}</Text>
         </View>
-      ) : (
-        <View style={styles.noImageContainer}>
-          <FontAwesome name="image" size={48} color="#ccc" />
-        </View>
-      )}
+      </View>
       
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.productDescription} numberOfLines={2}>
-          {item.description}
-        </Text>
-        <View style={styles.productDetails}>
-          <Text style={styles.productPrice}>₹{item.price.toLocaleString()}</Text>
-          <View style={styles.stockBadge}>
-            <FontAwesome name="cube" size={12} color="#666" />
-            <Text style={styles.productQuantity}>{item.quantity}</Text>
+        <View style={styles.cardFooter}>
+          <View style={styles.stockInfo}>
+            <FontAwesome name="cube" size={10} color="#856404" />
+            <Text style={styles.stockText}>{item.quantity} left</Text>
           </View>
-        </View>
-        <View style={styles.categoryBadge}>
-          <Text style={styles.productCategory}>{item.category}</Text>
+          <Text style={styles.categoryText} numberOfLines={1}>{item.category}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -96,38 +110,49 @@ const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-up
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Products</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => router.push('/add-product')}
-        >
-          <FontAwesome name="plus" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add</Text>
-        </TouchableOpacity>
-      </View>
+      {/* 4. Wrapped Header in a Max-Width container for Web */}
+      <View style={styles.maxWidthWrapper}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.welcomeText}>Hello Storekeeper,</Text>
+            <Text style={styles.title}>My Inventory</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => router.push('/add-product')}
+          >
+            <FontAwesome name="plus" size={16} color="#fff" />
+            <Text style={styles.addButtonText}>Add Product</Text>
+          </TouchableOpacity>
+        </View>
 
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading products...</Text>
-        </View>
-      ) : products && products.length > 0 ? (
-        <FlatList
-          data={products}
-          renderItem={renderProduct}
-          keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.list}
-          refreshing={isLoading}
-          onRefresh={refetch}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <View style={styles.emptyState}>
-          <FontAwesome name="inbox" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>No products yet</Text>
-          <Text style={styles.emptySubtext}>Tap the + button to add your first product</Text>
-        </View>
-      )}
+        {isLoading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#DAA520" />
+          </View>
+        ) : products && products.length > 0 ? (
+          <FlatList
+            key={numColumns} // Force re-render when columns change
+            data={products}
+            renderItem={renderProduct}
+            keyExtractor={(item) => item._id}
+            numColumns={numColumns}
+            columnWrapperStyle={styles.columnWrapper}
+            contentContainerStyle={styles.list}
+            refreshing={isLoading}
+            onRefresh={refetch}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <View style={styles.centerContainer}>
+            <FontAwesome name="folder-open-o" size={60} color="#E0D6C3" />
+            <Text style={styles.emptyText}>No products listed</Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/add-product')}>
+              <Text style={styles.emptyButtonText}>Create your first product</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -136,158 +161,154 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFF9E6',
+    alignItems: 'center', // Centers content on wide screens
+  },
+  maxWidthWrapper: {
+    width: '100%',
+    maxWidth: 1200, // Keeps the UI from stretching too wide on 4k monitors
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     backgroundColor: '#FFF9E6',
   },
+  welcomeText: {
+    fontSize: 14,
+    color: '#856404',
+    fontWeight: '500',
+  },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#2D2416',
   },
   addButton: {
     flexDirection: 'row',
     backgroundColor: '#DAA520',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
     alignItems: 'center',
     gap: 8,
+    ...Platform.select({
+      ios: { shadowColor: '#DAA520', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5 },
+      android: { elevation: 4 },
+      web: { cursor: 'pointer', transition: 'all 0.2s ease' }
+    }),
   },
   addButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   list: {
     padding: 20,
-    paddingTop: 0,
+  },
+  columnWrapper: {
+    justifyContent: 'flex-start', // Better for grids when the last row is incomplete
+    gap: 15,
   },
   productCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 16,
+    borderRadius: 15,
+    marginBottom: 20,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E0D6C3',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    ...Platform.select({
+      web: { 
+        transition: 'transform 0.2s ease-in-out',
+        outlineStyle: 'none'
+      },
+      android: { elevation: 3 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5 }
+    }),
   },
-  imageContainer: {
+  imageWrapper: {
+    backgroundColor: '#FDFCF0',
     position: 'relative',
   },
   productImage: {
     width: '100%',
-    height: 200,
+    height: '100%',
   },
-  noImageContainer: {
-    width: '100%',
-    height: 200,
+  noImagePlaceholder: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
-  imageCountBadge: {
+  priceTag: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
+    bottom: 8,
+    left: 8,
+    backgroundColor: '#DAA520',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  imageCountText: {
+  priceText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   productInfo: {
-    padding: 16,
+    padding: 12,
   },
   productName: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#2D2416',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  productDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  productDetails: {
+  cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginTop: 4,
   },
-  productPrice: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#DAA520',
-  },
-  stockBadge: {
+  stockInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 6,
+    gap: 4,
   },
-  productQuantity: {
-    fontSize: 14,
-    color: '#666',
+  stockText: {
+    fontSize: 11,
+    color: '#856404',
     fontWeight: '600',
   },
-  categoryBadge: {
-    alignSelf: 'flex-start',
+  categoryText: {
+    fontSize: 10,
+    color: '#A89378',
+    fontStyle: 'italic',
   },
-  productCategory: {
-    fontSize: 12,
-    color: '#666',
-    backgroundColor: '#f5f5f5',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  loadingContainer: {
+  centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
+    padding: 30,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
+    color: '#A89378',
+    marginTop: 15,
+    fontWeight: '500',
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
-    textAlign: 'center',
+  emptyButton: {
+    marginTop: 20,
+    backgroundColor: '#FFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DAA520',
+  },
+  emptyButtonText: {
+    color: '#DAA520',
+    fontWeight: '600',
   },
 });

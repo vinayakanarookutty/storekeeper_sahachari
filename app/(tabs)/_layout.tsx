@@ -7,7 +7,7 @@ import React, { useEffect } from 'react';
 import { Alert, Pressable } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
+// Icon component for the tab bar
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
@@ -16,7 +16,7 @@ function TabBarIcon(props: {
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light'; // Default to light if null
   const { token, clearAuthToken } = useAuth();
   const router = useRouter();
 
@@ -48,7 +48,16 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        // Dynamic colors based on the theme
+        tabBarActiveTintColor: Colors[colorScheme].tint,
+        tabBarInactiveTintColor: Colors[colorScheme].tabIconDefault,
+        tabBarStyle: {
+          backgroundColor: Colors[colorScheme].background,
+        },
+        headerStyle: {
+          backgroundColor: Colors[colorScheme].background,
+        },
+        headerTintColor: Colors[colorScheme].text,
         headerShown: useClientOnlyValue(false, true),
       }}>
       <Tabs.Screen
@@ -62,7 +71,7 @@ export default function TabLayout() {
                 <FontAwesome
                   name="sign-out"
                   size={25}
-                  color={Colors[colorScheme ?? 'light'].text}
+                  color={Colors[colorScheme].text}
                   style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
                 />
               )}
@@ -70,7 +79,7 @@ export default function TabLayout() {
           ),
         }}
       />
-       <Tabs.Screen
+      <Tabs.Screen
         name="three"
         options={{
           title: 'Orders',
@@ -84,7 +93,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
         }}
       />
-      
     </Tabs>
   );
 }

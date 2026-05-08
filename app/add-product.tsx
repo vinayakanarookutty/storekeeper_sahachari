@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  Modal, // Added Modal
 } from 'react-native';
 import { getToken } from './services/auth';
 
@@ -35,21 +36,6 @@ interface ProductData {
   images: string[];
 }
 
-export default function AddProductScreen() {
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  const categoryInputRef = useRef<TextInput>(null);
-  
-  const [category, setCategory] = useState('');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
-  const [uploadedImageKeys, setUploadedImageKeys] = useState<string[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-
 const PRODUCT_CATEGORIES = [
   'Food',
   'Vegetables and Fruits',
@@ -59,24 +45,31 @@ const PRODUCT_CATEGORIES = [
   'Fish & Meat'
 ];
 
-  const categories = PRODUCT_CATEGORIES;
+const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
 
-  // Check if selected category is Service
+export default function AddProductScreen() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  
+  const [category, setCategory] = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [unit, setUnit] = useState('kg');
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [uploadedImageKeys, setUploadedImageKeys] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // MODAL STATES
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showUnitModal, setShowUnitModal] = useState(false);
+
   const isService = category === 'Service';
 
-  // Filter categories based on user input
-  const filteredCategories = useMemo(() => {
-    if (!category) return categories;
-    return categories.filter(cat => 
-      cat.toLowerCase().includes(category.toLowerCase())
-    );
-  }, [category, categories]);
-
-  // Create product mutation
   const createProductMutation = useMutation({
     mutationFn: async (productData: ProductData) => {
       const token = await getToken();
-      
       const response = await fetch(`${API_BASE_URL}/storekeeper/products`, {
         method: 'POST',
         headers: {
@@ -90,7 +83,6 @@ const PRODUCT_CATEGORIES = [
         const errorData = await response.json().catch(() => null);
         throw new Error(errorData?.message || 'Failed to create product');
       }
-
       return response.json();
     },
     onSuccess: () => {
@@ -111,9 +103,7 @@ const PRODUCT_CATEGORIES = [
 
   const handleSelectCategory = (selectedCategory: string) => {
     setCategory(selectedCategory);
-    setShowCategoryDropdown(false);
-    Keyboard.dismiss();
-    // Reset quantity when switching to/from Service
+    setShowCategoryModal(false);
     if (selectedCategory === 'Service') {
       setQuantity('100');
     } else if (category === 'Service') {
@@ -124,25 +114,21 @@ const PRODUCT_CATEGORIES = [
   const pickImages = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please grant permission to access photos');
         return;
       }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
         quality: 0.8,
         selectionLimit: 5,
       });
-
       if (!result.canceled && result.assets) {
         const newImages = result.assets.map(asset => asset.uri);
         setSelectedImages(prev => [...prev, ...newImages]);
       }
     } catch (error) {
-      console.error('Error picking images:', error);
       Alert.alert('Error', 'Failed to pick images');
     }
   };
@@ -157,97 +143,58 @@ const PRODUCT_CATEGORIES = [
       Alert.alert('Error', 'Please select at least one image');
       return;
     }
-
     setIsUploading(true);
     const imageKeys: string[] = [];
-
     try {
       const token = await getToken();
-
       for (const imageUri of selectedImages) {
-        // 1. STRIP METADATA: Remove 'blob:', ':http', and query params
-        // This prevents S3 from creating "http:" folders
-        let cleanPath = imageUri.split(':http')[0]; // Remove local server reference
-        cleanPath = cleanPath.replace('blob:', ''); // Remove blob prefix
-        
-        // 2. EXTRACT EXTENSION
+        let cleanPath = imageUri.split(':http')[0].replace('blob:', '');
         const extensionMatch = cleanPath.match(/\.([a-zA-Z0-9]+)$/);
         const fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg';
-        
-        // 3. GENERATE CLEAN FILENAME
-        // Using a random string + timestamp for uniqueness
-        const randomId = Math.random().toString(36).substring(7);
-        const fileName = `product_${Date.now()}_${randomId}.${fileExtension}`;
-        
-        // 4. SET VALID MIME TYPE
+        const fileName = `product_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
         const fileType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
 
-        console.log(`Uploading: ${fileName} as ${fileType}`);
-
-        // 5. GET PRESIGNED URL FROM BACKEND
         const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            fileName,
-            fileType,
-            folder: 'uploads',
-          }),
+          body: JSON.stringify({ fileName, fileType, folder: 'uploads' }),
         });
 
         if (!presignedResponse.ok) throw new Error('Failed to get presigned URL');
-
         const { url: presignedUrl, key }: PresignedUrlResponse = await presignedResponse.json();
-
-        // 6. CONVERT URI TO BLOB
         const imageResponse = await fetch(imageUri);
         const blob = await imageResponse.blob();
 
-        // 7. UPLOAD DIRECTLY TO S3
         const uploadResponse = await fetch(presignedUrl, {
           method: 'PUT',
-          headers: {
-            'Content-Type': fileType, // Essential for S3 to recognize it as an image
-          },
+          headers: { 'Content-Type': fileType },
           body: blob,
         });
 
         if (!uploadResponse.ok) throw new Error('Failed to upload image to S3');
-
-        // Save the key (e.g., "uploads/product_123.jpg") to push to your DB later
         imageKeys.push(key);
       }
-
       setUploadedImageKeys(imageKeys);
       Alert.alert('Success', `${imageKeys.length} image(s) uploaded successfully!`);
     } catch (error: any) {
-      console.error('Upload error details:', error);
-      Alert.alert('Upload Failed', error.message || 'Check console for details');
+      Alert.alert('Upload Failed', error.message);
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleCreateProduct = () => {
-    if (!category.trim()) {
-      Alert.alert('Error', 'Please select a category');
-      return;
-    }
-
-    if (!name.trim() || !description.trim() || !price) {
+    if (!category.trim() || !name.trim() || !description.trim() || !price) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-
-    // For non-service categories, quantity is required
     if (!isService && !quantity) {
       Alert.alert('Error', 'Please enter the quantity');
       return;
     }
-
     if (uploadedImageKeys.length === 0) {
       Alert.alert('Error', 'Please upload at least one image');
       return;
@@ -265,380 +212,226 @@ const PRODUCT_CATEGORIES = [
     createProductMutation.mutate(productData);
   };
 
-  const renderCategoryItem = ({ item }: { item: string }) => (
-    <TouchableOpacity
-      style={styles.dropdownItem}
-      onPress={() => handleSelectCategory(item)}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.dropdownItemText}>{item}</Text>
-    </TouchableOpacity>
+  // Selection Modal Component for reusability
+  const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{title}</Text>
+              <TouchableOpacity onPress={onClose}>
+                <FontAwesome name="times" size={20} color="#2D2416" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={data}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={styles.modalItem} 
+                  onPress={() => onSelect(item)}
+                >
+                  <Text style={styles.modalItemText}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
   );
 
   return (
-    <TouchableWithoutFeedback onPress={() => setShowCategoryDropdown(false)}>
-      <View style={styles.container}>
-        {/* Header with close button */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{isService ? 'Add New Service' : 'Add New Product'}</Text>
-          <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-            <FontAwesome name="times" size={24} color="#2D2416" />
-          </TouchableOpacity>
-        </View>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{isService ? 'Add New Service' : 'Add New Product'}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+          <FontAwesome name="times" size={24} color="#2D2416" />
+        </TouchableOpacity>
+      </View>
 
-        <ScrollView 
-          style={styles.scrollView} 
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* CATEGORY FIELD */}
+        <TouchableOpacity 
+          style={styles.inputWrapper} 
+          onPress={() => setShowCategoryModal(true)}
         >
-          {/* CATEGORY FIELD - NOW FIRST */}
-          <View style={styles.autocompleteContainer}>
+          <View pointerEvents="none">
             <TextInput
-              ref={categoryInputRef}
-              style={styles.input}
-              placeholder="Category * (Select: Service or Other)"
+              style={[styles.input, { marginBottom: 0 }]}
+              placeholder="Select Category *"
               placeholderTextColor="#A89378"
               value={category}
-              onChangeText={(text) => {
-                setCategory(text);
-                setShowCategoryDropdown(true);
-              }}
-              onFocus={() => setShowCategoryDropdown(true)}
+              editable={false}
             />
-            
-            {showCategoryDropdown && filteredCategories.length > 0 && (
-              <View style={styles.dropdown}>
-                <FlatList
-                  data={filteredCategories}
-                  renderItem={renderCategoryItem}
-                  keyExtractor={(item, index) => `${item}-${index}`}
-                  style={styles.dropdownScroll}
-                  keyboardShouldPersistTaps="always"
-                  nestedScrollEnabled={true}
-                  showsVerticalScrollIndicator={true}
+          </View>
+          <FontAwesome name="chevron-down" size={14} color="#A89378" style={styles.inputIcon} />
+        </TouchableOpacity>
+
+        <TextInput
+          style={styles.input}
+          placeholder={isService ? "Service Name *" : "Product Name *"}
+          placeholderTextColor="#A89378"
+          value={name}
+          onChangeText={setName}
+        />
+
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Description *"
+          placeholderTextColor="#A89378"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Price *"
+          placeholderTextColor="#A89378"
+          value={price}
+          onChangeText={setPrice}
+          keyboardType="numeric"
+        />
+
+        {!isService && (
+          <View style={styles.section}>
+            <View style={styles.parallelContainer}>
+              <View style={{ flex: 2 }}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Stock *"
+                  placeholderTextColor="#A89378"
+                  value={quantity}
+                  onChangeText={setQuantity}
+                  keyboardType="numeric"
                 />
               </View>
-            )}
-          </View>
-          
-          <Text style={styles.fieldHint}>
-            {isService 
-              ? 'Service category selected - quantity will be set to 100 automatically'
-              : 'Select the category of your product'}
-          </Text>
 
-          {/* NAME FIELD */}
-          <TextInput
-            style={styles.input}
-            placeholder={isService ? "Service Name *" : "Product Name *"}
-            placeholderTextColor="#A89378"
-            value={name}
-            onChangeText={setName}
-            onFocus={() => setShowCategoryDropdown(false)}
-          />
-
-          {/* DESCRIPTION FIELD */}
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder={isService ? "Service Description *" : "Product Description *"}
-            placeholderTextColor="#A89378"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-            onFocus={() => setShowCategoryDropdown(false)}
-          />
-
-          {/* PRICE FIELD - Changed to default text keyboard */}
-          <TextInput
-            style={styles.input}
-            placeholder={isService ? "Service Price *" : "Price *"}
-            placeholderTextColor="#A89378"
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="default"
-            onFocus={() => setShowCategoryDropdown(false)}
-          />
-
-          {/* QUANTITY FIELD - ONLY SHOW FOR NON-SERVICE */}
-          {!isService && (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="Quantity *"
-                placeholderTextColor="#A89378"
-                value={quantity}
-                onChangeText={setQuantity}
-                keyboardType="numeric"
-                onFocus={() => setShowCategoryDropdown(false)}
-              />
-              <Text style={styles.fieldHint}>
-                Enter how many items are available in stock
-              </Text>
-            </>
-          )}
-
-          {/* IMAGES SECTION */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{isService ? 'Service Images' : 'Product Images'}</Text>
-            
-            <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
-              <FontAwesome name="image" size={24} color="#DAA520" />
-              <Text style={styles.pickButtonText}>Pick Images from Gallery</Text>
-            </TouchableOpacity>
-
-            {selectedImages.length > 0 && (
-              <View style={styles.imagesContainer}>
-                {selectedImages.map((uri, index) => (
-                  <View key={index} style={styles.imageWrapper}>
-                    <Image source={{ uri }} style={styles.imagePreview} />
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeImage(index)}
-                    >
-                      <Text style={styles.removeButtonText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <TouchableOpacity 
+                  style={styles.unitSelector} 
+                  onPress={() => setShowUnitModal(true)}
+                >
+                  <Text style={styles.unitText}>{unit}</Text>
+                  <FontAwesome name="caret-down" size={16} color="#DAA520" />
+                </TouchableOpacity>
               </View>
-            )}
-
-            {selectedImages.length > 0 && uploadedImageKeys.length === 0 && (
-              <TouchableOpacity
-                style={[styles.uploadButton, isUploading && styles.buttonDisabled]}
-                onPress={uploadImages}
-                disabled={isUploading}
-              >
-                {isUploading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <FontAwesome name="cloud-upload" size={20} color="#fff" />
-                    <Text style={styles.uploadButtonText}>Upload Images</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-
-            {uploadedImageKeys.length > 0 && (
-              <View style={styles.uploadStatus}>
-                <FontAwesome name="check-circle" size={20} color="#2E7D32" />
-                <Text style={styles.uploadStatusText}>
-                  {uploadedImageKeys.length} image(s) uploaded
-                </Text>
-              </View>
-            )}
+            </View>
+            <Text style={styles.fieldHint}>
+              Total Stock: {quantity || '0'} {unit}
+            </Text>
           </View>
+        )}
 
-          {/* CREATE BUTTON */}
-          <TouchableOpacity
-            style={[
-              styles.createButton,
-              (createProductMutation.isPending || uploadedImageKeys.length === 0) && styles.buttonDisabled
-            ]}
-            onPress={handleCreateProduct}
-            disabled={createProductMutation.isPending || uploadedImageKeys.length === 0}
-          >
-            {createProductMutation.isPending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.createButtonText}>
-                {isService ? 'Create Service' : 'Create Product'}
-              </Text>
-            )}
+        {/* IMAGES SECTION */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Images</Text>
+          <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
+            <FontAwesome name="image" size={24} color="#DAA520" />
+            <Text style={styles.pickButtonText}>Pick Images</Text>
           </TouchableOpacity>
-        </ScrollView>
-      </View>
-    </TouchableWithoutFeedback>
+
+          <View style={styles.imagesContainer}>
+            {selectedImages.map((uri, index) => (
+              <View key={index} style={styles.imageWrapper}>
+                <Image source={{ uri }} style={styles.imagePreview} />
+                <TouchableOpacity style={styles.removeButton} onPress={() => removeImage(index)}>
+                  <Text style={styles.removeButtonText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          {selectedImages.length > 0 && uploadedImageKeys.length === 0 && (
+            <TouchableOpacity style={styles.uploadButton} onPress={uploadImages} disabled={isUploading}>
+              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>Upload</Text>}
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.createButton, (createProductMutation.isPending || uploadedImageKeys.length === 0) && styles.buttonDisabled]}
+          onPress={handleCreateProduct}
+          disabled={createProductMutation.isPending || uploadedImageKeys.length === 0}
+        >
+          <Text style={styles.createButtonText}>Create {isService ? 'Service' : 'Product'}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* MODALS */}
+      <SelectionModal 
+        visible={showCategoryModal}
+        data={PRODUCT_CATEGORIES}
+        title="Select Category"
+        onSelect={handleSelectCategory}
+        onClose={() => setShowCategoryModal(false)}
+      />
+
+      <SelectionModal 
+        visible={showUnitModal}
+        data={UNITS}
+        title="Select Unit"
+        onSelect={(item: string) => {
+          setUnit(item);
+          setShowUnitModal(false);
+        }}
+        onClose={() => setShowUnitModal(false)}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF9E6',
+  container: { flex: 1, backgroundColor: '#FFF9E6' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, borderBottomWidth: 1, borderBottomColor: '#E0D6C3' },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#2D2416' },
+  closeButton: { padding: 8 },
+  scrollView: { flex: 1 },
+  content: { padding: 20 },
+  inputWrapper: { position: 'relative', marginBottom: 16 },
+  inputIcon: { position: 'absolute', right: 16, top: 20 },
+  input: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E0D6C3', color: '#2D2416' },
+  textArea: { minHeight: 100, textAlignVertical: 'top' },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#2D2416', marginBottom: 12 },
+  parallelContainer: { flexDirection: 'row', alignItems: 'flex-start' },
+  unitSelector: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 8, 
+    padding: 16, 
+    borderWidth: 1, 
+    borderColor: '#E0D6C3', 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    height: 58 
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#FFF9E6',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0D6C3',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2D2416',
-  },
-  closeButton: {
-    padding: 8,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 16,
-    fontSize: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E0D6C3',
-    color: '#2D2416',
-  },
-  textArea: {
-    minHeight: 100,
-  },
-  section: {
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2D2416',
-    marginBottom: 12,
-  },
-  pickButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#DAA520',
-    borderStyle: 'dashed',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  pickButtonText: {
-    color: '#DAA520',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  imagesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 16,
-    gap: 12,
-  },
-  imageWrapper: {
-    position: 'relative',
-  },
-  imagePreview: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0D6C3',
-  },
-  removeButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#ff3b30',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  uploadButton: {
-    backgroundColor: '#4A90E2',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  uploadButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  uploadStatus: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  uploadStatusText: {
-    color: '#2E7D32',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  createButton: {
-    backgroundColor: '#DAA520',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 40,
-  },
-  createButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  dropdownScroll: {
-    maxHeight: 200,
-  },
-  dropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0D6C3',
-    maxHeight: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 10,
-    zIndex: 10000,
-  },
-  autocompleteContainer: {
-    position: 'relative',
-    zIndex: 9999,
-    marginBottom: 16,
-  },
-  dropdownItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
-  },
-  dropdownItemText: {
-    fontSize: 16,
-    color: '#2D2416',
-  },
-  fieldHint: {
-    fontSize: 12,
-    color: '#856404',
-    marginBottom: 8,
-    marginTop: -6,
-  },
+  unitText: { fontSize: 16, color: '#2D2416', fontWeight: '600' },
+  fieldHint: { fontSize: 12, color: '#856404', marginTop: -6, marginBottom: 8 },
+  pickButton: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 20, alignItems: 'center', borderWidth: 2, borderColor: '#DAA520', borderStyle: 'dashed', flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  pickButtonText: { color: '#DAA520', fontSize: 16, fontWeight: '600' },
+  imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 12 },
+  imageWrapper: { position: 'relative' },
+  imagePreview: { width: 100, height: 100, borderRadius: 8 },
+  removeButton: { position: 'absolute', top: -8, right: -8, backgroundColor: '#ff3b30', width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  removeButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  uploadButton: { backgroundColor: '#4A90E2', borderRadius: 8, padding: 16, alignItems: 'center', marginTop: 16 },
+  uploadButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  createButton: { backgroundColor: '#DAA520', borderRadius: 8, padding: 16, alignItems: 'center', marginBottom: 40 },
+  createButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  buttonDisabled: { opacity: 0.6 },
+  
+  // MODAL STYLES
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '50%', paddingBottom: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#2D2416' },
+  modalItem: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
+  modalItemText: { fontSize: 16, color: '#2D2416' }
 });

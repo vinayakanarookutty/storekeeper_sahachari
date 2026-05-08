@@ -6,17 +6,25 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { getToken } from './services/auth';
 
+// Ensure these URLs match your environment configuration
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_URL || 'YOUR_S3_BUCKET_URL_HERE'; 
+
+const PRODUCT_CATEGORIES = ['Food', 'Vegetables and Fruits', 'Groceries', 'Home Made', 'Service', 'Fish & Meat'];
+const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
 
 interface PresignedUrlResponse {
   url: string;
@@ -26,7 +34,7 @@ interface PresignedUrlResponse {
 interface ProductData {
   name: string;
   description: string;
-  price: string;
+  price: number; 
   quantity: number;
   category: string;
   images: string[];
@@ -37,7 +45,7 @@ export default function EditProductScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   
-  // Parse product data from params
+  // Parse initial product data
   const productData = params.product ? JSON.parse(params.product as string) : null;
   
   const [name, setName] = useState(productData?.name || '');
@@ -45,473 +53,287 @@ export default function EditProductScreen() {
   const [price, setPrice] = useState(productData?.price?.toString() || '');
   const [quantity, setQuantity] = useState(productData?.quantity?.toString() || '');
   const [category, setCategory] = useState(productData?.category || '');
+  const [unit, setUnit] = useState('kg');
+  
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>(productData?.images || []);
   const [uploadedImageKeys, setUploadedImageKeys] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Update product mutation
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showUnitModal, setShowUnitModal] = useState(false);
+
+  const isService = category === 'Service';
+
   const updateProductMutation = useMutation({
-    mutationFn: async (productData: ProductData) => {
+    mutationFn: async (updatedData: ProductData) => {
       const token = await getToken();
-      
-      const response = await fetch(`${API_BASE_URL}/storekeeper/products/${params.id}`, {
+      const response = await fetch(`${API_BASE_URL}/storekeeper/products/${productData._id || params.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(productData),
+        body: JSON.stringify(updatedData),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
         throw new Error(errorData?.message || 'Failed to update product');
       }
-
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', 'Product updated successfully!', [
+      Alert.alert('Success', 'Updated successfully!', [
         {
           text: 'OK',
           onPress: () => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['product', params.id] });
             router.back();
           },
         },
       ]);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to update product');
+      Alert.alert('Error', error.message);
     },
   });
 
   const pickImages = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant permission to access photos');
-        return;
-      }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return Alert.alert('Permission needed', 'Grant access to photos');
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        quality: 0.8,
-        selectionLimit: 5,
-      });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
 
-      if (!result.canceled && result.assets) {
-        const newImages = result.assets.map(asset => asset.uri);
-        setSelectedImages(prev => [...prev, ...newImages]);
-      }
-    } catch (error) {
-      console.error('Error picking images:', error);
-      Alert.alert('Error', 'Failed to pick images');
+    if (!result.canceled) {
+      setSelectedImages(prev => [...prev, ...result.assets.map(a => a.uri)]);
     }
-  };
-
-  const removeNewImage = (index: number) => {
-    setSelectedImages(prev => prev.filter((_, i) => i !== index));
-    setUploadedImageKeys(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const removeExistingImage = (index: number) => {
-    setExistingImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const uploadImages = async () => {
-    if (selectedImages.length === 0) {
-      Alert.alert('Error', 'No new images to upload');
-      return;
-    }
-
     setIsUploading(true);
     const imageKeys: string[] = [];
-
     try {
       const token = await getToken();
-
-      for (const imageUri of selectedImages) {
-        const fileExtension = imageUri.split('.').pop() || 'jpg';
-        const fileName = `product_${Date.now()}.${fileExtension}`;
-        const fileType = `image/${fileExtension}`;
-
-        const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
+      for (const uri of selectedImages) {
+        const fileName = `edit_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.jpg`;
+        const presignedRes = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            fileName,
-            fileType,
-            folder: 'uploads',
-          }),
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ fileName, fileType: 'image/jpeg', folder: 'uploads' }),
         });
-
-        if (!presignedResponse.ok) {
-          throw new Error('Failed to get presigned URL');
-        }
-
-        const { url: presignedUrl, key }: PresignedUrlResponse = await presignedResponse.json();
-
-        const imageResponse = await fetch(imageUri);
-        const blob = await imageResponse.blob();
-
-        const uploadResponse = await fetch(presignedUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': fileType,
-          },
-          body: blob,
-        });
-
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload image');
-        }
-
+        const { url, key } = await presignedRes.json();
+        const imgBlob = await (await fetch(uri)).blob();
+        await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: imgBlob });
         imageKeys.push(key);
       }
-
       setUploadedImageKeys(imageKeys);
-      Alert.alert('Success', `${imageKeys.length} new image(s) uploaded!`);
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      Alert.alert('Upload Failed', error.message || 'Failed to upload images');
+      Alert.alert('Success', 'New images uploaded!');
+    } catch (e) {
+      Alert.alert('Error', 'Upload failed');
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleUpdateProduct = () => {
-    if (!name.trim() || !description.trim() || !price || !quantity || !category.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+    if (!name || !price || !category) return Alert.alert('Error', 'Required fields missing');
+    
+    // Process existing images to ensure we only send the keys back to the DB
+    const processedExistingKeys = existingImages
+      .map(img => img.replace(`${S3_BASE_URL}/`, '')) // Remove S3 prefix if present
+      .filter(Boolean) as string[];
 
-    const allImages = [...existingImages, ...uploadedImageKeys];
+    const finalImagesKeys = [...processedExistingKeys, ...uploadedImageKeys];
 
-    if (allImages.length === 0) {
-      Alert.alert('Error', 'Product must have at least one image');
-      return;
-    }
+    if (finalImagesKeys.length === 0) return Alert.alert('Error', 'Product requires at least one image');
 
-    const productData: ProductData = {
+    updateProductMutation.mutate({
       name,
       description,
-      price: price,
-      quantity: parseInt(quantity),
+      price: parseFloat(price), // Fixed: Convert string to number
+      quantity: isService ? 100 : parseInt(quantity),
       category,
-      images: allImages,
-    };
-
-    updateProductMutation.mutate(productData);
+      images: finalImagesKeys, 
+    });
   };
+
+  const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
+    <Modal visible={visible} transparent animationType="slide">
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}><Text style={styles.modalTitle}>{title}</Text></View>
+            <FlatList
+              data={data}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.modalItem} onPress={() => onSelect(item)}>
+                  <Text style={styles.modalItemText}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Edit Product</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-          <FontAwesome name="times" size={24} color="#2D2416" />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Details</Text>
+        <TouchableOpacity onPress={() => router.back()}><FontAwesome name="times" size={24} color="#2D2416" /></TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        <TextInput
-          style={styles.input}
-          placeholder="Product Name *"
-          placeholderTextColor="#A89378"
-          value={name}
-          onChangeText={setName}
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* CATEGORY FIELD */}
+        <Text style={styles.label}>Category</Text>
+        <TouchableOpacity style={styles.inputWrapper} onPress={() => setShowCategoryModal(true)}>
+          <TextInput style={[styles.input, { marginBottom: 0 }]} value={category} editable={false} placeholder="Select Category" />
+          <FontAwesome name="chevron-down" size={14} color="#A89378" style={styles.inputIcon} />
+        </TouchableOpacity>
+
+        {/* NAME FIELD */}
+        <Text style={styles.label}>Product/Service Name</Text>
+        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Enter Name" />
+
+        {/* DESCRIPTION FIELD */}
+        <Text style={styles.label}>Description</Text>
+        <TextInput 
+          style={[styles.input, styles.textArea]} 
+          value={description} 
+          onChangeText={setDescription} 
+          multiline 
+          placeholder="Enter Description"
         />
 
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Description *"
-          placeholderTextColor="#A89378"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
+        {/* PRICE FIELD */}
+        <Text style={styles.label}>Price (Numeric)</Text>
+        <TextInput style={styles.input} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="0.00" />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Price *"
-          placeholderTextColor="#A89378"
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="numeric"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Quantity *"
-          placeholderTextColor="#A89378"
-          value={quantity}
-          onChangeText={setQuantity}
-          keyboardType="numeric"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Category *"
-          placeholderTextColor="#A89378"
-          value={category}
-          onChangeText={setCategory}
-        />
+        {!isService && (
+          <>
+            <Text style={styles.label}>Stock Quantity</Text>
+            <View style={styles.parallelContainer}>
+              <TextInput 
+                style={[styles.input, { flex: 2 }]} 
+                value={quantity} 
+                onChangeText={setQuantity} 
+                keyboardType="numeric" 
+                placeholder="0"
+              />
+              <TouchableOpacity style={styles.unitSelector} onPress={() => setShowUnitModal(true)}>
+                <Text style={styles.unitText}>{unit}</Text>
+                <FontAwesome name="caret-down" size={16} color="#DAA520" />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Product Images</Text>
+          <Text style={styles.sectionTitle}>Manage Images</Text>
           
-          {/* Existing Images */}
+          {/* Preview of Existing/Current Images */}
           {existingImages.length > 0 && (
-            <>
-              <Text style={styles.subsectionTitle}>Current Images</Text>
-              <View style={styles.imagesContainer}>
-                {existingImages.map((imageKey, index) => (
-                  <View key={`existing-${index}`} style={styles.imageWrapper}>
-                    <Image 
-                      source={{ uri: `${API_BASE_URL}/${imageKey}` }} 
-                      style={styles.imagePreview} 
-                    />
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeExistingImage(index)}
+            <View style={styles.imagesContainer}>
+              {existingImages.map((imageKey, i) => {
+                const imageUri = imageKey.startsWith('http') ? imageKey : `${S3_BASE_URL}/${imageKey}`;
+                return (
+                  <View key={i} style={styles.imageWrapper}>
+                    <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
+                    <TouchableOpacity 
+                      style={styles.removeButton} 
+                      onPress={() => setExistingImages(prev => prev.filter((_, idx) => idx !== i))}
                     >
                       <Text style={styles.removeButtonText}>×</Text>
                     </TouchableOpacity>
                   </View>
-                ))}
-              </View>
-            </>
+                );
+              })}
+            </View>
           )}
-          
+
+          {/* Pick New Images */}
           <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
-            <FontAwesome name="image" size={24} color="#DAA520" />
-            <Text style={styles.pickButtonText}>Add More Images</Text>
+            <FontAwesome name="plus" size={20} color="#DAA520" />
+            <Text style={styles.pickButtonText}>Select New Images</Text>
           </TouchableOpacity>
 
+          {/* New Image Previews (Before Upload) */}
           {selectedImages.length > 0 && (
-            <>
-              <Text style={styles.subsectionTitle}>New Images</Text>
-              <View style={styles.imagesContainer}>
-                {selectedImages.map((uri, index) => (
-                  <View key={`new-${index}`} style={styles.imageWrapper}>
-                    <Image source={{ uri }} style={styles.imagePreview} />
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeNewImage(index)}
-                    >
-                      <Text style={styles.removeButtonText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </>
+            <View style={[styles.imagesContainer, { marginTop: 15 }]}>
+              {selectedImages.map((uri, i) => (
+                <View key={i} style={styles.imageWrapper}>
+                  <Image source={{ uri }} style={styles.imagePreview} resizeMode="cover" />
+                  <TouchableOpacity 
+                    style={styles.removeButton} 
+                    onPress={() => setSelectedImages(prev => prev.filter((_, idx) => idx !== i))}
+                  >
+                    <Text style={styles.removeButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
           )}
 
           {selectedImages.length > 0 && uploadedImageKeys.length === 0 && (
-            <TouchableOpacity
-              style={[styles.uploadButton, isUploading && styles.buttonDisabled]}
-              onPress={uploadImages}
-              disabled={isUploading}
-            >
-              {isUploading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <FontAwesome name="cloud-upload" size={20} color="#fff" />
-                  <Text style={styles.uploadButtonText}>Upload New Images</Text>
-                </>
-              )}
+            <TouchableOpacity style={styles.uploadButton} onPress={uploadImages} disabled={isUploading}>
+              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>Upload New Selection</Text>}
             </TouchableOpacity>
-          )}
-
-          {uploadedImageKeys.length > 0 && (
-            <View style={styles.uploadStatus}>
-              <FontAwesome name="check-circle" size={20} color="#2E7D32" />
-              <Text style={styles.uploadStatusText}>
-                {uploadedImageKeys.length} new image(s) uploaded
-              </Text>
-            </View>
           )}
         </View>
 
-        <TouchableOpacity
-          style={[styles.createButton, updateProductMutation.isPending && styles.buttonDisabled]}
-          onPress={handleUpdateProduct}
-          disabled={updateProductMutation.isPending}
+        <TouchableOpacity 
+            style={[styles.createButton, (updateProductMutation.isPending) && styles.buttonDisabled]} 
+            onPress={handleUpdateProduct}
+            disabled={updateProductMutation.isPending}
         >
-          {updateProductMutation.isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.createButtonText}>Update Product</Text>
-          )}
+          <Text style={styles.createButtonText}>Save Changes</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <SelectionModal visible={showCategoryModal} data={PRODUCT_CATEGORIES} title="Category" onSelect={(v: string) => { setCategory(v); setShowCategoryModal(false); }} onClose={() => setShowCategoryModal(false)} />
+      <SelectionModal visible={showUnitModal} data={UNITS} title="Unit" onSelect={(v: string) => { setUnit(v); setShowUnitModal(false); }} onClose={() => setShowUnitModal(false)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF9E6',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#FFF9E6',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0D6C3',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2D2416',
-  },
-  closeButton: {
-    padding: 8,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 16,
-    fontSize: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E0D6C3',
-    color: '#2D2416',
-  },
-  textArea: {
-    minHeight: 100,
-  },
-  section: {
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2D2416',
-    marginBottom: 12,
-  },
-  subsectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  pickButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#DAA520',
-    borderStyle: 'dashed',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    marginTop: 12,
-  },
-  pickButtonText: {
-    color: '#DAA520',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  imagesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  imageWrapper: {
-    position: 'relative',
-  },
-  imagePreview: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0D6C3',
-  },
-  removeButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#ff3b30',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  uploadButton: {
-    backgroundColor: '#4A90E2',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  uploadButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  uploadStatus: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  uploadStatusText: {
-    color: '#2E7D32',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  createButton: {
-    backgroundColor: '#DAA520',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 40,
-  },
-  createButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
+  container: { flex: 1, backgroundColor: '#FFF9E6' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, borderBottomWidth: 1, borderBottomColor: '#E0D6C3' },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#2D2416' },
+  content: { padding: 20 },
+  label: { fontSize: 14, fontWeight: '600', color: '#856404', marginBottom: 6, marginLeft: 4 },
+  inputWrapper: { position: 'relative', marginBottom: 16 },
+  inputIcon: { position: 'absolute', right: 16, top: 20 },
+  input: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E0D6C3', color: '#2D2416' },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
+  parallelContainer: { flexDirection: 'row', gap: 10 },
+  unitSelector: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#E0D6C3', flexDirection: 'row', alignItems: 'center', height: 58, flex: 1, justifyContent: 'space-between' },
+  unitText: { fontSize: 16, color: '#2D2416', fontWeight: 'bold' },
+  section: { marginVertical: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#2D2416', marginBottom: 15 },
+  imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 5 },
+  imageWrapper: { position: 'relative' },
+  imagePreview: { width: 85, height: 85, borderRadius: 8, backgroundColor: '#E0D6C3' },
+  removeButton: { position: 'absolute', top: -5, right: -5, backgroundColor: '#ff3b30', width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
+  removeButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  pickButton: { backgroundColor: '#FFF', borderRadius: 8, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: '#DAA520', borderStyle: 'dashed', flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 10 },
+  pickButtonText: { color: '#DAA520', fontWeight: '600' },
+  uploadButton: { backgroundColor: '#4A90E2', borderRadius: 8, padding: 15, alignItems: 'center', marginTop: 15 },
+  uploadButtonText: { color: '#fff', fontWeight: 'bold' },
+  createButton: { backgroundColor: '#DAA520', borderRadius: 8, padding: 18, alignItems: 'center', marginTop: 20, marginBottom: 50 },
+  createButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  buttonDisabled: { opacity: 0.5 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '50%' },
+  modalHeader: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold' },
+  modalItem: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
+  modalItemText: { fontSize: 16 }
 });

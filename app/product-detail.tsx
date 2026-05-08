@@ -3,6 +3,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import React, { useState } from 'react';
 import {
   Alert,
@@ -385,7 +386,7 @@ export default function ProductDetailScreen() {
           {/* Image Counter Badge */}
           {product.images && product.images.length > 1 && (
             <View style={styles.imageCountBadge}>
-              <FontAwesome name="images" size={14} color="#fff" />
+            <FontAwesome name="image" size={14} color="#fff" />
               <Text style={styles.imageCountText}>
                 {currentImageIndex + 1}/{product.images.length}
               </Text>
