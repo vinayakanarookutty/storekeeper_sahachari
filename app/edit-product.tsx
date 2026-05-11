@@ -21,7 +21,7 @@ import { getToken } from './services/auth';
 
 // Ensure these URLs match your environment configuration
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_URL || 'YOUR_S3_BUCKET_URL_HERE'; 
+const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com'; 
 
 const PRODUCT_CATEGORIES = ['Food', 'Vegetables and Fruits', 'Groceries', 'Home Made', 'Service', 'Fish & Meat'];
 const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
@@ -242,7 +242,7 @@ export default function EditProductScreen() {
           {existingImages.length > 0 && (
             <View style={styles.imagesContainer}>
               {existingImages.map((imageKey, i) => {
-                const imageUri = imageKey.startsWith('http') ? imageKey : `${S3_BASE_URL}/${imageKey}`;
+                const imageUri = imageKey.startsWith('https') ? imageKey : `${S3_BASE_URL}/${imageKey}`;
                 return (
                   <View key={i} style={styles.imageWrapper}>
                     <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
