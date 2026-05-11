@@ -231,11 +231,27 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(218, 165, 32, 0.1)',
+    
+    // The Outline
+    borderWidth: 1.5,
+    borderColor: '#E0D6C3', 
+    
+    // The Shadow
     ...Platform.select({
-      ios: { shadowColor: '#2D2416', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10 },
-      android: { elevation: 3 },
+      ios: { 
+        shadowColor: '#2D2416', 
+        shadowOffset: { width: 0, height: 6 }, 
+        shadowOpacity: 0.1, 
+        shadowRadius: 12 
+      },
+      android: { 
+        elevation: 4 
+      },
+      web: {
+        cursor: 'pointer',
+        transition: 'all 0.2s ease-in-out',
+        boxShadow: '0px 4px 12px rgba(45, 36, 22, 0.08)'
+      }
     }),
   },
   imageWrapper: { backgroundColor: '#F9F9F9', position: 'relative', overflow: 'hidden' },
@@ -258,4 +274,5 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 18, color: '#2D2416', marginTop: 20, fontWeight: '700' },
   emptyButton: { marginTop: 20, backgroundColor: '#DAA520', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10 },
   emptyButtonText: { color: '#FFFFFF', fontWeight: '700' },
+  
 });

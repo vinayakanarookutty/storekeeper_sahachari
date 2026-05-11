@@ -21,7 +21,6 @@ import { getToken } from '../services/auth';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
 
-// FIXED THEME COLORS (Dark Mode Proof)
 const COLORS = {
   bg: '#FFF9E6',
   card: '#FFFFFF',
@@ -56,11 +55,8 @@ interface EditModalProps {
 function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditModalProps) {
   const [editValue, setEditValue] = useState(value);
 
-  // CRITICAL FIX: Sync internal state when the modal opens with new data
   useEffect(() => {
-    if (visible) {
-      setEditValue(value);
-    }
+    if (visible) setEditValue(value);
   }, [visible, value]);
 
   const getFieldLabel = () => {
@@ -90,7 +86,6 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
             multiline={field === 'address' || field === 'address2'}
             keyboardType={field === 'mobileNumber' ? 'phone-pad' : 'default'}
             editable={!isLoading}
-            autoFocus
           />
 
           <View style={styles.modalButtons}>
@@ -120,37 +115,115 @@ export default function TabTwoScreen() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editInitialValue, setEditInitialValue] = useState('');
 
-  const { data: userData, isLoading } = useQuery<UserProfile>({
+  const { data: userData } = useQuery<UserProfile>({
     queryKey: ['currentUser'],
     queryFn: async () => {
       const authToken = await getToken();
       const res = await fetch(`${API_BASE_URL}/users/me`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+      if (!res.ok) throw new Error('Failed to fetch user');
       return res.json();
     },
     enabled: !!token,
   });
 
+  // RESTORED WORKING UPDATE MUTATION
   const updateProfileMutation = useMutation({
     mutationFn: async ({ field, value }: { field: string; value: string }) => {
       const authToken = await getToken();
       const body: any = {};
-      body[field] = field === 'serviceablePincodes' 
-        ? value.split(',').map(p => p.trim()).filter(Boolean) 
-        : value;
+      
+      if (field === 'serviceablePincodes') {
+        body[field] = value.split(',').map(p => p.trim()).filter(p => p.length > 0);
+      } else {
+        body[field] = value;
+      }
 
-      const res = await fetch(`${API_BASE_URL}/users/update-me`, {
+      const response = await fetch(`${API_BASE_URL}/users/update-me`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Update failed');
-      return res.json();
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update profile');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       setEditModalVisible(false);
+      Alert.alert('Success', 'Profile updated successfully!');
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Failed to update profile');
     },
   });
+
+  // RESTORED WORKING AVATAR UPLOAD MUTATION
+  const uploadAvatarMutation = useMutation({
+    mutationFn: async (imageUri: string) => {
+      const authToken = await getToken();
+      
+      let cleanPath = imageUri.split(':http')[0].replace('blob:', '');
+      const extensionMatch = cleanPath.match(/\.([a-zA-Z0-9]+)$/);
+      const fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg';
+      const fileName = `avatar_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+      const fileType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
+
+      // 1. Get Presigned URL
+      const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ fileName, fileType, folder: 'avatars' }),
+      });
+      if (!presignedResponse.ok) throw new Error('Failed to get upload URL');
+      const { url: presignedUrl, key } = await presignedResponse.json();
+
+      // 2. Convert to Blob & Upload to S3
+      const imageResponse = await fetch(imageUri);
+      const blob = await imageResponse.blob();
+      const uploadResponse = await fetch(presignedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': fileType },
+        body: blob,
+      });
+      if (!uploadResponse.ok) throw new Error('S3 Upload failed');
+
+      // 3. Update User Record
+      const updateResponse = await fetch(`${API_BASE_URL}/users/update-me`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ image: key }),
+      });
+      if (!updateResponse.ok) throw new Error('Failed to link profile picture');
+      
+      return updateResponse.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      Alert.alert('Success', 'Profile picture updated!');
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Upload failed');
+    },
+  });
+
+  const handlePickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      uploadAvatarMutation.mutate(result.assets[0].uri);
+    }
+  };
 
   const handleEditPress = (field: keyof UserProfile) => {
     let val = '';
@@ -158,7 +231,7 @@ export default function TabTwoScreen() {
       const rawVal = userData[field];
       val = Array.isArray(rawVal) ? rawVal.join(', ') : (rawVal as string) || '';
     }
-    setEditingField(field);
+    setEditingField(field as string);
     setEditInitialValue(val);
     setEditModalVisible(true);
   };
@@ -167,12 +240,16 @@ export default function TabTwoScreen() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.avatarWrapper}>
-          {userData?.image ? (
+          {uploadAvatarMutation.isPending ? (
+            <View style={styles.avatarPlaceholder}><ActivityIndicator color={COLORS.primary} /></View>
+          ) : userData?.image ? (
             <Image source={{ uri: `${S3_BASE_URL}/${userData.image}` }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}><FontAwesome name="user" size={50} color={COLORS.primary} /></View>
           )}
-          <TouchableOpacity style={styles.camBtn}><FontAwesome name="camera" size={14} color="#fff" /></TouchableOpacity>
+          <TouchableOpacity style={styles.camBtn} onPress={handlePickImage} disabled={uploadAvatarMutation.isPending}>
+            <FontAwesome name="camera" size={14} color="#fff" />
+          </TouchableOpacity>
         </View>
         <Text style={styles.userName}>{userData?.name || 'User'}</Text>
         <Text style={styles.userEmail}>{userData?.email}</Text>
@@ -180,7 +257,6 @@ export default function TabTwoScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Contact Information</Text>
-        
         {[
           { label: 'Mobile Number', field: 'mobileNumber', icon: 'phone' },
           { label: 'Primary Address', field: 'address', icon: 'map-marker' },
@@ -202,7 +278,7 @@ export default function TabTwoScreen() {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={async () => { await clearAuthToken(); router.replace('/signup'); }}>
+      <TouchableOpacity style={styles.logoutBtn} onPress={async () => { await clearAuthToken(); router.replace('/login'); }}>
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
 
