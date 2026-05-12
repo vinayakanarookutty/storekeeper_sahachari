@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "splash": {
         "image": "./assets/images/icon.png",
-        "resizeMode": "cover",
+        "resizeMode": "contain",
         "backgroundColor": "#FDB515"
       },
       "infoPlist": {
@@ -27,7 +27,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/splashscreen.png",
         "backgroundColor": "#FDB515"
       },
       "permissions": [
@@ -37,9 +37,9 @@
         "android.permission.RECORD_AUDIO"
       ],
       "splash": {
-        "image": "./assets/images/splashscreen.png",
+        "image": "./assets/images/icon.png",
         "resizeMode": "cover",
-        "backgroundColor": "#FDB515"
+        "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
