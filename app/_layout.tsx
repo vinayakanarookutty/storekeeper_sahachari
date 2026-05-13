@@ -6,8 +6,8 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { Image, Platform, StyleSheet, View } from 'react-native';
-import { AuthProvider } from './contexts/AuthContext';
+import { Image, Platform, View } from 'react-native';
+import { styles } from './styles/_layout.style';import { AuthProvider } from './contexts/AuthContext';
 
 // Prevent auto-hide so we control the timing
 SplashScreen.preventAutoHideAsync();
@@ -114,18 +114,3 @@ function RootLayoutNav() {
     </ThemeProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  splashContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FDB515',
-  },
-  splashImage: {
-    width: '40%',
-    height: '40%',
-    maxWidth: 500,
-    maxHeight: 500,
-  },
-});
