@@ -47,6 +47,7 @@ const PRODUCT_CATEGORIES = [
 
 const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
 const RENT_UNITS = ['Hour', 'Day', 'Week', 'Month'];
+const SERVICE_UNITS = ['Hour', 'Day', 'Service']; // Units specifically for services
 
 export default function AddProductScreen() {
   const queryClient = useQueryClient();
@@ -56,7 +57,7 @@ export default function AddProductScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [rentUnit, setRentUnit] = useState('Day'); // New state for rental duration
+  const [serviceUnit, setServiceUnit] = useState('Hour'); // State for Service/Rent duration
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('kg');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -66,10 +67,12 @@ export default function AddProductScreen() {
   // MODAL STATES
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
-  const [showRentUnitModal, setShowRentUnitModal] = useState(false);
+  const [showServiceUnitModal, setShowServiceUnitModal] = useState(false);
 
   const isService = category === 'Service';
   const isRent = category === 'Rent';
+  // Check if current category needs a time-based unit
+  const needsTimeUnit = isService || isRent;
 
   const createProductMutation = useMutation({
     mutationFn: async (productData: ProductData) => {
@@ -109,12 +112,13 @@ export default function AddProductScreen() {
     setCategory(selectedCategory);
     setShowCategoryModal(false);
     
-    // Logic for specific categories
     if (selectedCategory === 'Service') {
-      setQuantity('100');
+      setQuantity('1'); // Default quantity for service
+      setServiceUnit('Hour');
     } else if (selectedCategory === 'Rent') {
-      setUnit('unit'); // Default unit for rent
+      setUnit('unit');
       setQuantity('');
+      setServiceUnit('Day');
     } else {
       setUnit('kg');
       setQuantity('');
@@ -210,14 +214,14 @@ export default function AddProductScreen() {
       return;
     }
 
-    // Combine price with unit if it's a rental (e.g., "150/Day")
-    const finalPrice = isRent ? `${price}/${rentUnit}` : price;
+    // Combine price with unit for Service or Rent (e.g., "20/Hour")
+    const finalPrice = needsTimeUnit ? `${price}/${serviceUnit}` : price;
 
     const productData: ProductData = {
       name,
       description,
       price: finalPrice,
-      quantity: isService ? 100 : parseInt(quantity),
+      quantity: isService ? 1 : parseInt(quantity),
       category,
       images: uploadedImageKeys,
     };
@@ -268,7 +272,6 @@ export default function AddProductScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        {/* CATEGORY FIELD */}
         <TouchableOpacity 
           style={styles.inputWrapper} 
           onPress={() => setShowCategoryModal(true)}
@@ -302,7 +305,7 @@ export default function AddProductScreen() {
           multiline
         />
 
-        {/* PRICE FIELD - Layout changes if Rent is selected */}
+        {/* PRICE FIELD - Shows Unit dropdown for Service and Rent */}
         <View style={styles.parallelContainer}>
           <View style={{ flex: 2 }}>
             <TextInput
@@ -314,20 +317,20 @@ export default function AddProductScreen() {
               keyboardType="numeric"
             />
           </View>
-          {isRent && (
-            <View style={{ flex: 1, marginLeft: 10 }}>
+          {needsTimeUnit && (
+            <View style={{ flex: 1.5, marginLeft: 10 }}>
               <TouchableOpacity 
                 style={styles.unitSelector} 
-                onPress={() => setShowRentUnitModal(true)}
+                onPress={() => setShowServiceUnitModal(true)}
               >
-                <Text style={styles.unitText}>/ {rentUnit}</Text>
+                <Text style={styles.unitText}>/ {serviceUnit}</Text>
                 <FontAwesome name="caret-down" size={16} color="#DAA520" />
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* STOCK FIELD */}
+        {/* STOCK/QUANTITY FIELD */}
         {!isService && (
           <View style={styles.section}>
             <View style={styles.parallelContainer}>
@@ -342,7 +345,6 @@ export default function AddProductScreen() {
                 />
               </View>
 
-              {/* Hide unit dropdown for Rent */}
               {!isRent && (
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <TouchableOpacity 
@@ -355,13 +357,9 @@ export default function AddProductScreen() {
                 </View>
               )}
             </View>
-            <Text style={styles.fieldHint}>
-              Total Stock: {quantity || '0'} {unit}
-            </Text>
           </View>
         )}
 
-        {/* IMAGES SECTION */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Images</Text>
           <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
@@ -416,16 +414,16 @@ export default function AddProductScreen() {
         onClose={() => setShowUnitModal(false)}
       />
 
-      {/* RENT UNIT MODAL */}
+      {/* DYNAMIC UNIT MODAL FOR SERVICE/RENT */}
       <SelectionModal 
-        visible={showRentUnitModal}
-        data={RENT_UNITS}
-        title="Select Rental Unit"
+        visible={showServiceUnitModal}
+        data={isService ? SERVICE_UNITS : RENT_UNITS}
+        title={isService ? "Select Service Unit" : "Select Rental Unit"}
         onSelect={(item: string) => {
-          setRentUnit(item);
-          setShowRentUnitModal(false);
+          setServiceUnit(item);
+          setShowServiceUnitModal(false);
         }}
-        onClose={() => setShowRentUnitModal(false)}
+        onClose={() => setShowServiceUnitModal(false)}
       />
     </View>
   );
