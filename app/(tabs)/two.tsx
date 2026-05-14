@@ -2,21 +2,23 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   Modal,
   ScrollView,
-  StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
   Text,
+  RefreshControl,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { getToken } from '../services/auth';
+import { styles } from './tab_style/two.style';
+styles
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
@@ -114,8 +116,9 @@ export default function TabTwoScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editInitialValue, setEditInitialValue] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: userData } = useQuery<UserProfile>({
+  const { data: userData, refetch } = useQuery<UserProfile>({
     queryKey: ['currentUser'],
     queryFn: async () => {
       const authToken = await getToken();
@@ -126,7 +129,13 @@ export default function TabTwoScreen() {
     enabled: !!token,
   });
 
-  // RESTORED WORKING UPDATE MUTATION
+  // 1. REFRESH LOGIC
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
+
   const updateProfileMutation = useMutation({
     mutationFn: async ({ field, value }: { field: string; value: string }) => {
       const authToken = await getToken();
@@ -163,7 +172,6 @@ export default function TabTwoScreen() {
     },
   });
 
-  // RESTORED WORKING AVATAR UPLOAD MUTATION
   const uploadAvatarMutation = useMutation({
     mutationFn: async (imageUri: string) => {
       const authToken = await getToken();
@@ -174,7 +182,6 @@ export default function TabTwoScreen() {
       const fileName = `avatar_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
       const fileType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
 
-      // 1. Get Presigned URL
       const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
@@ -183,7 +190,6 @@ export default function TabTwoScreen() {
       if (!presignedResponse.ok) throw new Error('Failed to get upload URL');
       const { url: presignedUrl, key } = await presignedResponse.json();
 
-      // 2. Convert to Blob & Upload to S3
       const imageResponse = await fetch(imageUri);
       const blob = await imageResponse.blob();
       const uploadResponse = await fetch(presignedUrl, {
@@ -193,7 +199,6 @@ export default function TabTwoScreen() {
       });
       if (!uploadResponse.ok) throw new Error('S3 Upload failed');
 
-      // 3. Update User Record
       const updateResponse = await fetch(`${API_BASE_URL}/users/update-me`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
@@ -237,7 +242,20 @@ export default function TabTwoScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      // 2. REFRESH CONTROL COMPONENT
+      refreshControl={
+        <RefreshControl 
+          refreshing={refreshing} 
+          onRefresh={onRefresh} 
+          tintColor={COLORS.primary} 
+          colors={[COLORS.primary]}
+        />
+      }
+      contentContainerStyle={styles.scrollContent}
+    >
       <View style={styles.header}>
         <View style={styles.avatarWrapper}>
           {uploadAvatarMutation.isPending ? (
@@ -293,36 +311,3 @@ export default function TabTwoScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  header: { alignItems: 'center', paddingTop: 60, paddingBottom: 30 },
-  avatarWrapper: { position: 'relative', marginBottom: 15 },
-  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: '#fff' },
-  avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-  camBtn: { position: 'absolute', bottom: 0, right: 0, backgroundColor: COLORS.primary, padding: 8, borderRadius: 20, borderWidth: 2, borderColor: COLORS.bg },
-  userName: { fontSize: 22, fontWeight: 'bold', color: COLORS.textDark },
-  userEmail: { fontSize: 14, color: COLORS.textLight, marginTop: 4 },
-  
-  section: { paddingHorizontal: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.textDark, marginBottom: 15, marginTop: 10 },
-  infoCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, padding: 15, borderRadius: 15, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
-  infoIconBg: { width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.bg, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  infoLabel: { fontSize: 12, color: COLORS.textLight, marginBottom: 2 },
-  infoValue: { fontSize: 15, fontWeight: '600', color: COLORS.textDark },
-  
-  logoutBtn: { margin: 20, backgroundColor: COLORS.card, padding: 18, borderRadius: 15, alignItems: 'center', borderWidth: 1, borderColor: COLORS.danger },
-  logoutText: { color: COLORS.danger, fontWeight: 'bold', fontSize: 16 },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 25 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.textDark },
-  modalInput: { backgroundColor: COLORS.bg, borderRadius: 12, padding: 15, fontSize: 16, color: COLORS.textDark, borderWidth: 1, borderColor: COLORS.border },
-  textArea: { height: 100, textAlignVertical: 'top' },
-  modalButtons: { flexDirection: 'row', gap: 10, marginTop: 20 },
-  cancelBtn: { flex: 1, padding: 15, alignItems: 'center' },
-  cancelBtnText: { color: COLORS.textLight, fontWeight: '600' },
-  saveBtn: { flex: 2, backgroundColor: COLORS.primary, padding: 15, borderRadius: 12, alignItems: 'center' },
-  saveBtnText: { color: '#fff', fontWeight: 'bold' }
-});
