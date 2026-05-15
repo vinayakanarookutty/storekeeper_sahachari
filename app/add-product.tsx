@@ -8,16 +8,16 @@ import {
   Alert,
   FlatList,
   Image,
+  Modal,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
-  Modal,
 } from 'react-native';
-import { styles } from './styles/add-product.style';
 import { getToken } from './services/auth';
+import { styles } from './styles/add-edit-common.style';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
