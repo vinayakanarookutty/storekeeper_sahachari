@@ -67,9 +67,9 @@ export const styles = StyleSheet.create({
   },
 
   forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 16,
-  },
+  marginTop: 15,
+  alignItems: 'center',
+},
 
   forgotPasswordText: {
     color: '#DAA520',
