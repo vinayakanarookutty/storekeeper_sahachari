@@ -137,12 +137,14 @@ export default function TabOneScreen() {
             )}
           </View>
 
-          <View style={styles.cardFooter}>
-            <View style={styles.stockInfo}>
-              <FontAwesome name="cube" size={10} color="#856404" />
-              <Text style={styles.stockText}>{item.quantity} in stock</Text>
-            </View>
-          </View>
+          {item.category !== 'Service' && (
+  <View style={styles.cardFooter}>
+    <View style={styles.stockInfo}>
+      <FontAwesome name="cube" size={10} color="#856404" />
+      <Text style={styles.stockText}>{item.quantity} in stock</Text>
+    </View>
+  </View>
+)}
         </View>
       </TouchableOpacity>
     );
