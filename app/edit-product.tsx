@@ -156,7 +156,7 @@ export default function EditProductScreen() {
     ? 100
     : parseInt(quantity),
   category,
-  images: finalImagesKeys,
+  images: finalImages,
 });
   };
 

@@ -16,7 +16,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { styles } from './styles/add-product.style';
+import { styles } from './styles/add-edit-common.style';
 import { getToken } from './services/auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
