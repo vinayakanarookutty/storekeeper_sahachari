@@ -8,16 +8,16 @@ import {
   Alert,
   FlatList,
   Image,
+  Modal,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
-  Modal,
 } from 'react-native';
-import { styles } from './styles/add-product.style';
 import { getToken } from './services/auth';
+import { styles } from './styles/add-product.style';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -215,8 +215,9 @@ export default function AddProductScreen() {
     }
 
     // Combine price with unit for Service or Rent (e.g., "20/Hour")
-    const finalPrice = needsTimeUnit ? `${price}/${serviceUnit}` : price;
-
+const finalPrice = needsTimeUnit
+  ? `${price}/${serviceUnit}`
+  : `${price}/${unit}`;
     const productData: ProductData = {
       name,
       description,

@@ -50,7 +50,7 @@ const UNITS = [
 interface ProductData {
   name: string;
   description: string;
-  price: number;
+  price: string;
   quantity: number;
   category: string;
   images: string[];
@@ -281,15 +281,15 @@ export default function EditProductScreen() {
     }
 
     updateProductMutation.mutate({
-      name,
-      description,
-      price: parseFloat(price),
-      quantity: isService
-        ? 100
-        : parseInt(quantity),
-      category,
-      images: finalImagesKeys,
-    });
+  name,
+  description,
+  price, // keep full value like 80/kg
+  quantity: isService
+    ? 100
+    : parseInt(quantity),
+  category,
+  images: finalImagesKeys,
+});
   };
 
   // MODAL
