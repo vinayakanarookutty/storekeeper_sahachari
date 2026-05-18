@@ -1,429 +1,217 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-    
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  filterContainer: {
-    backgroundColor: '#fff',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  filterScroll: {
-    paddingHorizontal: 24,
-    gap: 12,
-  },
-  filterPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 8,
-  },
-  filterPillInactive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-    gap: 8,
-  },
-  filterPillTextSelected: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  filterPillText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 32,
+    backgroundColor: '#F7F7F7',
   },
   orderCard: {
-    marginBottom: 20,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    marginHorizontal: 4,
+    marginBottom: 24,
+    borderRadius: 24,
+    backgroundColor: '#fff',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
     overflow: 'hidden',
   },
   orderCardGradient: {
     padding: 20,
+    borderRadius: 24,
   },
+  // HEADER STYLES
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    paddingBottom: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  orderIdLabel: {
+    fontSize: 10,
+    letterSpacing: 1.2,
+    color: '#AAA',
+    fontWeight: '800',
+  },
+  orderId: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  // CUSTOMER CARD
+  customerCard: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#EEE',
+    marginBottom: 20,
+  },
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#DAA520',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  customerNameMain: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  expandedDetails: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#EAEAEA',
+    gap: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  detailText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  // PROGRESS TRACKER
+  progressContainer: {
+    flexDirection: 'row',
+    marginBottom: 25,
+    paddingHorizontal: 10,
+  },
+  progressLine: {
+    height: 2,
+    width: '100%',
+    position: 'absolute',
+    top: 9,
+    left: '-50%',
+  },
+  progressDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  progressText: {
+    fontSize: 9,
+    fontWeight: '600',
+    marginTop: 6,
+    textTransform: 'capitalize',
+  },
+  // ITEM ROW
+  itemRowImproved: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  orderHeaderLeft: {
-    flex: 1,
-    gap: 4,
-  },
-  orderIdLabel: {
-    fontSize: 12,
-    color: '#999',
-    fontWeight: '500',
-  },
-  orderId: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2D2416',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    gap: 6,
-  },
-  statusBadgeText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  customerSection: {
-    marginBottom: 20,
-  },
-  customerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  customerIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF9E6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  customerInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  customerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2D2416',
-  },
-  customerEmail: {
-    fontSize: 13,
-    color: '#666',
-  },
-  progressSection: {
-    marginBottom: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2D2416',
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  progressSteps: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  stepContainer: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepIconWrapper: {
+  itemImageWrapper: {
     position: 'relative',
-    alignItems: 'center',
   },
-  stepLine: {
+  itemImageSmall: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#EEE',
+  },
+  qtyBadge: {
     position: 'absolute',
-    right: '50%',
-    width:  5 - 40,
-    height: 2,
-    top: 17,
+    top: -5,
+    right: -5,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: '#FFF',
   },
-  stepLineCompleted: {
-    backgroundColor: '#4A90E2',
-  },
-  stepIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  stepIconCurrent: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  stepLabel: {
-    fontSize: 11,
-    color: '#999',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  stepLabelCompleted: {
-    color: '#2D2416',
-    fontWeight: '600',
-  },
-  stepLabelCurrent: {
-    fontSize: 12,
+  qtyText: {
+    color: '#FFF',
+    fontSize: 10,
     fontWeight: 'bold',
   },
-  failedSection: {
-    marginBottom: 20,
-  },
-  failedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
-  },
-  failedText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  itemsSection: {
-    marginBottom: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 12,
-  },
-  itemImageContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#F5F5F5',
-  },
-  itemImage: {
-    width: '100%',
-    height: '100%',
-  },
-  noItemImage: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFF9E6',
-  },
-  itemDetails: {
+  itemInfo: {
     flex: 1,
-    gap: 4,
+    marginLeft: 15,
   },
-  itemName: {
-    fontSize: 15,
+  itemNameSmall: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#2D2416',
+    color: '#222',
   },
-  itemCategory: {
+  itemCatSmall: {
     fontSize: 12,
-    color: '#999',
+    color: '#888',
   },
-  itemPriceSection: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  itemQuantity: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
-  },
-  itemPrice: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#DAA520',
-  },
-  moreItems: {
-    fontSize: 13,
-    color: '#DAA520',
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  addressSection: {
-    marginBottom: 20,
-  },
-  addressCard: {
-    padding: 16,
-    borderRadius: 12,
-    gap: 4,
-  },
-  addressText: {
+  itemPriceSmall: {
     fontSize: 14,
-    color: '#2D2416',
-    lineHeight: 20,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  phoneText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  notesContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginTop: 8,
-    padding: 12,
-    backgroundColor: '#FFF9E6',
-    borderRadius: 8,
-  },
-  notesText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  summarySection: {
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    gap: 12,
-    marginBottom: 12,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  summaryValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#2E7D32',
   },
-  summaryDate: {
-    fontSize: 13,
-    color: '#2D2416',
-    fontWeight: '600',
-  },
-  pickupSection: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    marginBottom: 16,
-  },
-  pickupIconRow: {
+  // TOTALS & ACTIONS
+  totalRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 6,
+    marginTop: 15,
+    paddingTop: 15,
   },
-  pickupLabel: {
-    fontSize: 13,
+  totalLabel: {
+    fontSize: 14,
     color: '#666',
-  },
-  pickupAddress: {
-    fontSize: 13,
-    color: '#2D2416',
     fontWeight: '600',
-    flex: 1,
   },
-  actionsSection: {
-    paddingTop: 16,
-    borderTopWidth: 2,
-    borderTopColor: '#E0E0E0',
-    gap: 12,
+  totalValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1A1A1A',
   },
-  actionsSectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2D2416',
-    marginBottom: 4,
+  actionsContainer: {
+    flexDirection: 'row', 
+    gap: 10, 
+    marginTop: 20 
   },
   actionButton: {
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   actionButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    gap: 10,
+    paddingVertical: 12,
   },
   actionButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#fff',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 80,
-    gap: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2D2416',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    paddingHorizontal: 40,
   },
 });

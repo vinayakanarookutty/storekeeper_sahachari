@@ -1,671 +1,247 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
-styles
+import React, { useState, useMemo } from 'react';
 import {
-  ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Image,
-  ScrollView,
   StatusBar,
-  StyleSheet,
   Text,
   TouchableOpacity,
   RefreshControl,
-  View
+  View,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
 import { getToken } from '../services/auth';
 import { styles } from './tab_style/three.style';
 
-const S3_BASE_URL =
-  process.env.EXPO_PUBLIC_S3_BASE_URL ||
-  'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
-
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-
-const { width } = Dimensions.get('window');
-
-interface Product {
-  _id: string;
-  name: string;
-  description: string;
-  price: string | number;
-  images: string[];
-  category: string;
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-interface OrderItem {
-  productId: Product;
-  quantity: number;
-  price: number;
-  _id: string;
-}
+const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
-interface DeliveryAddress {
-  street: string;
-  city: string;
-  zipCode: string;
-  phone: string;
-  notes?: string;
-}
+const PRODUCT_STEPS = ['PLACED', 'READY', 'ACCEPTED', 'PICKED_UP', 'DELIVERED'];
+const SERVICE_STEPS = ['PLACED', 'ACCEPTED', 'DELIVERED'];
 
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-}
-
-interface Order {
-  _id: string;
-  userId: User;
-  storeId: string;
-  checkoutId: string;
-  deliveryBoyId: string | null;
-  items: OrderItem[];
-  totalAmount: number;
-  deliveryAddress: DeliveryAddress;
-  pickupAddress: string;
-  status:
-    | 'PLACED'
-    | 'ACCEPTED'
-    | 'REJECTED'
-    | 'READY'
-    | 'PICKED_UP'
-    | 'DELIVERED'
-    | 'FAILED'
-    | 'CANCELLED';
-  createdAt: string;
-  updatedAt: string;
-}
-
-const STATUS_STEPS = [
-  'PLACED',
-  'READY',
-  'ACCEPTED',
-  'PICKED_UP',
-  'DELIVERED',
-];
-
+// Status Configuration - Matches your Backend Enums
 const STATUS_CONFIG = {
-  PLACED: {
-    color: '#DAA520',
-    icon: 'shopping-cart',
-    label: 'Order Placed',
-  },
-  READY: {
-    color: '#FF9800',
-    icon: 'clock-o',
-    label: 'Ready for Pickup',
-  },
-  ACCEPTED: {
-    color: '#2E7D32',
-    icon: 'check-circle',
-    label: 'Accepted by Driver',
-  },
-  PICKED_UP: {
-    color: '#9C27B0',
-    icon: 'motorcycle',
-    label: 'Picked Up',
-  },
-  DELIVERED: {
-    color: '#4CAF50',
-    icon: 'check-circle',
-    label: 'Delivered',
-  },
-  REJECTED: {
-    color: '#D32F2F',
-    icon: 'times-circle',
-    label: 'Rejected',
-  },
-  FAILED: {
-    color: '#D32F2F',
-    icon: 'exclamation-circle',
-    label: 'Failed',
-  },
-  CANCELLED: {
-    color: '#757575',
-    icon: 'ban',
-    label: 'Cancelled',
-  },
+  PLACED: { color: '#DAA520', icon: 'shopping-cart', label: 'Order Placed' },
+  READY: { color: '#FF9800', icon: 'clock-o', label: 'Ready' },
+  ACCEPTED: { color: '#2E7D32', icon: 'check-circle', label: 'Accepted' },
+  PICKED_UP: { color: '#9C27B0', icon: 'motorcycle', label: 'Picked Up' },
+  DELIVERED: { color: '#4CAF50', icon: 'check-circle', label: 'Completed' },
+  CANCELLED: { color: '#D32F2F', icon: 'times-circle', label: 'Rejected' }, // Backend uses CANCELLED
 };
 
 export default function OrdersScreen() {
-  const router = useRouter();
   const queryClient = useQueryClient();
+  const [selectedFilter, setSelectedFilter] = useState('ALL');
+  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
 
-  const [selectedFilter, setSelectedFilter] =
-    useState<string>('ALL');
-
-  // NEW REFRESH STATE
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const {
-    data: orders,
-    isLoading,
-    refetch,
-  } = useQuery({
+  // 1. Fetch Orders with Auto-Polling (checks for new orders every 30s)
+  const { data: orders, isLoading, refetch } = useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
       const token = await getToken();
-
-      const response = await fetch(
-        `${API_BASE_URL}/storekeeper/orders`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch orders');
-      }
-
-      return response.json() as Promise<Order[]>;
-    },
-  });
-
-  // NEW REFRESH FUNCTION
-  const onRefresh = useCallback(async () => {
-    try {
-      setIsRefreshing(true);
-
-      await queryClient.invalidateQueries({
-        queryKey: ['orders'],
+      const response = await fetch(`${API_BASE_URL}/storekeeper/orders`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      await refetch();
-    } catch (error) {
-      console.error('Refresh failed:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [queryClient, refetch]);
-
-  const markOrderReadyMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const token = await getToken();
-
-      const response = await fetch(
-        `${API_BASE_URL}/storekeeper/orders/${orderId}/ready`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-
-        throw new Error(
-          errorData.message ||
-            'Failed to mark order as ready'
-        );
-      }
-
+      if (!response.ok) throw new Error('Failed to fetch orders');
       return response.json();
     },
-
-    onSuccess: async () => {
-      Alert.alert(
-        'Success',
-        'Order marked as ready for pickup!'
-      );
-
-      await queryClient.invalidateQueries({
-        queryKey: ['orders'],
-      });
-
-      refetch();
-    },
-
-    onError: (error: Error) => {
-      Alert.alert('Error', error.message);
-    },
+    refetchInterval: 30000, 
   });
 
-  const handleMarkReady = (orderId: string) => {
-    Alert.alert(
-      'Mark Order as Ready',
-      'Mark this order as ready for pickup by delivery boy?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
+  // 2. Filter Logic
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+    if (selectedFilter === 'ALL') return orders;
+    return orders.filter((o: any) => o.status === selectedFilter);
+  }, [orders, selectedFilter]);
+
+  // 3. Status Update Mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ orderId, endpoint }: { orderId: string; endpoint: string }) => {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/storekeeper/orders/${orderId}/${endpoint}`, {
+        method: 'POST',
+        headers: { 
+          Authorization: `Bearer ${token}`, 
+          'Content-Type': 'application/json' 
         },
-        {
-          text: 'Mark Ready',
-          style: 'default',
-          onPress: () => {
-            markOrderReadyMutation.mutate(orderId);
-          },
-        },
-      ]
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Update failed');
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      Alert.alert('Success', 'Order status updated');
+    },
+    onError: (error: any) => {
+      Alert.alert('Action Failed', error.message);
+    }
+  });
+
+  const handleAction = (orderId: string, endpoint: string, label: string) => {
+    Alert.alert('Confirm', `Do you want to ${label}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Confirm', onPress: () => updateStatusMutation.mutate({ orderId, endpoint }) },
+    ]);
+  };
+
+  const toggleExpand = (orderId: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedOrders(prev => ({ ...prev, [orderId]: !prev[orderId] }));
+  };
+
+  const renderActionButtons = (order: any) => {
+    // No actions for finished or cancelled orders
+    if (['DELIVERED', 'CANCELLED', 'PICKED_UP'].includes(order.status)) return null;
+
+    const isServiceOrRent = order.items.some((i: any) => 
+        i.productId?.category === 'Service' || i.productId?.category === 'Rent'
+    );
+    const isSelfPickup = order.paymentMethod === 'SELF_PICKUP';
+
+    return (
+      <View style={[styles.actionsContainer, { gap: 10, marginTop: 15 }]}>
+        {order.status === 'PLACED' && (
+          <>
+            <TouchableOpacity 
+              style={{ flex: 2 }} 
+              onPress={() => handleAction(order._id, 'ready', isServiceOrRent ? 'Accept' : 'Mark Ready')}
+            >
+              <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.actionButtonGradient}>
+                <Text style={styles.actionButtonText}>{isServiceOrRent ? 'ACCEPT' : 'MARK READY'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              onPress={() => handleAction(order._id, 'reject', 'Reject Order')}
+            >
+              <LinearGradient colors={['#F44336', '#D32F2F']} style={styles.actionButtonGradient}>
+                <Text style={styles.actionButtonText}>REJECT</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Deliver button for Self-Pickup or Service items that don't need a driver */}
+        {(order.status === 'READY' || order.status === 'ACCEPTED') && (isServiceOrRent || isSelfPickup) && (
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              onPress={() => handleAction(order._id, 'deliver', 'Complete Order')}
+            >
+              <LinearGradient colors={['#2196F3', '#1976D2']} style={styles.actionButtonGradient}>
+                <Text style={styles.actionButtonText}>COMPLETE / DELIVER</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+        )}
+      </View>
     );
   };
 
-  const getCurrentStepIndex = (status: string) => {
-    if (
-      status === 'REJECTED' ||
-      status === 'FAILED' ||
-      status === 'CANCELLED'
-    ) {
-      return -1;
-    }
-
-    return STATUS_STEPS.indexOf(status);
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const filterOptions = [
-    'ALL',
-    'PLACED',
-    'READY',
-    'ACCEPTED',
-    'PICKED_UP',
-    'DELIVERED',
-    'CANCELLED',
-  ];
-
-  const filteredOrders =
-    orders?.filter((order) =>
-      selectedFilter === 'ALL'
-        ? true
-        : order.status === selectedFilter
-    ) || [];
-
-  const renderActionButtons = (order: Order) => {
-    if (order.status === 'PLACED') {
-      return (
-        <View style={styles.actionsSection}>
-          <Text style={styles.actionsSectionTitle}>
-            Actions
-          </Text>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            activeOpacity={0.8}
-            onPress={() => handleMarkReady(order._id)}
-            disabled={markOrderReadyMutation.isPending}
-          >
-            <LinearGradient
-              colors={['#FF9800', '#F57C00']}
-              style={styles.actionButtonGradient}
-            >
-              {markOrderReadyMutation.isPending ? (
-                <ActivityIndicator
-                  size="small"
-                  color="#fff"
-                />
-              ) : (
-                <>
-                  <FontAwesome
-                    name="check-circle"
-                    size={16}
-                    color="#fff"
-                  />
-
-                  <Text style={styles.actionButtonText}>
-                    Mark as Ready
-                  </Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    return null;
-  };
-
-  const renderOrderItem = ({
-    item: order,
-  }: {
-    item: Order;
-  }) => {
-    const currentStep = getCurrentStepIndex(order.status);
-
-    const isFailedStatus = currentStep === -1;
-
-    const statusConfig =
-      STATUS_CONFIG[order.status];
+  const renderOrderItem = ({ item: order }: { item: any }) => {
+    const isServiceOrRent = order.items.some((i: any) => i.productId?.category === 'Service' || i.productId?.category === 'Rent');
+    const steps = isServiceOrRent ? SERVICE_STEPS : PRODUCT_STEPS;
+    const currentStep = steps.indexOf(order.status);
+    const isExpanded = expandedOrders[order._id];
+    const statusInfo = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.PLACED;
 
     return (
-      <TouchableOpacity
-        style={styles.orderCard}
-        activeOpacity={0.9}
-      >
-        <LinearGradient
-          colors={['#FFFEF9', '#FFF9E6']}
-          style={styles.orderCardGradient}
-        >
-          {/* HEADER */}
+      <View style={styles.orderCard}>
+        <LinearGradient colors={['#FFFFFF', '#FDFBF0']} style={styles.orderCardGradient}>
+          
+          {/* Header */}
           <View style={styles.orderHeader}>
-            <View style={styles.orderHeaderLeft}>
-              <Text style={styles.orderIdLabel}>
-                Order ID
-              </Text>
-
-              <Text
-                style={styles.orderId}
-                numberOfLines={1}
-              >
-                {order.checkoutId}
-              </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.orderIdLabel}>REF: #{order.checkoutId?.toUpperCase()}</Text>
+              <Text style={{ fontSize: 10, color: '#888' }}>{new Date(order.createdAt).toLocaleDateString()}</Text>
             </View>
-
-            <LinearGradient
-              colors={[
-                statusConfig.color,
-                statusConfig.color + 'DD',
-              ]}
-              style={styles.statusBadge}
-            >
-              <FontAwesome
-                name={statusConfig.icon as any}
-                size={14}
-                color="#fff"
-              />
-
-              <Text style={styles.statusBadgeText}>
-                {statusConfig.label}
-              </Text>
-            </LinearGradient>
-          </View>
-
-          {/* CUSTOMER */}
-          <View style={styles.customerSection}>
-            <View style={styles.customerRow}>
-              <View
-                style={styles.customerIconContainer}
-              >
-                <FontAwesome
-                  name="user"
-                  size={16}
-                  color="#DAA520"
-                />
-              </View>
-
-              <View style={styles.customerInfo}>
-                <Text style={styles.customerName}>
-                  {order.userId.name}
-                </Text>
-
-                <Text style={styles.customerEmail}>
-                  {order.userId.email}
-                </Text>
-              </View>
+            <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '15', borderColor: statusInfo.color, borderWidth: 1 }]}>
+              <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
             </View>
           </View>
 
-          {/* PROGRESS */}
-          {!isFailedStatus ? (
-            <View style={styles.progressSection}>
-              <Text style={styles.sectionTitle}>
-                Order Progress
-              </Text>
-
-              <View style={styles.progressSteps}>
-                {STATUS_STEPS.map((step, index) => {
-                  const isCompleted =
-                    index <= currentStep;
-
-                  const isCurrent =
-                    index === currentStep;
-
-                  const stepConfig =
-                    STATUS_CONFIG[
-                      step as keyof typeof STATUS_CONFIG
-                    ];
-
-                  return (
-                    <View
-                      key={step}
-                      style={styles.stepContainer}
-                    >
-                      <View
-                        style={styles.stepIconWrapper}
-                      >
-                        {index > 0 && (
-                          <View
-                            style={[
-                              styles.stepLine,
-                              isCompleted &&
-                                styles.stepLineCompleted,
-                              {
-                                backgroundColor:
-                                  isCompleted
-                                    ? stepConfig.color
-                                    : '#E0E0E0',
-                              },
-                            ]}
-                          />
-                        )}
-
-                        <LinearGradient
-                          colors={
-                            isCompleted
-                              ? [
-                                  stepConfig.color,
-                                  stepConfig.color + 'DD',
-                                ]
-                              : ['#E0E0E0', '#F5F5F5']
-                          }
-                          style={[
-                            styles.stepIcon,
-                            isCurrent &&
-                              styles.stepIconCurrent,
-                          ]}
-                        >
-                          <FontAwesome
-                            name={
-                              stepConfig.icon as any
-                            }
-                            size={
-                              isCurrent ? 18 : 14
-                            }
-                            color={
-                              isCompleted
-                                ? '#fff'
-                                : '#999'
-                            }
-                          />
-                        </LinearGradient>
-                      </View>
-
-                      <Text
-                        style={[
-                          styles.stepLabel,
-                          isCompleted &&
-                            styles.stepLabelCompleted,
-                          isCurrent &&
-                            styles.stepLabelCurrent,
-                        ]}
-                      >
-                        {stepConfig.label}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
+          {/* Customer Info */}
+          <TouchableOpacity onPress={() => toggleExpand(order._id)} style={styles.customerCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={styles.avatarCircle}>
+                    <Text style={styles.avatarText}>{order.userId?.name?.charAt(0) || '?'}</Text>
+                  </View>
+                  <Text style={styles.customerNameMain}>{order.userId?.name || 'Unknown'}</Text>
+                </View>
+                <FontAwesome name={isExpanded ? "chevron-up" : "chevron-down"} size={12} color="#AAA" />
             </View>
-          ) : (
-            <View style={styles.failedSection}>
-              <LinearGradient
-                colors={[
-                  statusConfig.color + '20',
-                  statusConfig.color + '10',
-                ]}
-                style={styles.failedBanner}
-              >
-                <FontAwesome
-                  name={statusConfig.icon as any}
-                  size={24}
-                  color={statusConfig.color}
-                />
+            {isExpanded && (
+              <View style={styles.expandedDetails}>
+                <Text style={styles.detailText}><FontAwesome name="phone" /> {order.deliveryAddress?.phone}</Text>
+                <Text style={styles.detailText}><FontAwesome name="map-marker" /> {order.deliveryAddress?.street}, {order.deliveryAddress?.city}</Text>
+                {order.paymentMethod === 'SELF_PICKUP' && (
+                  <View style={{ backgroundColor: '#E3F2FD', padding: 5, borderRadius: 4, marginTop: 5 }}>
+                    <Text style={{ fontSize: 10, color: '#1976D2', fontWeight: 'bold' }}>SELF PICKUP ORDER</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
 
-                <Text
-                  style={[
-                    styles.failedText,
-                    {
-                      color: statusConfig.color,
-                    },
-                  ]}
-                >
-                  Order {statusConfig.label}
-                </Text>
-              </LinearGradient>
+          {/* Steps Progress */}
+          {order.status !== 'CANCELLED' && (
+            <View style={styles.progressContainer}>
+              {steps.map((step, index) => (
+                <View key={step} style={{ alignItems: 'center', flex: 1 }}>
+                  <View style={[styles.progressDot, { backgroundColor: index <= currentStep ? '#DAA520' : '#E0E0E0' }]}>
+                    {index <= currentStep && <FontAwesome name="check" size={8} color="#fff" />}
+                  </View>
+                  <Text style={[styles.progressText, { color: index <= currentStep ? '#DAA520' : '#999' }]}>{step}</Text>
+                </View>
+              ))}
             </View>
           )}
 
-          {/* ITEMS */}
-          <View style={styles.itemsSection}>
-            <View style={styles.sectionTitleRow}>
-              <FontAwesome
-                name="shopping-bag"
-                size={16}
-                color="#DAA520"
+          {/* Items List */}
+          {order.items.map((item: any) => (
+            <View key={item._id} style={styles.itemRowImproved}>
+              <Image 
+                source={{ uri: `${S3_BASE_URL}/${item.productId?.images?.[0]}` }} 
+                style={styles.itemImageSmall} 
+                defaultSource={require('../../assets/images/icon.png')} 
               />
-
-              <Text style={styles.sectionTitle}>
-                Items ({order.items.length})
-              </Text>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemNameSmall} numberOfLines={1}>{item.productId?.name}</Text>
+                <Text style={styles.itemCatSmall}>Qty: {item.quantity} | {item.productId?.category}</Text>
+              </View>
+              <Text style={styles.itemPriceSmall}>₹{item.price}</Text>
             </View>
+          ))}
 
-            {order.items
-              .slice(0, 2)
-              .map((item) => (
-                <View
-                  key={item._id}
-                  style={styles.itemRow}
-                >
-                  <View
-                    style={styles.itemImageContainer}
-                  >
-                    {item.productId.images &&
-                    item.productId.images.length >
-                      0 ? (
-                      <Image
-                        source={{
-                          uri: `${S3_BASE_URL}/${item.productId.images[0]}`,
-                        }}
-                        style={styles.itemImage}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View
-                        style={styles.noItemImage}
-                      >
-                        <FontAwesome
-                          name="image"
-                          size={20}
-                          color="#DAA520"
-                        />
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={styles.itemDetails}>
-                    <Text
-                      style={styles.itemName}
-                      numberOfLines={1}
-                    >
-                      {item.productId.name}
-                    </Text>
-
-                    <Text
-                      style={styles.itemCategory}
-                    >
-                      {item.productId.category}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={styles.itemPriceSection}
-                  >
-                    <Text
-                      style={styles.itemQuantity}
-                    >
-                      x{item.quantity}
-                    </Text>
-
-                    <Text style={styles.itemPrice}>
-                      ₹
-                      {item.price.toLocaleString(
-                        'en-IN'
-                      )}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Grand Total</Text>
+            <Text style={styles.totalValue}>₹{order.totalAmount}</Text>
           </View>
 
-          {/* SUMMARY */}
-          <View style={styles.summarySection}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>
-                Total Amount
-              </Text>
-
-              <Text style={styles.summaryValue}>
-                ₹
-                {order.totalAmount.toLocaleString(
-                  'en-IN'
-                )}
-              </Text>
-            </View>
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>
-                Order Date
-              </Text>
-
-              <Text style={styles.summaryDate}>
-                {formatDate(order.createdAt)}
-              </Text>
-            </View>
-          </View>
-
-          {/* ACTIONS */}
           {renderActionButtons(order)}
         </LinearGradient>
-      </TouchableOpacity>
+      </View>
     );
   };
 
-  if (isLoading) {
+  if (isLoading && !orders) {
     return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" />
-
-        <ActivityIndicator
-          size="large"
-          color="#DAA520"
-        />
-
-        <Text style={styles.loadingText}>
-          Loading orders...
-        </Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#DAA520" />
       </View>
     );
   }
@@ -673,132 +249,39 @@ export default function OrdersScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-
-      {/* FILTERS */}
-      <View style={styles.filterContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={
-            styles.filterScroll
-          }
-        >
-          {filterOptions.map((filter) => {
-            const isSelected =
-              selectedFilter === filter;
-
-            const statusConfig =
-              filter !== 'ALL'
-                ? STATUS_CONFIG[
-                    filter as keyof typeof STATUS_CONFIG
-                  ]
-                : null;
-
-            return (
-              <TouchableOpacity
-                key={filter}
-                onPress={() =>
-                  setSelectedFilter(filter)
-                }
-                activeOpacity={0.7}
-              >
-                {isSelected ? (
-                  <LinearGradient
-                    colors={
-                      statusConfig
-                        ? [
-                            statusConfig.color,
-                            statusConfig.color + 'DD',
-                          ]
-                        : ['#DAA520', '#B8860B']
-                    }
-                    style={styles.filterPill}
-                  >
-                    {statusConfig && (
-                      <FontAwesome
-                        name={
-                          statusConfig.icon as any
-                        }
-                        size={14}
-                        color="#fff"
-                      />
-                    )}
-
-                    <Text
-                      style={
-                        styles.filterPillTextSelected
-                      }
-                    >
-                      {filter === 'ALL'
-                        ? 'All Orders'
-                        : statusConfig?.label}
-                    </Text>
-                  </LinearGradient>
-                ) : (
-                  <View
-                    style={
-                      styles.filterPillInactive
-                    }
-                  >
-                    {statusConfig && (
-                      <FontAwesome
-                        name={
-                          statusConfig.icon as any
-                        }
-                        size={14}
-                        color="#666"
-                      />
-                    )}
-
-                    <Text
-                      style={styles.filterPillText}
-                    >
-                      {filter === 'ALL'
-                        ? 'All Orders'
-                        : statusConfig?.label}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+      
+      {/* Filter Bar */}
+      <View style={{ backgroundColor: '#fff', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15 }}>
+          {['ALL', 'PLACED', 'READY', 'ACCEPTED', 'DELIVERED', 'CANCELLED'].map((filter) => (
+             <TouchableOpacity 
+             key={filter}
+             onPress={() => setSelectedFilter(filter)}
+             style={[
+                 { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 10, backgroundColor: '#f5f5f5' },
+                 selectedFilter === filter && { backgroundColor: '#DAA520' }
+             ]}
+           >
+             <Text style={{ color: selectedFilter === filter ? '#fff' : '#666', fontWeight: 'bold', fontSize: 12 }}>
+                 {filter === 'CANCELLED' ? 'REJECTED' : filter}
+             </Text>
+           </TouchableOpacity>
+          ))}
         </ScrollView>
       </View>
 
-      {/* ORDERS LIST */}
       <FlatList
         data={filteredOrders}
         renderItem={renderOrderItem}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            colors={['#DAA520']}
-            tintColor="#DAA520"
-          />
+        contentContainerStyle={{ padding: 15, paddingBottom: 40 }}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor="#DAA520" />}
+        ListEmptyComponent={
+            <View style={{ marginTop: 100, alignItems: 'center' }}>
+                <FontAwesome name="inbox" size={50} color="#ddd" />
+                <Text style={{ color: '#999', marginTop: 10, fontSize: 16 }}>No orders found</Text>
+            </View>
         }
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <FontAwesome
-              name="shopping-cart"
-              size={64}
-              color="#E0E0E0"
-            />
-
-            <Text style={styles.emptyTitle}>
-              No orders found
-            </Text>
-
-            <Text style={styles.emptySubtitle}>
-              {selectedFilter !== 'ALL'
-                ? `No ${selectedFilter.toLowerCase()} orders at the moment`
-                : 'Orders will appear here once customers place them'}
-            </Text>
-          </View>
-        )}
       />
     </View>
   );
