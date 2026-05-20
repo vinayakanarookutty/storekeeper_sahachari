@@ -16,8 +16,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { getToken } from './services/auth';
 import { styles } from './styles/add-edit-common.style';
+import { getToken } from './services/auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -215,8 +215,9 @@ export default function AddProductScreen() {
     }
 
     // Combine price with unit for Service or Rent (e.g., "20/Hour")
-    const finalPrice = needsTimeUnit ? `${price}/${serviceUnit}` : price;
-
+const finalPrice = needsTimeUnit
+  ? `${price}/${serviceUnit}`
+  : `${price}/${unit}`;
     const productData: ProductData = {
       name,
       description,

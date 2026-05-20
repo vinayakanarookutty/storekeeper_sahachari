@@ -88,9 +88,16 @@ export default function TabOneScreen() {
     };
 
     const activeOffer = getActiveOffer();
+    console.log('PRICE VALUE:', item.price);
     const numericPrice = typeof item.price === 'string' 
       ? parseFloat(item.price.replace(/[^0-9.]/g, '')) 
       : item.price;
+
+      const priceString = String(item.price);
+
+const priceUnit = priceString.includes('/')
+  ? '/' + priceString.split('/')[1].trim()
+  : '';
     
     const discountedPrice = activeOffer 
       ? Math.round(numericPrice - (numericPrice * activeOffer.value / 100))
@@ -129,8 +136,13 @@ export default function TabOneScreen() {
           <View style={styles.priceRow}>
             {activeOffer ? (
               <View style={styles.priceContainer}>
-                <Text style={styles.discountedPrice}>₹{discountedPrice}</Text>
-                <Text style={styles.originalPriceText}>₹{numericPrice}</Text>
+                <Text style={styles.discountedPrice}>
+  ₹{discountedPrice}{priceUnit}
+</Text>
+
+<Text style={styles.originalPriceText}>
+  ₹{numericPrice}{priceUnit}
+</Text>
               </View>
             ) : (
               <Text style={styles.priceText}>₹{item.price}</Text>

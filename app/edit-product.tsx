@@ -149,13 +149,15 @@ export default function EditProductScreen() {
     if (finalImages.length === 0) return Alert.alert('Error', 'At least one image required');
 
     updateProductMutation.mutate({
-      name,
-      description,
-      price: finalPrice,
-      quantity: isService ? 1 : parseInt(quantity),
-      category,
-      images: finalImages,
-    });
+  name,
+  description,
+  price, // keep full value like 80/kg
+  quantity: isService
+    ? 100
+    : parseInt(quantity),
+  category,
+  images: finalImages,
+});
   };
 
   const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
