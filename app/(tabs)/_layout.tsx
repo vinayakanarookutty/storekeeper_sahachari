@@ -53,7 +53,7 @@ export default function TabLayout() {
   // Redirect if user not logged in
   useEffect(() => {
     if (!token) {
-      router.replace('/signup');
+      router.replace('./login');
     }
   }, [token]);
 
@@ -72,7 +72,7 @@ export default function TabLayout() {
           style: 'destructive',
           onPress: async () => {
             await clearAuthToken();
-            router.replace('/signup');
+            router.replace('/login');
           },
         },
       ]

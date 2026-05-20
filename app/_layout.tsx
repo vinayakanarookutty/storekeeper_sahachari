@@ -89,7 +89,6 @@ function RootLayoutNav() {
         <Stack.Screen name="index" />
         
         {/* Auth screens */}
-        <Stack.Screen name="signup" />
         <Stack.Screen name="login" />
         
         {/* Main app */}

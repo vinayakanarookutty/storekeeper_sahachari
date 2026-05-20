@@ -1,24 +1,24 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  LayoutAnimation,
+  Platform,
+  RefreshControl,
+  ScrollView,
   StatusBar,
   Text,
   TouchableOpacity,
-  RefreshControl,
-  View,
-  LayoutAnimation,
-  Platform,
   UIManager,
-  ScrollView,
-  ActivityIndicator
+  View
 } from 'react-native';
 import { getToken } from '../services/auth';
-import { styles } from './tab_style/three.style';
+import { styles } from '../tab_style/three.style';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);

@@ -2,18 +2,18 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
-import { 
-  FlatList, 
-  Image, 
-  TouchableOpacity, 
-  View, 
-  Text, 
+import {
   ActivityIndicator,
+  FlatList,
+  Image,
+  Text,
+  TouchableOpacity,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { getToken } from '../services/auth';
-import { styles } from './tab_style/index.style';
+import { styles } from '../tab_style/index.style';
 styles
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';

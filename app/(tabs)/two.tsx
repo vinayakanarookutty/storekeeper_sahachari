@@ -2,22 +2,22 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   Modal,
+  RefreshControl,
   ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
   View,
-  Text,
-  RefreshControl,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { getToken } from '../services/auth';
-import { styles } from './tab_style/two.style';
+import { styles } from '../tab_style/two.style';
 styles
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
