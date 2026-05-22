@@ -196,9 +196,20 @@ export default function ProductDetailScreen() {
   };
 
   const handleDelete = () => {
+  const title = `Delete ${isService ? 'Service' : 'Product'}`;
+  const message = `Are you sure you want to delete this ${isService ? 'service' : 'product'}? This action cannot be undone.`;
+
+  if (Platform.OS === 'web') {
+    // Standard web browser confirmation dialog
+    const confirmed = window.confirm(`${title}\n\n${message}`);
+    if (confirmed) {
+      deleteProductMutation.mutate(product._id);
+    }
+  } else {
+    // Native mobile alert behavior
     Alert.alert(
-      `Delete ${isService ? 'Service' : 'Product'}`,
-      `Are you sure you want to delete this ${isService ? 'service' : 'product'}? This action cannot be undone.`,
+      title,
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -208,7 +219,8 @@ export default function ProductDetailScreen() {
         },
       ]
     );
-  };
+  }
+};
 
   const handleDeleteOffer = () => {
     Alert.alert(
