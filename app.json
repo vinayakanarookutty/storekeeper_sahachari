@@ -52,10 +52,7 @@
     },
     "plugins": [
       [
-      "expo-notifications",
-        {
-          "sounds": ["./assets/sounds/notifications.wav"]
-        }
+      "expo-notifications"
       ],
       "expo-router",
       [
