@@ -35,6 +35,24 @@ function TabBarIcon(props: {
   );
 }
 
+const showLogoutConfirmation = (onConfirm: () => void) => {
+  if (Platform.OS === 'web') {
+    const confirmed = window.confirm('Logout\n\nAre you sure you want to logout?');
+    if (confirmed) {
+      onConfirm();
+    }
+  } else {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', style: 'destructive', onPress: onConfirm },
+      ]
+    );
+  }
+};
+
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const { token, clearAuthToken } = useAuth();
@@ -46,37 +64,24 @@ export default function TabLayout() {
     card: colorScheme === 'dark' ? '#1E1E1E' : '#FFFFFF',
     text: colorScheme === 'dark' ? '#FFFFFF' : '#1A1A1A',
     inactive: colorScheme === 'dark' ? '#8E8E93' : '#7A7A7A',
-    primary: '#DAA520 ',
+    primary: '#DAA520', // <-- Removed the extra space here
     border: colorScheme === 'dark' ? '#2C2C2E' : '#E5E7EB',
   };
 
   // Redirect if user not logged in
   useEffect(() => {
     if (!token) {
-      router.replace('/signup');
+      router.replace('./login');
     }
   }, [token]);
 
   // Logout function
+  // Find your existing handleLogout function and update it to this:
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await clearAuthToken();
-            router.replace('/signup');
-          },
-        },
-      ]
-    );
+    showLogoutConfirmation(async () => {
+      await clearAuthToken();
+      router.replace('/login');
+    });
   };
 
   return (

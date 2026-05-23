@@ -4,57 +4,79 @@
     "slug": "storekeeper",
     "version": "3.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+
+    "icon": "./assets/images/logo.png",
+
     "scheme": "storekeeper",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/splashscreen.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FDB515"
-    },
+
     "ios": {
       "supportsTablet": true,
-      "splash": {
-        "image": "./assets/images/icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#FDB515"
-      },
+      "bundleIdentifier": "com.corestoneinnovations.sahachariadmin",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload product images.",
         "NSCameraUsageDescription": "This app needs access to your camera to take product photos."
       }
     },
+
+    "splash": {
+      "image": "./assets/images/splashscreen2.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/splashscreen.png",
-        "backgroundColor": "#FDB515"
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#FFFFFF"
       },
+
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
+
       "splash": {
-        "image": "./assets/images/icon.png",
+        "image": "./assets/images/splashscreen2.png",
         "resizeMode": "cover",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#FFFFFF"
       },
+
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+
       "package": "com.corestoneinnovations.sahachariadmin"
     },
+
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       [
       "expo-notifications"
       ],
       "expo-router",
+
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splashscreen.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+
+          "dark": {
+            "backgroundColor": "#FFFFFF"
+          }
+        }
+      ],
+
       [
         "expo-image-picker",
         {
@@ -63,11 +85,15 @@
         }
       ]
     ],
+
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "reactCompiler": true
     },
+
     "extra": {
       "router": {},
+
       "eas": {
         "projectId": "86767deb-9516-4273-a7af-bcf0b7497e57"
       }

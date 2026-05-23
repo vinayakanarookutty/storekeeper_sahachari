@@ -2,22 +2,23 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   Modal,
+  RefreshControl,
   ScrollView,
+  Text,
   TextInput,
+  Platform,
   TouchableOpacity,
   View,
-  Text,
-  RefreshControl,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { getToken } from '../services/auth';
-import { styles } from './tab_style/two.style';
+import { styles } from '../tab_style/two.style';
 styles
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -53,7 +54,31 @@ interface EditModalProps {
   onSave: (field: string, value: string) => void;
   isLoading: boolean;
 }
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
 
+const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+  if (Platform.OS === 'web') {
+    const confirmed = window.confirm(`${title}\n\n${message}`);
+    if (confirmed) {
+      onConfirm();
+    }
+  } else {
+    Alert.alert(
+      title,
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Out', style: 'destructive', onPress: onConfirm }
+      ]
+    );
+  }
+};
 function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditModalProps) {
   const [editValue, setEditValue] = useState(value);
 
@@ -165,10 +190,10 @@ export default function TabTwoScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       setEditModalVisible(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      showAlert('Success', 'Profile updated successfully!'); // <-- Changed here
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      showAlert('Error', error.message || 'Failed to update profile'); // <-- Changed here
     },
   });
 
@@ -210,10 +235,10 @@ export default function TabTwoScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
-      Alert.alert('Success', 'Profile picture updated!');
+      showAlert('Success', 'Profile picture updated!'); // <-- Changed here
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Upload failed');
+      showAlert('Error', error.message || 'Upload failed'); // <-- Changed here
     },
   });
 
@@ -296,7 +321,20 @@ export default function TabTwoScreen() {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={async () => { await clearAuthToken(); router.replace('/login'); }}>
+      {/* Update your Log Out touchable button to this structure: */}
+      <TouchableOpacity 
+        style={styles.logoutBtn} 
+        onPress={() => {
+          showConfirm(
+            'Logout',
+            'Are you sure you want to logout?',
+            async () => {
+              await clearAuthToken();
+              router.replace('/login');
+            }
+          );
+        }}
+      >
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
 

@@ -8,6 +8,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
   Modal,
   ScrollView,
   Text,
@@ -27,6 +28,20 @@ const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
 const RENT_UNITS = ['Hour', 'Day', 'Week', 'Month'];
 const SERVICE_UNITS = ['Hour', 'Day', 'Service'];
 
+// Add below your S3_BASE_URL constant definition
+const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+  if (Platform.OS === 'web') {
+    alert(`${title}: ${message}`);
+    if (onConfirm) onConfirm();
+  } else {
+    Alert.alert(
+      title, 
+      message, 
+      onConfirm ? [{ text: 'OK', onPress: onConfirm }] : undefined
+    );
+  }
+};
+
 interface ProductData {
   name: string;
   description: string;
@@ -43,13 +58,18 @@ export default function EditProductScreen() {
   
   const product = params.product ? JSON.parse(params.product as string) : null;
 
-  // Logic to parse existing price (e.g., "50/Hour" -> price: "50", unit: "Hour")
+  // FIX: Parse existing price AND units properly for all categories
   const parsePriceData = () => {
-    if (!product?.price) return { val: '', unit: 'Hour' };
+    if (!product?.price) return { val: '', unit: 'kg' };
     const parts = product.price.toString().split('/');
+    
+    let defaultUnit = 'kg';
+    if (product.category === 'Rent') defaultUnit = 'Day';
+    if (product.category === 'Service') defaultUnit = 'Hour';
+
     return {
       val: parts[0],
-      unit: parts[1] || (product.category === 'Rent' ? 'Day' : 'Hour')
+      unit: parts[1] || defaultUnit
     };
   };
 
@@ -62,7 +82,7 @@ export default function EditProductScreen() {
   const [price, setPrice] = useState(initialPriceInfo.val);
   const [serviceUnit, setServiceUnit] = useState(initialPriceInfo.unit);
   const [quantity, setQuantity] = useState(product?.quantity?.toString() || '');
-  const [unit, setUnit] = useState('kg');
+  const [unit, setUnit] = useState(initialPriceInfo.unit); // FIX: Dynamic assignment, not hardcoded to 'kg'
   
   const [existingImages, setExistingImages] = useState<string[]>(product?.images || []);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -78,27 +98,33 @@ export default function EditProductScreen() {
   const needsTimeUnit = isService || isRent;
 
   const updateProductMutation = useMutation({
-    mutationFn: async (updatedData: ProductData) => {
+    mutationFn: async ({ id, data }: { id: string; data: ProductData }) => {
       const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/storekeeper/products/${product._id}`, {
+      
+      const response = await fetch(`${API_BASE_URL}/storekeeper/products/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(updatedData),
+        body: JSON.stringify(data),
       });
 
-      if (!response.ok) throw new Error('Update failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Failed to update product');
+      }
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', 'Updated successfully!', [
-        { text: 'OK', onPress: () => {
-          queryClient.invalidateQueries({ queryKey: ['products'] });
-          router.back();
-        }},
-      ]);
+      // Fix: Now uses web-safe alert mapping to ensure redirect executes
+      showAlert('Success', 'Updated successfully!', () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        router.back();
+      });
+    },
+    onError: (error: any) => {
+      showAlert('Error', error.message || 'Failed to update item');
     },
   });
 
@@ -119,45 +145,78 @@ export default function EditProductScreen() {
     try {
       const token = await getToken();
       for (const uri of selectedImages) {
-        const fileName = `edit_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+        let fileExtension = 'jpg';
+        let fileType = 'image/jpeg';
+
+        // Web environment image metadata adjustment
+        if (Platform.OS === 'web') {
+          if (uri.includes('image/png') || uri.endsWith('.png')) {
+            fileExtension = 'png';
+            fileType = 'image/png';
+          }
+        }
+
+        const fileName = `edit_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+        
         const presignedRes = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ fileName, fileType: 'image/jpeg', folder: 'uploads' }),
+          body: JSON.stringify({ fileName, fileType, folder: 'uploads' }),
         });
+        
         const { url, key } = await presignedRes.json();
         const blob = await (await fetch(uri)).blob();
-        await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: blob });
+        
+        await fetch(url, { method: 'PUT', headers: { 'Content-Type': fileType }, body: blob });
         newKeys.push(key);
       }
       setUploadedImageKeys(prev => [...prev, ...newKeys]);
-      setSelectedImages([]); // Clear preview once uploaded
-      Alert.alert('Success', 'New images uploaded!');
+      setSelectedImages([]);
+      showAlert('Success', 'New images uploaded!');
     } catch (e) {
-      Alert.alert('Error', 'Upload failed');
+      showAlert('Error', 'Upload failed');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleUpdateProduct = () => {
-    if (!category || !name || !price) return Alert.alert('Error', 'Missing required fields');
-
-    const finalPrice = needsTimeUnit ? `${price}/${serviceUnit}` : price;
+ const handleUpdateProduct = () => {
+    if (!category.trim() || !name.trim() || !description.trim() || !price) {
+      showAlert('Error', 'Please fill in all required fields');
+      return;
+    }
+    if (!isService && !quantity) {
+      showAlert('Error', 'Please enter the quantity');
+      return;
+    }
+    
     const finalImages = [...existingImages, ...uploadedImageKeys];
+    if (finalImages.length === 0) {
+      showAlert('Error', 'Please keep or upload at least one image');
+      return;
+    }
 
-    if (finalImages.length === 0) return Alert.alert('Error', 'At least one image required');
+    const finalPrice = needsTimeUnit ? `${price}/${serviceUnit}` : `${price}/${unit}`;
+
+    const productData: ProductData = {
+      name,
+      description,
+      price: finalPrice,
+      quantity: isService ? 1 : parseInt(quantity, 10),
+      category,
+      images: finalImages,
+    };
+
+    const currentId = product?._id; 
+
+    if (!currentId) {
+      return showAlert('Error', 'Could not locate an active Product ID to update');
+    }
 
     updateProductMutation.mutate({
-  name,
-  description,
-  price, // keep full value like 80/kg
-  quantity: isService
-    ? 100
-    : parseInt(quantity),
-  category,
-  images: finalImages,
-});
+      id: currentId,
+      data: productData,
+    });
   };
 
   const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
@@ -240,7 +299,6 @@ export default function EditProductScreen() {
           <Text style={styles.sectionTitle}>Manage Images</Text>
           
           <View style={styles.imagesContainer}>
-            {/* Show existing images from S3 */}
             {existingImages.map((img, index) => (
               <View key={`ex-${index}`} style={styles.imageWrapper}>
                 <Image source={{ uri: img.startsWith('http') ? img : `${S3_BASE_URL}/${img}` }} style={styles.imagePreview} />
@@ -249,7 +307,6 @@ export default function EditProductScreen() {
                 </TouchableOpacity>
               </View>
             ))}
-            {/* Show locally picked images */}
             {selectedImages.map((uri, index) => (
               <View key={`new-${index}`} style={styles.imageWrapper}>
                 <Image source={{ uri }} style={styles.imagePreview} />
@@ -282,9 +339,46 @@ export default function EditProductScreen() {
       </ScrollView>
 
       {/* MODALS */}
-      <SelectionModal visible={showCategoryModal} data={PRODUCT_CATEGORIES} title="Select Category" onSelect={(item: string) => { setCategory(item); setShowCategoryModal(false); }} onClose={() => setShowCategoryModal(false)} />
-      <SelectionModal visible={showUnitModal} data={UNITS} title="Select Unit" onSelect={(item: string) => { setUnit(item); setShowUnitModal(false); }} onClose={() => setShowUnitModal(false)} />
-      <SelectionModal visible={showServiceUnitModal} data={isService ? SERVICE_UNITS : RENT_UNITS} title="Select Unit" onSelect={(item: string) => { setServiceUnit(item); setShowServiceUnitModal(false); }} onClose={() => setShowServiceUnitModal(false)} />
+      <SelectionModal 
+        visible={showCategoryModal} 
+        data={PRODUCT_CATEGORIES} 
+        title="Select Category" 
+        onSelect={(item: string) => { 
+          setCategory(item); 
+          // FIX: Automatically keep unit states contextually synchronized on live selection
+          if (item === 'Service') {
+            setServiceUnit('Hour');
+          } else if (item === 'Rent') {
+            setServiceUnit('Day');
+          } else {
+            setUnit('kg');
+          }
+          setShowCategoryModal(false); 
+        }} 
+        onClose={() => setShowCategoryModal(false)} 
+      />
+
+      <SelectionModal 
+        visible={showUnitModal} 
+        data={UNITS} 
+        title="Select Unit" 
+        onSelect={(item: string) => { 
+          setUnit(item); 
+          setShowUnitModal(false); 
+        }} 
+        onClose={() => setShowUnitModal(false)} 
+      />
+
+      <SelectionModal 
+        visible={showServiceUnitModal} 
+        data={isService ? SERVICE_UNITS : RENT_UNITS} 
+        title="Select Unit" 
+        onSelect={(item: string) => { 
+          setServiceUnit(item); 
+          setShowServiceUnitModal(false); 
+        }} 
+        onClose={() => setShowServiceUnitModal(false)} 
+      />
     </View>
   );
 }
