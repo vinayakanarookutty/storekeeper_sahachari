@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useAuth } from './contexts/AuthContext';
-
+import { ActivityIndicator, View } from 'react-native';
+import { styles } from './styles/index.style';
 export default function Index() {
   const { token, isLoading } = useAuth();
 
@@ -25,12 +25,3 @@ export default function Index() {
   console.log('❌ User not authenticated - redirecting to login');
   return <Redirect href="/login" />;
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFF9E6',
-  },
-});

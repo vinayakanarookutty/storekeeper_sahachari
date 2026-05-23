@@ -2,22 +2,21 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  Keyboard,
+  Modal,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
-  Modal, // Added Modal
 } from 'react-native';
+import { styles } from './styles/add-edit-common.style';
 import { getToken } from './services/auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -42,10 +41,13 @@ const PRODUCT_CATEGORIES = [
   'Groceries',
   'Home Made',
   'Service',
-  'Fish & Meat'
+  'Fish & Meat',
+  'Rent'
 ];
 
 const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
+const RENT_UNITS = ['Hour', 'Day', 'Week', 'Month'];
+const SERVICE_UNITS = ['Hour', 'Day', 'Service']; // Units specifically for services
 
 export default function AddProductScreen() {
   const queryClient = useQueryClient();
@@ -55,6 +57,7 @@ export default function AddProductScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [serviceUnit, setServiceUnit] = useState('Hour'); // State for Service/Rent duration
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('kg');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -64,8 +67,12 @@ export default function AddProductScreen() {
   // MODAL STATES
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
+  const [showServiceUnitModal, setShowServiceUnitModal] = useState(false);
 
   const isService = category === 'Service';
+  const isRent = category === 'Rent';
+  // Check if current category needs a time-based unit
+  const needsTimeUnit = isService || isRent;
 
   const createProductMutation = useMutation({
     mutationFn: async (productData: ProductData) => {
@@ -86,7 +93,7 @@ export default function AddProductScreen() {
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', isService ? 'Service created successfully!' : 'Product created successfully!', [
+      Alert.alert('Success', 'Created successfully!', [
         {
           text: 'OK',
           onPress: () => {
@@ -97,16 +104,23 @@ export default function AddProductScreen() {
       ]);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || `Failed to create ${isService ? 'service' : 'product'}`);
+      Alert.alert('Error', error.message || 'Failed to create item');
     },
   });
 
   const handleSelectCategory = (selectedCategory: string) => {
     setCategory(selectedCategory);
     setShowCategoryModal(false);
+    
     if (selectedCategory === 'Service') {
-      setQuantity('100');
-    } else if (category === 'Service') {
+      setQuantity('1'); // Default quantity for service
+      setServiceUnit('Hour');
+    } else if (selectedCategory === 'Rent') {
+      setUnit('unit');
+      setQuantity('');
+      setServiceUnit('Day');
+    } else {
+      setUnit('kg');
       setQuantity('');
     }
   };
@@ -200,11 +214,15 @@ export default function AddProductScreen() {
       return;
     }
 
+    // Combine price with unit for Service or Rent (e.g., "20/Hour")
+const finalPrice = needsTimeUnit
+  ? `${price}/${serviceUnit}`
+  : `${price}/${unit}`;
     const productData: ProductData = {
       name,
       description,
-      price: price,
-      quantity: isService ? 100 : parseInt(quantity),
+      price: finalPrice,
+      quantity: isService ? 1 : parseInt(quantity),
       category,
       images: uploadedImageKeys,
     };
@@ -212,7 +230,6 @@ export default function AddProductScreen() {
     createProductMutation.mutate(productData);
   };
 
-  // Selection Modal Component for reusability
   const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -256,7 +273,6 @@ export default function AddProductScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        {/* CATEGORY FIELD */}
         <TouchableOpacity 
           style={styles.inputWrapper} 
           onPress={() => setShowCategoryModal(true)}
@@ -290,22 +306,39 @@ export default function AddProductScreen() {
           multiline
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Price *"
-          placeholderTextColor="#A89378"
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="numeric"
-        />
+        {/* PRICE FIELD - Shows Unit dropdown for Service and Rent */}
+        <View style={styles.parallelContainer}>
+          <View style={{ flex: 2 }}>
+            <TextInput
+              style={styles.input}
+              placeholder="Price *"
+              placeholderTextColor="#A89378"
+              value={price}
+              onChangeText={setPrice}
+              keyboardType="numeric"
+            />
+          </View>
+          {needsTimeUnit && (
+            <View style={{ flex: 1.5, marginLeft: 10 }}>
+              <TouchableOpacity 
+                style={styles.unitSelector} 
+                onPress={() => setShowServiceUnitModal(true)}
+              >
+                <Text style={styles.unitText}>/ {serviceUnit}</Text>
+                <FontAwesome name="caret-down" size={16} color="#DAA520" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
+        {/* STOCK/QUANTITY FIELD */}
         {!isService && (
           <View style={styles.section}>
             <View style={styles.parallelContainer}>
               <View style={{ flex: 2 }}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Stock *"
+                  placeholder={isRent ? "Stock (Unit) *" : "Stock *"}
                   placeholderTextColor="#A89378"
                   value={quantity}
                   onChangeText={setQuantity}
@@ -313,23 +346,21 @@ export default function AddProductScreen() {
                 />
               </View>
 
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <TouchableOpacity 
-                  style={styles.unitSelector} 
-                  onPress={() => setShowUnitModal(true)}
-                >
-                  <Text style={styles.unitText}>{unit}</Text>
-                  <FontAwesome name="caret-down" size={16} color="#DAA520" />
-                </TouchableOpacity>
-              </View>
+              {!isRent && (
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <TouchableOpacity 
+                    style={styles.unitSelector} 
+                    onPress={() => setShowUnitModal(true)}
+                  >
+                    <Text style={styles.unitText}>{unit}</Text>
+                    <FontAwesome name="caret-down" size={16} color="#DAA520" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-            <Text style={styles.fieldHint}>
-              Total Stock: {quantity || '0'} {unit}
-            </Text>
           </View>
         )}
 
-        {/* IMAGES SECTION */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Images</Text>
           <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
@@ -383,55 +414,18 @@ export default function AddProductScreen() {
         }}
         onClose={() => setShowUnitModal(false)}
       />
+
+      {/* DYNAMIC UNIT MODAL FOR SERVICE/RENT */}
+      <SelectionModal 
+        visible={showServiceUnitModal}
+        data={isService ? SERVICE_UNITS : RENT_UNITS}
+        title={isService ? "Select Service Unit" : "Select Rental Unit"}
+        onSelect={(item: string) => {
+          setServiceUnit(item);
+          setShowServiceUnitModal(false);
+        }}
+        onClose={() => setShowServiceUnitModal(false)}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF9E6' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, borderBottomWidth: 1, borderBottomColor: '#E0D6C3' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#2D2416' },
-  closeButton: { padding: 8 },
-  scrollView: { flex: 1 },
-  content: { padding: 20 },
-  inputWrapper: { position: 'relative', marginBottom: 16 },
-  inputIcon: { position: 'absolute', right: 16, top: 20 },
-  input: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E0D6C3', color: '#2D2416' },
-  textArea: { minHeight: 100, textAlignVertical: 'top' },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#2D2416', marginBottom: 12 },
-  parallelContainer: { flexDirection: 'row', alignItems: 'flex-start' },
-  unitSelector: { 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 8, 
-    padding: 16, 
-    borderWidth: 1, 
-    borderColor: '#E0D6C3', 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    height: 58 
-  },
-  unitText: { fontSize: 16, color: '#2D2416', fontWeight: '600' },
-  fieldHint: { fontSize: 12, color: '#856404', marginTop: -6, marginBottom: 8 },
-  pickButton: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 20, alignItems: 'center', borderWidth: 2, borderColor: '#DAA520', borderStyle: 'dashed', flexDirection: 'row', justifyContent: 'center', gap: 12 },
-  pickButtonText: { color: '#DAA520', fontSize: 16, fontWeight: '600' },
-  imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 12 },
-  imageWrapper: { position: 'relative' },
-  imagePreview: { width: 100, height: 100, borderRadius: 8 },
-  removeButton: { position: 'absolute', top: -8, right: -8, backgroundColor: '#ff3b30', width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  removeButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  uploadButton: { backgroundColor: '#4A90E2', borderRadius: 8, padding: 16, alignItems: 'center', marginTop: 16 },
-  uploadButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  createButton: { backgroundColor: '#DAA520', borderRadius: 8, padding: 16, alignItems: 'center', marginBottom: 40 },
-  createButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  buttonDisabled: { opacity: 0.6 },
-  
-  // MODAL STYLES
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '50%', paddingBottom: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#2D2416' },
-  modalItem: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  modalItemText: { fontSize: 16, color: '#2D2416' }
-});

@@ -1,71 +1,17 @@
 import { getToken } from "./auth";
 
-// Get API URL from environment or use default
+/**
+ * CONFIGURATION
+ */
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
 
+/**
+ * INTERFACES & TYPES
+ */
 interface ApiRequestOptions extends RequestInit {
   requiresAuth?: boolean;
 }
 
-export async function apiRequest<T>(
-  endpoint: string,
-  options: ApiRequestOptions = {},
-): Promise<T> {
-  const { requiresAuth = true, headers = {}, ...restOptions } = options;
-
-  const requestHeaders: HeadersInit = {
-    "Content-Type": "application/json",
-    ...headers,
-  };
-
-  // Add authorization token if required
-  if (requiresAuth) {
-    const token = await getToken();
-    if (token) {
-      requestHeaders["Authorization"] = `Bearer ${token}`;
-    }
-  }
-
-  const url = `${API_BASE_URL}${endpoint}`;
-
-  console.log("API Request:", {
-    url,
-    method: restOptions.method || "GET",
-    requiresAuth,
-    hasToken: requiresAuth ? !!(await getToken()) : "N/A",
-  });
-
-  const response = await fetch(url, {
-    ...restOptions,
-    headers: requestHeaders,
-  });
-
-  // Handle error responses
-  if (!response.ok) {
-    let errorMessage = `API Error: ${response.status} ${response.statusText}`;
-
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
-    } catch (e) {
-      // If response is not JSON, try to get text
-      try {
-        const errorText = await response.text();
-        if (errorText) {
-          errorMessage = errorText;
-        }
-      } catch (textError) {
-        // Use default error message
-      }
-    }
-
-    throw new Error(errorMessage);
-  }
-
-  return response.json();
-}
-
-// Auth API calls
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -78,15 +24,12 @@ export interface SignupCredentials {
   address: string;
   serviceablePincodes: string[];
   role: string;
-  // NOTE: category field removed - not required by API
 }
 
-// Login response - only contains accessToken
 export interface LoginResponse {
   accessToken: string;
 }
 
-// Signup response
 export interface SignupResponse {
   id: string;
   email: string;
@@ -95,7 +38,6 @@ export interface SignupResponse {
   message: string;
 }
 
-// User data structure (from /auth/me or other endpoints)
 export interface User {
   id: string;
   email: string;
@@ -105,65 +47,126 @@ export interface User {
   serviceablePincodes?: string[];
 }
 
-export async function loginApi(
-  credentials: LoginCredentials,
-): Promise<LoginResponse> {
+/**
+ * CORE API WRAPPWER
+ */
+export async function apiRequest<T>(
+  endpoint: string,
+  options: ApiRequestOptions = {},
+): Promise<T> {
+  const { requiresAuth = true, headers = {}, ...restOptions } = options;
+
+  // Initialize headers with standard JSON content type
+  const requestHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(headers as Record<string, string>),
+  };
+
+  let token: string | null = null;
+
+  // Handle Authentication logic
+  if (requiresAuth) {
+    token = await getToken();
+    if (token) {
+      requestHeaders["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
+  const url = `${API_BASE_URL}${endpoint}`;
+
+  // Log request for debugging (Optimized to use existing variables)
+  console.log(`[API ${restOptions.method || "GET"}]`, url, {
+    auth: requiresAuth,
+    hasToken: !!token,
+  });
+
+  const response = await fetch(url, {
+    ...restOptions,
+    headers: requestHeaders,
+  });
+
+  // Handle error responses
+  if (!response.ok) {
+    let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+
+    try {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } else {
+        const errorText = await response.text();
+        if (errorText) errorMessage = errorText;
+      }
+    } catch (e) {
+      // Keep default message if parsing fails
+    }
+
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * EXPORTED API FUNCTIONS
+ */
+
+// --- Auth Endpoints ---
+
+export async function loginApi(credentials: LoginCredentials): Promise<LoginResponse> {
   return apiRequest("/auth/login", {
     method: "POST",
     body: JSON.stringify(credentials),
-    requiresAuth: false, // No token needed
+    requiresAuth: false,
   });
 }
 
-export async function signupApi(
-  credentials: SignupCredentials,
-): Promise<SignupResponse> {
+export async function signupApi(credentials: SignupCredentials): Promise<SignupResponse> {
   return apiRequest("/auth/register", {
     method: "POST",
     body: JSON.stringify(credentials),
-    requiresAuth: false, // No token needed
+    requiresAuth: false,
   });
 }
 
 export async function getCurrentUser(): Promise<User> {
   return apiRequest("/auth/me", {
     method: "GET",
-    requiresAuth: true, // Token required
+    requiresAuth: true,
   });
 }
 
-// Example: Other API calls that require authentication
+// --- User Profile Endpoints ---
+
 export async function fetchUserProfile(userId: string): Promise<User> {
   return apiRequest(`/users/${userId}`, {
     method: "GET",
-    requiresAuth: true, // Token required
+    requiresAuth: true,
   });
 }
 
-export async function updateUserProfile(
-  userId: string,
-  data: Partial<User>,
-): Promise<User> {
+export async function updateUserProfile(userId: string, data: Partial<User>): Promise<User> {
   return apiRequest(`/users/${userId}`, {
     method: "PUT",
     body: JSON.stringify(data),
-    requiresAuth: true, // Token required
+    requiresAuth: true,
   });
 }
 
-// Example: Fetch items (requires token)
+// --- Product/Item Endpoints ---
+
 export async function fetchItems(): Promise<any[]> {
   return apiRequest("/items", {
     method: "GET",
-    requiresAuth: true, // Token required
+    requiresAuth: true,
   });
 }
 
-// Example: Create item (requires token)
 export async function createItem(data: any): Promise<any> {
   return apiRequest("/items", {
     method: "POST",
     body: JSON.stringify(data),
-    requiresAuth: true, // Token required
+    requiresAuth: true,
   });
 }
