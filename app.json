@@ -51,6 +51,10 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-notifications",
+        {
+          "sounds": ["assets/sounds/notifications.wav"]
+        },
       "expo-router",
       [
         "expo-image-picker",
