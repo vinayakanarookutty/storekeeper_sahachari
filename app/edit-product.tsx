@@ -8,6 +8,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
   Modal,
   ScrollView,
   Text,
@@ -26,6 +27,20 @@ const PRODUCT_CATEGORIES = ['Food', 'Vegetables and Fruits', 'Groceries', 'Home 
 const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
 const RENT_UNITS = ['Hour', 'Day', 'Week', 'Month'];
 const SERVICE_UNITS = ['Hour', 'Day', 'Service'];
+
+// Add below your S3_BASE_URL constant definition
+const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+  if (Platform.OS === 'web') {
+    alert(`${title}: ${message}`);
+    if (onConfirm) onConfirm();
+  } else {
+    Alert.alert(
+      title, 
+      message, 
+      onConfirm ? [{ text: 'OK', onPress: onConfirm }] : undefined
+    );
+  }
+};
 
 interface ProductData {
   name: string;
@@ -102,18 +117,14 @@ export default function EditProductScreen() {
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', 'Updated successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            router.back();
-          },
-        },
-      ]);
+      // Fix: Now uses web-safe alert mapping to ensure redirect executes
+      showAlert('Success', 'Updated successfully!', () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        router.back();
+      });
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to update item');
+      showAlert('Error', error.message || 'Failed to update item');
     },
   });
 
@@ -134,46 +145,58 @@ export default function EditProductScreen() {
     try {
       const token = await getToken();
       for (const uri of selectedImages) {
-        const fileName = `edit_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+        let fileExtension = 'jpg';
+        let fileType = 'image/jpeg';
+
+        // Web environment image metadata adjustment
+        if (Platform.OS === 'web') {
+          if (uri.includes('image/png') || uri.endsWith('.png')) {
+            fileExtension = 'png';
+            fileType = 'image/png';
+          }
+        }
+
+        const fileName = `edit_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+        
         const presignedRes = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ fileName, fileType: 'image/jpeg', folder: 'uploads' }),
+          body: JSON.stringify({ fileName, fileType, folder: 'uploads' }),
         });
+        
         const { url, key } = await presignedRes.json();
         const blob = await (await fetch(uri)).blob();
-        await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: blob });
+        
+        await fetch(url, { method: 'PUT', headers: { 'Content-Type': fileType }, body: blob });
         newKeys.push(key);
       }
       setUploadedImageKeys(prev => [...prev, ...newKeys]);
       setSelectedImages([]);
-      Alert.alert('Success', 'New images uploaded!');
+      showAlert('Success', 'New images uploaded!');
     } catch (e) {
-      Alert.alert('Error', 'Upload failed');
+      showAlert('Error', 'Upload failed');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleUpdateProduct = () => {
+ const handleUpdateProduct = () => {
     if (!category.trim() || !name.trim() || !description.trim() || !price) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      showAlert('Error', 'Please fill in all required fields');
       return;
     }
     if (!isService && !quantity) {
-      Alert.alert('Error', 'Please enter the quantity');
+      showAlert('Error', 'Please enter the quantity');
       return;
     }
     
     const finalImages = [...existingImages, ...uploadedImageKeys];
     if (finalImages.length === 0) {
-      Alert.alert('Error', 'Please keep or upload at least one image');
+      showAlert('Error', 'Please keep or upload at least one image');
       return;
     }
 
-    const finalPrice = needsTimeUnit
-      ? `${price}/${serviceUnit}`
-      : `${price}/${unit}`;
+    const finalPrice = needsTimeUnit ? `${price}/${serviceUnit}` : `${price}/${unit}`;
 
     const productData: ProductData = {
       name,
@@ -187,7 +210,7 @@ export default function EditProductScreen() {
     const currentId = product?._id; 
 
     if (!currentId) {
-      return Alert.alert('Error', 'Could not locate an active Product ID to update');
+      return showAlert('Error', 'Could not locate an active Product ID to update');
     }
 
     updateProductMutation.mutate({
