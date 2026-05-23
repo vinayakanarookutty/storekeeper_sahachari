@@ -8,6 +8,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
   Modal,
   ScrollView,
   Text,
@@ -20,6 +21,16 @@ import { styles } from './styles/add-edit-common.style';
 import { getToken } from './services/auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
+// Add below API_BASE_URL
+const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+  if (Platform.OS === 'web') {
+    alert(`${title}: ${message}`);
+    if (onConfirm) onConfirm();
+  } else {
+    Alert.alert(title, message, onConfirm ? [{ text: 'OK', onPress: onConfirm }] : undefined);
+  }
+};
 
 interface PresignedUrlResponse {
   url: string;
@@ -92,19 +103,14 @@ export default function AddProductScreen() {
       }
       return response.json();
     },
-    onSuccess: () => {
-      Alert.alert('Success', 'Created successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            router.back();
-          },
-        },
-      ]);
+   onSuccess: () => {
+      showAlert('Success', 'Created successfully!', () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        router.back();
+      });
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to create item');
+      showAlert('Error', error.message || 'Failed to create item');
     },
   });
 
@@ -125,11 +131,11 @@ export default function AddProductScreen() {
     }
   };
 
-  const pickImages = async () => {
+ const pickImages = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant permission to access photos');
+        showAlert('Permission needed', 'Please grant permission to access photos');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -143,7 +149,7 @@ export default function AddProductScreen() {
         setSelectedImages(prev => [...prev, ...newImages]);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick images');
+      showAlert('Error', 'Failed to pick images');
     }
   };
 
@@ -151,22 +157,36 @@ export default function AddProductScreen() {
     setSelectedImages(prev => prev.filter((_, i) => i !== index));
     setUploadedImageKeys(prev => prev.filter((_, i) => i !== index));
   };
-
-  const uploadImages = async () => {
+const uploadImages = async () => {
     if (selectedImages.length === 0) {
-      Alert.alert('Error', 'Please select at least one image');
+      showAlert('Error', 'Please select at least one image');
       return;
     }
     setIsUploading(true);
     const imageKeys: string[] = [];
+    
     try {
       const token = await getToken();
       for (const imageUri of selectedImages) {
-        let cleanPath = imageUri.split(':http')[0].replace('blob:', '');
-        const extensionMatch = cleanPath.match(/\.([a-zA-Z0-9]+)$/);
-        const fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg';
+        let fileExtension = 'jpg';
+        let fileType = 'image/jpeg';
+
+        if (Platform.OS === 'web') {
+          // Web images often come with layout indicators or header types embedded
+          if (imageUri.includes('image/png') || imageUri.endsWith('.png')) {
+            fileExtension = 'png';
+            fileType = 'image/png';
+          }
+        } else {
+          const cleanPath = imageUri.split(':http')[0].replace('blob:', '');
+          const extensionMatch = cleanPath.match(/\.([a-zA-Z0-9]+)$/);
+          if (extensionMatch) {
+            fileExtension = extensionMatch[1].toLowerCase();
+            fileType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
+          }
+        }
+
         const fileName = `product_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
-        const fileType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
 
         const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
           method: 'POST',
@@ -179,6 +199,8 @@ export default function AddProductScreen() {
 
         if (!presignedResponse.ok) throw new Error('Failed to get presigned URL');
         const { url: presignedUrl, key }: PresignedUrlResponse = await presignedResponse.json();
+        
+        // Resolve the raw file content safely
         const imageResponse = await fetch(imageUri);
         const blob = await imageResponse.blob();
 
@@ -191,33 +213,30 @@ export default function AddProductScreen() {
         if (!uploadResponse.ok) throw new Error('Failed to upload image to S3');
         imageKeys.push(key);
       }
+      
       setUploadedImageKeys(imageKeys);
-      Alert.alert('Success', `${imageKeys.length} image(s) uploaded successfully!`);
+      showAlert('Success', `${imageKeys.length} image(s) uploaded successfully!`);
     } catch (error: any) {
-      Alert.alert('Upload Failed', error.message);
+      showAlert('Upload Failed', error.message);
     } finally {
       setIsUploading(false);
     }
   };
-
   const handleCreateProduct = () => {
     if (!category.trim() || !name.trim() || !description.trim() || !price) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      showAlert('Error', 'Please fill in all required fields');
       return;
     }
     if (!isService && !quantity) {
-      Alert.alert('Error', 'Please enter the quantity');
+      showAlert('Error', 'Please enter the quantity');
       return;
     }
     if (uploadedImageKeys.length === 0) {
-      Alert.alert('Error', 'Please upload at least one image');
+      showAlert('Error', 'Please upload your picked images first');
       return;
     }
 
-    // Combine price with unit for Service or Rent (e.g., "20/Hour")
-const finalPrice = needsTimeUnit
-  ? `${price}/${serviceUnit}`
-  : `${price}/${unit}`;
+    const finalPrice = needsTimeUnit ? `${price}/${serviceUnit}` : `${price}/${unit}`;
     const productData: ProductData = {
       name,
       description,
@@ -229,7 +248,6 @@ const finalPrice = needsTimeUnit
 
     createProductMutation.mutate(productData);
   };
-
   const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
