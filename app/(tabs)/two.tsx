@@ -12,6 +12,7 @@ import {
   ScrollView,
   Text,
   TextInput,
+  Platform,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -53,7 +54,16 @@ interface EditModalProps {
   onSave: (field: string, value: string) => void;
   isLoading: boolean;
 }
-
+// Place this right under your S3_BASE_URL or COLORS declaration
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    // Web safe fallback
+    alert(`${title}: ${message}`);
+  } else {
+    // Native mobile execution
+    Alert.alert(title, message);
+  }
+};
 function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditModalProps) {
   const [editValue, setEditValue] = useState(value);
 
@@ -165,10 +175,10 @@ export default function TabTwoScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       setEditModalVisible(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      showAlert('Success', 'Profile updated successfully!'); // <-- Changed here
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      showAlert('Error', error.message || 'Failed to update profile'); // <-- Changed here
     },
   });
 
@@ -210,10 +220,10 @@ export default function TabTwoScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
-      Alert.alert('Success', 'Profile picture updated!');
+      showAlert('Success', 'Profile picture updated!'); // <-- Changed here
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Upload failed');
+      showAlert('Error', error.message || 'Upload failed'); // <-- Changed here
     },
   });
 

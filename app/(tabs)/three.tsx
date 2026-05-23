@@ -30,6 +30,35 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const PRODUCT_STEPS = ['PLACED', 'READY', 'ACCEPTED', 'PICKED_UP', 'DELIVERED'];
 const SERVICE_STEPS = ['PLACED', 'ACCEPTED', 'DELIVERED'];
 
+// Add this below your API_BASE_URL / constant definitions
+const showConfirmation = (
+  title: string, 
+  message: string, 
+  onConfirm: () => void
+) => {
+  if (Platform.OS === 'web') {
+    // web browsers natively support confirm blocks which returns a boolean
+    const confirmed = window.confirm(`${title}\n\n${message}`);
+    if (confirmed) {
+      onConfirm();
+    }
+  } else {
+    // Mobile devices use the standard React Native multi-button array
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Confirm', onPress: onConfirm },
+    ]);
+  }
+};
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
 // Status Configuration - Matches your Backend Enums
 const STATUS_CONFIG = {
   PLACED: { color: '#DAA520', icon: 'shopping-cart', label: 'Order Placed' },
@@ -82,24 +111,28 @@ export default function OrdersScreen() {
       if (!response.ok) throw new Error(result.message || 'Update failed');
       return result;
     },
-    onSuccess: () => {
+   onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      Alert.alert('Success', 'Order status updated');
+      showAlert('Success', 'Order status updated'); // <-- Changed to showAlert
     },
     onError: (error: any) => {
-      Alert.alert('Action Failed', error.message);
+      showAlert('Action Failed', error.message); // <-- Changed to showAlert
     }
   });
 
   const handleAction = (orderId: string, endpoint: string, label: string) => {
-    Alert.alert('Confirm', `Do you want to ${label}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Confirm', onPress: () => updateStatusMutation.mutate({ orderId, endpoint }) },
-    ]);
+    showConfirmation(
+      'Confirm', 
+      `Do you want to ${label}?`, 
+      () => updateStatusMutation.mutate({ orderId, endpoint })
+    );
   };
 
   const toggleExpand = (orderId: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    // Only execute layout animations on native mobile platforms
+    if (Platform.OS !== 'web') {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
     setExpandedOrders(prev => ({ ...prev, [orderId]: !prev[orderId] }));
   };
 
