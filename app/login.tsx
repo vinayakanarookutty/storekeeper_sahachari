@@ -17,6 +17,15 @@ import { useAuth } from './contexts/AuthContext';
 import { getCurrentUser, loginApi } from './services/api';
 import { styles } from './styles/login.style';
 
+// Add this below: import { styles } from './styles/login.style';
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
 export default function LoginScreen() {
   const router = useRouter();
   const { setAuthToken } = useAuth();
@@ -26,7 +35,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); // State to toggle visibility
 
-  const loginMutation = useMutation({
+ const loginMutation = useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
       const loginResponse = await loginApi(credentials);
       return loginResponse;
@@ -39,16 +48,17 @@ export default function LoginScreen() {
       } catch (error) {
         console.log('Could not fetch user data:', error);
       }
-      router.replace('/(tabs)');
+      // Fix: Routing to '/' is cleaner and universally parsed across native and web engines
+      router.replace('/');
     },
     onError: (error: any) => {
-      Alert.alert('Login Failed', error.message || 'Invalid email or password');
+      showAlert('Login Failed', error.message || 'Invalid email or password');
     },
   });
 
   const handleLogin = () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields');
       return;
     }
     loginMutation.mutate({ email, password });

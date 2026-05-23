@@ -54,14 +54,29 @@ interface EditModalProps {
   onSave: (field: string, value: string) => void;
   isLoading: boolean;
 }
-// Place this right under your S3_BASE_URL or COLORS declaration
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web') {
-    // Web safe fallback
     alert(`${title}: ${message}`);
   } else {
-    // Native mobile execution
     Alert.alert(title, message);
+  }
+};
+
+const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+  if (Platform.OS === 'web') {
+    const confirmed = window.confirm(`${title}\n\n${message}`);
+    if (confirmed) {
+      onConfirm();
+    }
+  } else {
+    Alert.alert(
+      title,
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Out', style: 'destructive', onPress: onConfirm }
+      ]
+    );
   }
 };
 function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditModalProps) {
@@ -306,7 +321,20 @@ export default function TabTwoScreen() {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={async () => { await clearAuthToken(); router.replace('/login'); }}>
+      {/* Update your Log Out touchable button to this structure: */}
+      <TouchableOpacity 
+        style={styles.logoutBtn} 
+        onPress={() => {
+          showConfirm(
+            'Logout',
+            'Are you sure you want to logout?',
+            async () => {
+              await clearAuthToken();
+              router.replace('/login');
+            }
+          );
+        }}
+      >
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
 
