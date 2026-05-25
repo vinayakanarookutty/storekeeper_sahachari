@@ -262,7 +262,7 @@ export default function OrdersScreen() {
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Grand Total</Text>
-            <Text style={styles.totalValue}>₹{order.totalAmount}</Text>
+            <Text style={styles.totalValue}>₹{order.itemsSubtotal}</Text>
           </View>
 
           {renderActionButtons(order)}

@@ -64,7 +64,7 @@ export default function TabLayout() {
     card: colorScheme === 'dark' ? '#1E1E1E' : '#FFFFFF',
     text: colorScheme === 'dark' ? '#FFFFFF' : '#1A1A1A',
     inactive: colorScheme === 'dark' ? '#8E8E93' : '#7A7A7A',
-    primary: '#DAA520', // <-- Removed the extra space here
+    primary: '#DAA520',
     border: colorScheme === 'dark' ? '#2C2C2E' : '#E5E7EB',
   };
 
@@ -76,7 +76,6 @@ export default function TabLayout() {
   }, [token]);
 
   // Logout function
-  // Find your existing handleLogout function and update it to this:
   const handleLogout = () => {
     showLogoutConfirmation(async () => {
       await clearAuthToken();
@@ -144,7 +143,6 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="home"
@@ -152,7 +150,6 @@ export default function TabLayout() {
               focused={focused}
             />
           ),
-
           headerRight: () => (
             <Pressable
               onPress={handleLogout}
@@ -179,10 +176,24 @@ export default function TabLayout() {
         name="three"
         options={{
           title: 'Orders',
-
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="shopping-bag"
+              color={color}
+              focused={focused}
+            />
+          ),
+        }}
+      />
+
+      {/* ANALYTICS TAB (ADDED HERE) */}
+      <Tabs.Screen
+        name="Analytics"
+        options={{
+          title: 'Analytics',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon
+              name="bar-chart"
               color={color}
               focused={focused}
             />
@@ -195,7 +206,6 @@ export default function TabLayout() {
         name="two"
         options={{
           title: 'Profile',
-
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="user"
