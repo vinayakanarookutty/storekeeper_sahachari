@@ -102,6 +102,13 @@ function RootLayoutNav() {
             presentation: 'modal',
           }} 
         />
+
+<Stack.Screen 
+  name="bulk-upload" 
+  options={{ 
+    presentation: 'modal',
+    title: 'Bulk Upload',
+  }} />
         <Stack.Screen 
           name="edit-product" 
           options={{ 
