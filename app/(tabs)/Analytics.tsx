@@ -9,10 +9,12 @@ import {
   useColorScheme,
   RefreshControl,
 } from 'react-native';
-import { LineChart, BarChart } from 'react-native-chart-kit';
-import { useQuery } from '@tanstack/react-query'; // Or your specific react-query path
+import { LineChart, BarChart, ProgressChart } from 'react-native-chart-kit';
+import { useQuery } from '@tanstack/react-query';
 import { styles } from '../tab_style/analyticsStyle';
+
 import { getToken } from '../services/auth';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -27,55 +29,44 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: '#f97316',
 };
 
-// ─── Exact Backend Types Matched to JSON ─────────────────────────────────────
-interface MongoOid {
-  $oid: string;
-}
-
-interface MongoDate {
-  $date: string;
-}
-
-interface OrderItem {
-  productId: MongoOid;
-  quantity: number;
-  price: number;
-  _id: MongoOid;
-}
+// ─── Interfaces ──────────────────────────────────────────────────────────────
+interface MongoOid { $oid: string; }
+interface MongoDate { $date: string; }
 
 interface MobileOrder {
   _id: MongoOid | string;
-  userId: MongoOid;
-  storeId: MongoOid;
-  checkoutId: string;
-  deliveryBoyId: string | null;
-  items: OrderItem[];
-  itemsSubtotal: number;
-  deliveryCharge: number;
   totalAmount: number;
   status: string;
-  paymentMethod: string;
-  paymentStatus: string;
-  amountPaid: number;
-  isPaymentVerified: boolean;
-  currency: string;
-  createdAt: MongoDate; // Nested field
+  createdAt: MongoDate;
+}
+
+interface Product {
+  _id: MongoOid;
+  storeId: MongoOid;
+  name: string;
+  description: string;
+  images: string[];
+  quantity: number;
+  price: string; // e.g., "100/kg" or "50"
+  category: string;
+  createdAt: MongoDate;
   updatedAt: MongoDate;
 }
 
 export default function AnalyticsScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
-
+  
+  // Adjusted State Management Engine to support 'Stock' view
   const [chartView, setChartView] = useState<'daily' | 'monthly' | 'Stock'>('daily');
 
-  // ─── Your Token & Base URL configurations ──────────────────────────────────
-  // Assuming these are accessible in your file or via imports:
-  // const getToken = async () => ...
-  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
-
-  // ─── The Live Query Hook ───────────────────────────────────────────────────
-  const { data: orders = [], isLoading, isRefetching, refetch } = useQuery<MobileOrder[]>({
+  // ─── Query 1: Orders Fetching Engine ───────────────────────────────────────
+  const { 
+    data: orders = [], 
+    isLoading: isOrdersLoading, 
+    isRefetching: isOrdersRefetching, 
+    refetch: refetchOrders 
+  } = useQuery<MobileOrder[]>({
     queryKey: ['orders'],
     queryFn: async () => {
       const token = await getToken();
@@ -85,9 +76,40 @@ export default function AnalyticsScreen() {
       if (!response.ok) throw new Error('Failed to fetch orders');
       return response.json();
     },
-    refetchInterval: 30000, 
+    refetchInterval: 30000,
+    enabled: chartView !== 'Stock', // Performance win: don't background refetch orders if viewing stock
   });
 
+  // ─── Query 2: Product/Stock Fetching Engine ─────────────────────────────────
+  const { 
+    data: products = [], 
+    isLoading: isProductsLoading, 
+    isRefetching: isProductsRefetching, 
+    refetch: refetchProducts 
+  } = useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const authToken = await getToken();
+      const response = await fetch(`${API_BASE_URL}/storekeeper/products`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
+    refetchInterval: 60000, // Inventory changes less frequently than live orders
+    enabled: chartView === 'Stock', // Only triggers execution when the shopkeeper clicks "Stock"
+  });
+
+  // Unified Pull-To-Refresh Dispatcher
+  const handleRefresh = async () => {
+    if (chartView === 'Stock') {
+      await refetchProducts();
+    } else {
+      await refetchOrders();
+    }
+  };
+
+  // Theme Settings
   const theme = {
     background: isDark ? '#121212' : '#F4F6F8',
     card: isDark ? '#1E1E1E' : '#FFFFFF',
@@ -104,75 +126,88 @@ export default function AnalyticsScreen() {
     color: (opacity = 1) => `rgba(218, 165, 32, ${opacity})`, 
     labelColor: (opacity = 1) => `rgba(${isDark ? '255, 255, 255' : '26, 26, 26'}, ${opacity})`,
     style: { borderRadius: 16 },
-    propsForDots: {
-      r: '4',
-      strokeWidth: '2',
-      stroke: theme.primary,
-    },
   };
 
-  // ─── Analytical Calculations Adjusted for Mongo Format ──────────────────────
-  const analytics = useMemo(() => {
-    if (!orders || orders.length === 0) return null;
+  // ─── Memoized Computations for Orders Analytics ─────────────────────────────
+  const orderAnalytics = useMemo(() => {
+    if (!orders.length || chartView === 'Stock') return null;
 
     let totalRevenue = 0;
     const statusMap: Record<string, number> = {};
     const timelineMap: Record<string, { revenue: number; counts: number }> = {};
 
     for (const o of orders) {
-      // 💡 Important Change: Use native MongoDB structure parsing
       const orderAmt = o.totalAmount || 0;
       totalRevenue += orderAmt;
-
       statusMap[o.status] = (statusMap[o.status] ?? 0) + 1;
 
-      // Safe check for missing or alternative nested date variations
       const rawDateStr = o.createdAt?.$date || o.createdAt;
-      if (!rawDateStr || typeof rawDateStr !== 'string') continue;
+      if (typeof rawDateStr !== 'string') continue;
 
       const dateObj = new Date(rawDateStr);
       if (isNaN(dateObj.getTime())) continue;
 
       const key = chartView === 'daily' 
-        ? dateObj.toISOString().slice(5, 10)  // Outputs: "05-23"
-        : dateObj.toISOString().slice(0, 7);   // Outputs: "2026-05"
+        ? dateObj.toISOString().slice(5, 10) 
+        : dateObj.toISOString().slice(0, 7);
 
-      if (!timelineMap[key]) {
-        timelineMap[key] = { revenue: 0, counts: 0 };
-      }
+      if (!timelineMap[key]) timelineMap[key] = { revenue: 0, counts: 0 };
       timelineMap[key].revenue += orderAmt;
       timelineMap[key].counts += 1;
     }
 
-    const avgOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
-
-    const sortedTimeline = Object.keys(timelineMap).sort().map((key) => ({
-      label: key,
-      ...timelineMap[key],
-    }));
-
-    // Keeps chart items neat and clear without text overlaps
+    const sortedTimeline = Object.keys(timelineMap).sort().map(key => ({ label: key, ...timelineMap[key] }));
     const limitedTimeline = sortedTimeline.slice(-6);
-
-    const peakWindow = sortedTimeline.reduce(
-      (max, current) => (current.revenue > max.revenue ? current : max),
-      sortedTimeline[0] || { label: 'N/A', revenue: 0, counts: 0 }
-    );
+    const peakWindow = sortedTimeline.reduce((max, curr) => (curr.revenue > max.revenue ? curr : max), sortedTimeline[0] || { label: 'N/A', revenue: 0 });
 
     return {
       totalRevenue,
-      avgOrderValue,
+      avgOrderValue: totalRevenue / orders.length,
       statusMap,
       sortedTimeline,
       peakWindow,
-      chartLabels: limitedTimeline.map(item => item.label),
-      chartRevenues: limitedTimeline.map(item => item.revenue),
-      chartOrdersCount: limitedTimeline.map(item => item.counts)
+      chartLabels: limitedTimeline.map(i => i.label),
+      chartRevenues: limitedTimeline.map(i => i.revenue),
+      chartOrdersCount: limitedTimeline.map(i => i.counts)
     };
   }, [orders, chartView]);
 
-  // Initial processing setup spinner
-  if (isLoading) {
+  // ─── Memoized Computations for Stock / Inventory Analytics ───────────────────
+  const stockAnalytics = useMemo(() => {
+    if (!products.length || chartView !== 'Stock') return null;
+
+    let totalItemsStocked = 0;
+    let lowStockCount = 0;
+    const categoryMap: Record<string, number> = {};
+
+    for (const p of products) {
+      const qty = Number(p.quantity) || 0;
+      totalItemsStocked += qty;
+
+      // Business logic guard: Flag items with stock counts under 5 units
+      if (qty <= 5) lowStockCount++;
+
+      // Distribute data metrics safely per Category
+      const cat = p.category || 'Other';
+      categoryMap[cat] = (categoryMap[cat] ?? 0) + qty;
+    }
+
+    const sortedCategories = Object.keys(categoryMap).sort((a, b) => categoryMap[b] - categoryMap[a]);
+    const topCategories = sortedCategories.slice(0, 5); // Keep top 5 categories for graph visibility
+
+    return {
+      totalUniqueProducts: products.length,
+      totalItemsStocked,
+      lowStockCount,
+      categoryLabels: topCategories,
+      categoryVolumes: topCategories.map(cat => categoryMap[cat]),
+      allCategoriesBreakdown: Object.entries(categoryMap).sort((a, b) => b[1] - a[1])
+    };
+  }, [products, chartView]);
+
+  // Master layout Loading Switchboard
+  const isDataLoading = chartView === 'Stock' ? isProductsLoading : isOrdersLoading;
+  if (isDataLoading) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: theme.background }]}>
         <ActivityIndicator size="large" color={theme.primary} />
@@ -186,8 +221,8 @@ export default function AnalyticsScreen() {
       contentContainerStyle={styles.scrollContent}
       refreshControl={
         <RefreshControl
-          refreshing={isRefetching} // 💡 Powered natively by React Query tracking
-          onRefresh={refetch}       // 💡 Explicitly invokes react-query cache clear
+          refreshing={chartView === 'Stock' ? isProductsRefetching : isOrdersRefetching}
+          onRefresh={handleRefresh}
           colors={[theme.primary]}            
           tintColor={theme.primary}           
           progressBackgroundColor={theme.card} 
@@ -210,32 +245,87 @@ export default function AnalyticsScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.toggleButton, chartView === 'Stock' && { backgroundColor: theme.primary }]}
-          onPress={() => setChartView('Stock')} 
-          >
-          <Text style={[styles.toggleText, { color: chartView === 'Stock' ? '#FFF' : theme.text }]}>Stoke</Text>
+          onPress={() => setChartView('Stock')}
+        >
+          <Text style={[styles.toggleText, { color: chartView === 'Stock' ? '#FFF' : theme.text }]}>Stock</Text>
         </TouchableOpacity>
       </View>
 
-      {!analytics ? (
-        <View style={styles.centerContainer}>
-          <Text style={{ color: theme.subText, marginTop: 40, textAlign: 'center' }}>
-            No current order streams detected.
-          </Text>
-        </View>
-      ) : (
+      {/* ─── RENDER ENGINE A: STOCK VIEW ──────────────────────────────────────── */}
+      {chartView === 'Stock' && stockAnalytics && (
+        <>
+          {/* Inventory Grid Matrix */}
+          <View style={styles.gridRow}>
+            <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+              <Text style={[styles.metricLabel, { color: theme.subText }]}>Unique Products</Text>
+              <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalUniqueProducts}</Text>
+            </View>
+            <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+              <Text style={[styles.metricLabel, { color: theme.subText }]}>Total Stock Quantity</Text>
+              <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalItemsStocked}</Text>
+            </View>
+          </View>
+
+          <View style={styles.gridRow}>
+            <View style={[styles.metricCard, { backgroundColor: theme.card, borderColor: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.border, borderWidth: stockAnalytics.lowStockCount > 0 ? 1 : 0 }]}>
+              <Text style={[styles.metricLabel, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.subText }]}>Low Stock Alerts (≤5)</Text>
+              <Text style={[styles.metricValue, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.text }]}>
+                {stockAnalytics.lowStockCount} Items
+              </Text>
+            </View>
+          </View>
+
+          {/* Category Distribution Chart */}
+          {stockAnalytics.categoryLabels.length > 0 && (
+            <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Top Stock Categories (Items Count)</Text>
+              <BarChart
+                data={{
+                  labels: stockAnalytics.categoryLabels,
+                  datasets: [{ data: stockAnalytics.categoryVolumes }],
+                }}
+                width={SCREEN_WIDTH - 64}
+                height={200}
+                yAxisLabel=""
+                yAxisSuffix=""
+                chartConfig={{
+                  ...chartConfig,
+                  color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, // Beautiful Emerald Green for Stock charts
+                }}
+                style={styles.chartCanvas}
+                verticalLabelRotation={15} // Rotated slightly to prevent clipping on long category words
+              />
+            </View>
+          )}
+
+          {/* Tabular Detailed Inventory Logs */}
+          <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+            <Text style={[styles.sectionTitle, { color: theme.subText }]}>ALL CATEGORY BREAKDOWN</Text>
+            {stockAnalytics.allCategoriesBreakdown.map(([catName, qty], idx) => (
+              <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                <Text style={{ color: theme.text, fontWeight: '600', flex: 2 }}>{catName}</Text>
+                <Text style={{ color: theme.primary, fontWeight: '700', flex: 1, textAlign: 'right' }}>{qty} Units</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
+      {/* ─── RENDER ENGINE B: ORDERS VIEW (Daily / Monthly) ───────────────────── */}
+      {chartView !== 'Stock' && orderAnalytics && (
         <>
           {/* Metrics Grid Matrix */}
           <View style={styles.gridRow}>
             <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
               <Text style={[styles.metricLabel, { color: theme.subText }]}>Total Revenue</Text>
               <Text style={[styles.metricValue, { color: theme.text }]}>
-                ₹{analytics.totalRevenue.toLocaleString('en-IN')}
+                ₹{orderAnalytics.totalRevenue.toLocaleString('en-IN')}
               </Text>
             </View>
             <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
               <Text style={[styles.metricLabel, { color: theme.subText }]}>Avg Order Value</Text>
               <Text style={[styles.metricValue, { color: theme.text }]}>
-                ₹{Math.round(analytics.avgOrderValue).toLocaleString('en-IN')}
+                ₹{Math.round(orderAnalytics.avgOrderValue).toLocaleString('en-IN')}
               </Text>
             </View>
           </View>
@@ -248,19 +338,19 @@ export default function AnalyticsScreen() {
             <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
               <Text style={[styles.metricLabel, { color: theme.subText }]}>Peak Performance</Text>
               <Text style={[styles.metricValue, { color: theme.text, fontSize: 15 }]} numberOfLines={1}>
-                {analytics.peakWindow.label} (₹{analytics.peakWindow.revenue})
+                {orderAnalytics.peakWindow.label} (₹{orderAnalytics.peakWindow.revenue})
               </Text>
             </View>
           </View>
 
-          {/* 1. Revenue Area Chart Graphic */}
-          {analytics.chartLabels.length > 0 && (
+          {/* Revenue Chart Layout */}
+          {orderAnalytics.chartLabels.length > 0 && (
             <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Revenue Timeline (₹)</Text>
               <LineChart
                 data={{
-                  labels: analytics.chartLabels,
-                  datasets: [{ data: analytics.chartRevenues }],
+                  labels: orderAnalytics.chartLabels,
+                  datasets: [{ data: orderAnalytics.chartRevenues }],
                 }}
                 width={SCREEN_WIDTH - 64} 
                 height={180}
@@ -273,14 +363,14 @@ export default function AnalyticsScreen() {
             </View>
           )}
 
-          {/* 2. Order Frequency Volume Bar Chart */}
-          {analytics.chartLabels.length > 0 && (
+          {/* Orders Count Tracker Bar Graph */}
+          {orderAnalytics.chartLabels.length > 0 && (
             <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Orders Volume Tracker</Text>
               <BarChart
                 data={{
-                  labels: analytics.chartLabels,
-                  datasets: [{ data: analytics.chartOrdersCount }],
+                  labels: orderAnalytics.chartLabels,
+                  datasets: [{ data: orderAnalytics.chartOrdersCount }],
                 }}
                 width={SCREEN_WIDTH - 64}
                 height={180}
@@ -291,15 +381,14 @@ export default function AnalyticsScreen() {
                   color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
                 }}
                 style={styles.chartCanvas}
-                verticalLabelRotation={0}
               />
             </View>
           )}
 
-          {/* Tabular Numerical Logs Breakdown */}
+          {/* Table Breakdown Logging */}
           <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
             <Text style={[styles.sectionTitle, { color: theme.subText }]}>REVENUE TIMELINE BREAKDOWN</Text>
-            {analytics.sortedTimeline.map((item, idx) => (
+            {orderAnalytics.sortedTimeline.map((item, idx) => (
               <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
                 <Text style={{ color: theme.text, fontWeight: '600' }}>{item.label}</Text>
                 <Text style={{ color: theme.subText }}>{item.counts} Orders</Text>
@@ -308,10 +397,10 @@ export default function AnalyticsScreen() {
             ))}
           </View>
 
-          {/* Categorical Progress Allocations */}
+          {/* Order Status Allocation Progress Tracks */}
           <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
             <Text style={[styles.sectionTitle, { color: theme.subText }]}>ORDER STATUS ALLOCATION</Text>
-            {Object.entries(analytics.statusMap).map(([statusName, count], idx) => {
+            {Object.entries(orderAnalytics.statusMap).map(([statusName, count], idx) => {
               const allocationPercentage = ((count / orders.length) * 100).toFixed(0);
               const statusColor = STATUS_COLORS[statusName] ?? '#9ca3af';
 
@@ -327,18 +416,22 @@ export default function AnalyticsScreen() {
                     </Text>
                   </View>
                   <View style={[styles.progressBarBackground, { backgroundColor: isDark ? '#2c2c2e' : '#e5e7eb' }]}>
-                    <View 
-                      style={[
-                        styles.progressBarFill, 
-                        { backgroundColor: statusColor, width: `${allocationPercentage}%` as any }
-                      ]} 
-                    /> 
+                    <View style={[styles.progressBarFill, { backgroundColor: statusColor, width: `${allocationPercentage}%` as any }]} /> 
                   </View>
                 </View>
               );
             })}
           </View>
         </>
+      )}
+
+      {/* Empty State Layout Layer Exception Case */}
+      {((chartView === 'Stock' && !stockAnalytics) || (chartView !== 'Stock' && !orderAnalytics)) && (
+        <View style={styles.centerContainer}>
+          <Text style={{ color: theme.subText, marginTop: 40, textAlign: 'center' }}>
+            No information profile logs available for this database module.
+          </Text>
+        </View>
       )}
     </ScrollView>
   );
