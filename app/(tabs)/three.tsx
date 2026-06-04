@@ -18,32 +18,45 @@ import {
   View
 } from 'react-native';
 import { getToken } from '../services/auth';
-import { styles } from '../tab_style/three.style';
+import { screenStyles } from '../tab_style/three.style';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
+const S3_BASE_URL = process.env.EXEXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
 const PRODUCT_STEPS = ['PLACED', 'READY', 'ACCEPTED', 'PICKED_UP', 'DELIVERED'];
 const SERVICE_STEPS = ['PLACED', 'ACCEPTED', 'DELIVERED'];
 
-// Add this below your API_BASE_URL / constant definitions
-const showConfirmation = (
-  title: string, 
-  message: string, 
-  onConfirm: () => void
-) => {
+// Map structural workflow steps to specific visual icons
+const STEP_ICON_CONFIG: Record<string, { icon: string; label: string }> = {
+  PLACED: { icon: 'shopping-cart', label: 'Placed' },
+  READY: { icon: 'clock-o', label: 'Ready' },
+  ACCEPTED: { icon: 'thumbs-up', label: 'Accepted' },
+  PICKED_UP: { icon: 'motorcycle', label: 'Picked Up' },
+  DELIVERED: { icon: 'check-circle', label: 'Delivered' },
+};
+
+// Global mapping for all backend enum states (combining badge styling and icon assets)
+const STATUS_CONFIG = {
+  PLACED: { color: '#DAA520', icon: 'shopping-cart', label: 'Order Placed' },
+  READY: { color: '#FF9800', icon: 'clock-o', label: 'Ready' },
+  ACCEPTED: { color: '#2E7D32', icon: 'check-circle', label: 'Accepted' },
+  PICKED_UP: { color: '#9C27B0', icon: 'motorcycle', label: 'Picked Up' },
+  DELIVERED: { color: '#4CAF50', icon: 'check-circle', label: 'Completed' },
+  REJECTED: { color: '#D32F2F', icon: 'times-circle', label: 'Rejected' }, 
+  FAILED: { color: '#757575', icon: 'exclamation-triangle', label: 'Failed' },
+  CANCEL_PENDING: { color: '#E65100', icon: 'exclamation-circle', label: 'Cancel Requested' },
+  CANCELLED: { color: '#D32F2F', icon: 'ban', label: 'Cancelled' },
+};
+
+const showConfirmation = (title: string, message: string, onConfirm: () => void) => {
   if (Platform.OS === 'web') {
-    // web browsers natively support confirm blocks which returns a boolean
     const confirmed = window.confirm(`${title}\n\n${message}`);
-    if (confirmed) {
-      onConfirm();
-    }
+    if (confirmed) onConfirm();
   } else {
-    // Mobile devices use the standard React Native multi-button array
     Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Confirm', onPress: onConfirm },
@@ -59,22 +72,12 @@ const showAlert = (title: string, message: string) => {
   }
 };
 
-// Status Configuration - Matches your Backend Enums
-const STATUS_CONFIG = {
-  PLACED: { color: '#DAA520', icon: 'shopping-cart', label: 'Order Placed' },
-  READY: { color: '#FF9800', icon: 'clock-o', label: 'Ready' },
-  ACCEPTED: { color: '#2E7D32', icon: 'check-circle', label: 'Accepted' },
-  PICKED_UP: { color: '#9C27B0', icon: 'motorcycle', label: 'Picked Up' },
-  DELIVERED: { color: '#4CAF50', icon: 'check-circle', label: 'Completed' },
-  CANCELLED: { color: '#D32F2F', icon: 'times-circle', label: 'Rejected' }, // Backend uses CANCELLED
-};
-
 export default function OrdersScreen() {
   const queryClient = useQueryClient();
   const [selectedFilter, setSelectedFilter] = useState('ALL');
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
 
-  // 1. Fetch Orders with Auto-Polling (checks for new orders every 30s)
+  // 1. Fetch Orders with Auto-Polling
   const { data: orders, isLoading, refetch } = useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
@@ -106,17 +109,16 @@ export default function OrdersScreen() {
           'Content-Type': 'application/json' 
         },
       });
-
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Update failed');
       return result;
     },
-   onSuccess: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      showAlert('Success', 'Order status updated'); // <-- Changed to showAlert
+      showAlert('Success', 'Order status updated');
     },
     onError: (error: any) => {
-      showAlert('Action Failed', error.message); // <-- Changed to showAlert
+      showAlert('Action Failed', error.message);
     }
   });
 
@@ -129,7 +131,6 @@ export default function OrdersScreen() {
   };
 
   const toggleExpand = (orderId: string) => {
-    // Only execute layout animations on native mobile platforms
     if (Platform.OS !== 'web') {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
@@ -137,8 +138,7 @@ export default function OrdersScreen() {
   };
 
   const renderActionButtons = (order: any) => {
-    // No actions for finished or cancelled orders
-    if (['DELIVERED', 'CANCELLED', 'PICKED_UP'].includes(order.status)) return null;
+    if (['DELIVERED', 'CANCELLED', 'REJECTED', 'FAILED', 'PICKED_UP', 'CANCEL_PENDING'].includes(order.status)) return null;
 
     const isServiceOrRent = order.items.some((i: any) => 
         i.productId?.category === 'Service' || i.productId?.category === 'Rent'
@@ -146,15 +146,15 @@ export default function OrdersScreen() {
     const isSelfPickup = order.paymentMethod === 'SELF_PICKUP';
 
     return (
-      <View style={[styles.actionsContainer, { gap: 10, marginTop: 15 }]}>
+      <View style={screenStyles.actionsContainer}>
         {order.status === 'PLACED' && (
           <>
             <TouchableOpacity 
               style={{ flex: 2 }} 
               onPress={() => handleAction(order._id, 'ready', isServiceOrRent ? 'Accept' : 'Mark Ready')}
             >
-              <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.actionButtonGradient}>
-                <Text style={styles.actionButtonText}>{isServiceOrRent ? 'ACCEPT' : 'MARK READY'}</Text>
+              <LinearGradient colors={['#4CAF50', '#2E7D32']} style={screenStyles.actionButtonGradient}>
+                <Text style={screenStyles.actionButtonText}>{isServiceOrRent ? 'ACCEPT' : 'MARK READY'}</Text>
               </LinearGradient>
             </TouchableOpacity>
             
@@ -162,21 +162,20 @@ export default function OrdersScreen() {
               style={{ flex: 1 }} 
               onPress={() => handleAction(order._id, 'reject', 'Reject Order')}
             >
-              <LinearGradient colors={['#F44336', '#D32F2F']} style={styles.actionButtonGradient}>
-                <Text style={styles.actionButtonText}>REJECT</Text>
+              <LinearGradient colors={['#F44336', '#D32F2F']} style={screenStyles.actionButtonGradient}>
+                <Text style={screenStyles.actionButtonText}>REJECT</Text>
               </LinearGradient>
             </TouchableOpacity>
           </>
         )}
 
-        {/* Deliver button for Self-Pickup or Service items that don't need a driver */}
         {(order.status === 'READY' || order.status === 'ACCEPTED') && (isServiceOrRent || isSelfPickup) && (
             <TouchableOpacity 
               style={{ flex: 1 }} 
               onPress={() => handleAction(order._id, 'deliver', 'Complete Order')}
             >
-              <LinearGradient colors={['#2196F3', '#1976D2']} style={styles.actionButtonGradient}>
-                <Text style={styles.actionButtonText}>COMPLETE / DELIVER</Text>
+              <LinearGradient colors={['#2196F3', '#1976D2']} style={screenStyles.actionButtonGradient}>
+                <Text style={screenStyles.actionButtonText}>COMPLETE / DELIVER</Text>
               </LinearGradient>
             </TouchableOpacity>
         )}
@@ -190,79 +189,102 @@ export default function OrdersScreen() {
     const currentStep = steps.indexOf(order.status);
     const isExpanded = expandedOrders[order._id];
     const statusInfo = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.PLACED;
+    
+    const showCancelIndicator = order.status === 'CANCEL_PENDING' || order.status === 'CANCELLED';
 
     return (
-      <View style={styles.orderCard}>
-        <LinearGradient colors={['#FFFFFF', '#FDFBF0']} style={styles.orderCardGradient}>
+      <View style={screenStyles.orderCard}>
+        <LinearGradient colors={['#FFFFFF', '#FDFBF0']} style={screenStyles.orderCardGradient}>
           
           {/* Header */}
-          <View style={styles.orderHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.orderIdLabel}>REF: #{order.checkoutId?.toUpperCase()}</Text>
-              <Text style={{ fontSize: 10, color: '#888' }}>{new Date(order.createdAt).toLocaleDateString()}</Text>
+          <View style={screenStyles.orderHeader}>
+            <View style={screenStyles.headerLeftRef}>
+              {showCancelIndicator && (
+                <FontAwesome 
+                  name={statusInfo.icon as any} 
+                  size={16} 
+                  color={statusInfo.color} 
+                />
+              )}
+              <Text style={screenStyles.orderIdLabel}>REF: #{order.checkoutId?.toUpperCase()}</Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '15', borderColor: statusInfo.color, borderWidth: 1 }]}>
-              <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
+            
+            {/* Dynamic Status Badge displaying both an explicit status Icon + Text label */}
+            <View style={[screenStyles.statusBadge, { backgroundColor: statusInfo.color + '12', borderColor: statusInfo.color }]}>
+              <FontAwesome name={statusInfo.icon as any} size={11} color={statusInfo.color} />
+              <Text style={[screenStyles.statusBadgeText, { color: statusInfo.color }]}>
+                {statusInfo.label}
+              </Text>
             </View>
           </View>
 
-          {/* Customer Info */}
-          <TouchableOpacity onPress={() => toggleExpand(order._id)} style={styles.customerCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={styles.avatarCircle}>
-                    <Text style={styles.avatarText}>{order.userId?.name?.charAt(0) || '?'}</Text>
+          <Text style={screenStyles.dateText}>
+            {new Date(order.createdAt).toLocaleDateString()}
+          </Text>
+
+          {/* Customer Info Card */}
+          <TouchableOpacity onPress={() => toggleExpand(order._id)} style={screenStyles.customerCard}>
+            <View style={screenStyles.customerRow}>
+                <View style={screenStyles.customerMainLeft}>
+                  <View style={screenStyles.avatarCircle}>
+                    <Text style={screenStyles.avatarText}>{order.userId?.name?.charAt(0) || '?'}</Text>
                   </View>
-                  <Text style={styles.customerNameMain}>{order.userId?.name || 'Unknown'}</Text>
+                  <Text style={screenStyles.customerNameMain}>{order.userId?.name || 'Unknown'}</Text>
                 </View>
                 <FontAwesome name={isExpanded ? "chevron-up" : "chevron-down"} size={12} color="#AAA" />
             </View>
             {isExpanded && (
-              <View style={styles.expandedDetails}>
-                <Text style={styles.detailText}><FontAwesome name="phone" /> {order.deliveryAddress?.phone}</Text>
-                <Text style={styles.detailText}><FontAwesome name="map-marker" /> {order.deliveryAddress?.street}, {order.deliveryAddress?.city}</Text>
+              <View style={screenStyles.expandedDetails}>
+                <Text style={screenStyles.detailText}><FontAwesome name="phone" /> {order.deliveryAddress?.phone}</Text>
+                <Text style={screenStyles.detailText}><FontAwesome name="map-marker" /> {order.deliveryAddress?.street}, {order.deliveryAddress?.city}</Text>
                 {order.paymentMethod === 'SELF_PICKUP' && (
-                  <View style={{ backgroundColor: '#E3F2FD', padding: 5, borderRadius: 4, marginTop: 5 }}>
-                    <Text style={{ fontSize: 10, color: '#1976D2', fontWeight: 'bold' }}>SELF PICKUP ORDER</Text>
+                  <View style={screenStyles.selfPickupBadge}>
+                    <Text style={screenStyles.selfPickupText}>SELF PICKUP ORDER</Text>
                   </View>
                 )}
               </View>
             )}
           </TouchableOpacity>
 
-          {/* Steps Progress */}
-          {order.status !== 'CANCELLED' && (
-            <View style={styles.progressContainer}>
-              {steps.map((step, index) => (
-                <View key={step} style={{ alignItems: 'center', flex: 1 }}>
-                  <View style={[styles.progressDot, { backgroundColor: index <= currentStep ? '#DAA520' : '#E0E0E0' }]}>
-                    {index <= currentStep && <FontAwesome name="check" size={8} color="#fff" />}
+          {/* Steps Progress Tracker - Using functional Workflow Tracking Icons */}
+          {!['CANCELLED', 'CANCEL_PENDING', 'REJECTED', 'FAILED'].includes(order.status) && (
+            <View style={screenStyles.progressContainer}>
+              {steps.map((step, index) => {
+                const isCompletedOrCurrent = index <= currentStep;
+                const stepMeta = STEP_ICON_CONFIG[step] || { icon: 'circle', label: step };
+                return (
+                  <View key={step} style={screenStyles.stepBlock}>
+                    <View style={[screenStyles.progressIconCircle, { backgroundColor: isCompletedOrCurrent ? '#DAA520' : '#E0E0E0' }]}>
+                      <FontAwesome name={stepMeta.icon as any} size={11} color={isCompletedOrCurrent ? '#fff' : '#999'} />
+                    </View>
+                    <Text style={[screenStyles.progressText, { color: isCompletedOrCurrent ? '#DAA520' : '#999' }]}>
+                      {stepMeta.label}
+                    </Text>
                   </View>
-                  <Text style={[styles.progressText, { color: index <= currentStep ? '#DAA520' : '#999' }]}>{step}</Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
 
           {/* Items List */}
           {order.items.map((item: any) => (
-            <View key={item._id} style={styles.itemRowImproved}>
+            <View key={item._id} style={screenStyles.itemRowImproved}>
               <Image 
                 source={{ uri: `${S3_BASE_URL}/${item.productId?.images?.[0]}` }} 
-                style={styles.itemImageSmall} 
+                style={screenStyles.itemImageSmall} 
                 defaultSource={require('../../assets/images/icon.png')} 
               />
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemNameSmall} numberOfLines={1}>{item.productId?.name}</Text>
-                <Text style={styles.itemCatSmall}>Qty: {item.quantity} | {item.productId?.category}</Text>
+              <View style={screenStyles.itemInfo}>
+                <Text style={screenStyles.itemNameSmall} numberOfLines={1}>{item.productId?.name}</Text>
+                <Text style={screenStyles.itemCatSmall}>Qty: {item.quantity} | {item.productId?.category}</Text>
               </View>
-              <Text style={styles.itemPriceSmall}>₹{item.price}</Text>
+              <Text style={screenStyles.itemPriceSmall}>₹{item.price}</Text>
             </View>
           ))}
 
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Grand Total</Text>
-            <Text style={styles.totalValue}>₹{order.itemsSubtotal}</Text>
+          <View style={screenStyles.totalRow}>
+            <Text style={screenStyles.totalLabel}>Grand Total</Text>
+            <Text style={screenStyles.totalValue}>₹{order.itemsSubtotal}</Text>
           </View>
 
           {renderActionButtons(order)}
@@ -273,32 +295,32 @@ export default function OrdersScreen() {
 
   if (isLoading && !orders) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={screenStyles.centered}>
         <ActivityIndicator size="large" color="#DAA520" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenStyles.container}>
       <StatusBar barStyle="dark-content" />
       
-      {/* Filter Bar */}
-      <View style={{ backgroundColor: '#fff', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+      {/* Scrollable Filter View */}
+      <View style={screenStyles.filterBarContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15 }}>
-          {['ALL', 'PLACED', 'READY', 'ACCEPTED', 'DELIVERED', 'CANCELLED'].map((filter) => (
+          {['ALL', 'PLACED', 'READY', 'ACCEPTED', 'DELIVERED', 'CANCEL_PENDING', 'CANCELLED', 'REJECTED'].map((filter) => (
              <TouchableOpacity 
-             key={filter}
-             onPress={() => setSelectedFilter(filter)}
-             style={[
-                 { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 10, backgroundColor: '#f5f5f5' },
-                 selectedFilter === filter && { backgroundColor: '#DAA520' }
-             ]}
-           >
-             <Text style={{ color: selectedFilter === filter ? '#fff' : '#666', fontWeight: 'bold', fontSize: 12 }}>
-                 {filter === 'CANCELLED' ? 'REJECTED' : filter}
-             </Text>
-           </TouchableOpacity>
+               key={filter}
+               onPress={() => setSelectedFilter(filter)}
+               style={[
+                   screenStyles.filterTabButton,
+                   selectedFilter === filter && { backgroundColor: '#DAA520' }
+               ]}
+             >
+               <Text style={[screenStyles.filterTabText, { color: selectedFilter === filter ? '#fff' : '#666' }]}>
+                   {filter === 'CANCEL_PENDING' ? 'CANCEL REQ.' : filter}
+               </Text>
+             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
@@ -310,9 +332,9 @@ export default function OrdersScreen() {
         contentContainerStyle={{ padding: 15, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor="#DAA520" />}
         ListEmptyComponent={
-            <View style={{ marginTop: 100, alignItems: 'center' }}>
+            <View style={screenStyles.emptyContainer}>
                 <FontAwesome name="inbox" size={50} color="#ddd" />
-                <Text style={{ color: '#999', marginTop: 10, fontSize: 16 }}>No orders found</Text>
+                <Text style={screenStyles.emptyText}>No orders found</Text>
             </View>
         }
       />
