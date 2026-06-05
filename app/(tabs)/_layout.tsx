@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext'; // IMPORT LANGUAGE CONTEXT HOOK
 
 // Custom Tab Icon Component
 function TabBarIcon(props: {
@@ -56,6 +57,7 @@ const showLogoutConfirmation = (onConfirm: () => void) => {
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const { token, clearAuthToken } = useAuth();
+  const { t } = useLanguage(); // ACCESS TRANSLATIONS OBJECT
   const router = useRouter();
 
   // Theme colors
@@ -142,7 +144,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t.homeTab, // TRANSLATED "HOME"
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="home"
@@ -175,7 +177,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="three"
         options={{
-          title: 'Orders',
+          title: t.ordersTab, // TRANSLATED "ORDERS"
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="shopping-bag"
@@ -186,11 +188,11 @@ export default function TabLayout() {
         }}
       />
 
-      {/* ANALYTICS TAB (ADDED HERE) */}
+      {/* ANALYTICS TAB */}
       <Tabs.Screen
         name="Analytics"
         options={{
-          title: 'Analytics',
+          title: t.analyticsTab, // TRANSLATED "ANALYTICS"
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="bar-chart"
@@ -205,7 +207,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="two"
         options={{
-          title: 'Profile',
+          title: t.profileTab, // TRANSLATED "PROFILE"
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="user"

@@ -19,10 +19,10 @@ import {
 } from 'react-native';
 import { styles } from './styles/add-edit-common.style';
 import { getToken } from './services/auth';
+import { useLanguage } from './contexts/LanguageContext';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
-// Add below API_BASE_URL
 const showAlert = (title: string, message: string, onConfirm?: () => void) => {
   if (Platform.OS === 'web') {
     alert(`${title}: ${message}`);
@@ -58,17 +58,18 @@ const PRODUCT_CATEGORIES = [
 
 const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
 const RENT_UNITS = ['Hour', 'Day', 'Week', 'Month'];
-const SERVICE_UNITS = ['Hour', 'Day', 'Service']; // Units specifically for services
+const SERVICE_UNITS = ['Hour', 'Day', 'Service'];
 
 export default function AddProductScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { t } = useLanguage();
   
   const [category, setCategory] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [serviceUnit, setServiceUnit] = useState('Hour'); // State for Service/Rent duration
+  const [serviceUnit, setServiceUnit] = useState('Hour');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('kg');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -82,7 +83,6 @@ export default function AddProductScreen() {
 
   const isService = category === 'Service';
   const isRent = category === 'Rent';
-  // Check if current category needs a time-based unit
   const needsTimeUnit = isService || isRent;
 
   const createProductMutation = useMutation({
@@ -103,14 +103,15 @@ export default function AddProductScreen() {
       }
       return response.json();
     },
-   onSuccess: () => {
-      showAlert('Success', 'Created successfully!', () => {
+    onSuccess: () => {
+      // Replaced missing key with generic string or success context fallback
+      showAlert(t.successTitle || 'Success', 'Created successfully!', () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         router.back();
       });
     },
     onError: (error: any) => {
-      showAlert('Error', error.message || 'Failed to create item');
+      showAlert(t.failedTitle || 'Error', error.message || 'Failed to create item');
     },
   });
 
@@ -119,7 +120,7 @@ export default function AddProductScreen() {
     setShowCategoryModal(false);
     
     if (selectedCategory === 'Service') {
-      setQuantity('1'); // Default quantity for service
+      setQuantity('1');
       setServiceUnit('Hour');
     } else if (selectedCategory === 'Rent') {
       setUnit('unit');
@@ -131,11 +132,11 @@ export default function AddProductScreen() {
     }
   };
 
- const pickImages = async () => {
+  const pickImages = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        showAlert('Permission needed', 'Please grant permission to access photos');
+        showAlert(t.failedTitle || 'Permission needed', 'Please grant permission to access photos');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -149,7 +150,7 @@ export default function AddProductScreen() {
         setSelectedImages(prev => [...prev, ...newImages]);
       }
     } catch (error) {
-      showAlert('Error', 'Failed to pick images');
+      showAlert(t.failedTitle || 'Error', 'Failed to pick images');
     }
   };
 
@@ -157,9 +158,10 @@ export default function AddProductScreen() {
     setSelectedImages(prev => prev.filter((_, i) => i !== index));
     setUploadedImageKeys(prev => prev.filter((_, i) => i !== index));
   };
-const uploadImages = async () => {
+
+  const uploadImages = async () => {
     if (selectedImages.length === 0) {
-      showAlert('Error', 'Please select at least one image');
+      showAlert(t.failedTitle || 'Error', 'Please select at least one image');
       return;
     }
     setIsUploading(true);
@@ -172,7 +174,6 @@ const uploadImages = async () => {
         let fileType = 'image/jpeg';
 
         if (Platform.OS === 'web') {
-          // Web images often come with layout indicators or header types embedded
           if (imageUri.includes('image/png') || imageUri.endsWith('.png')) {
             fileExtension = 'png';
             fileType = 'image/png';
@@ -200,7 +201,6 @@ const uploadImages = async () => {
         if (!presignedResponse.ok) throw new Error('Failed to get presigned URL');
         const { url: presignedUrl, key }: PresignedUrlResponse = await presignedResponse.json();
         
-        // Resolve the raw file content safely
         const imageResponse = await fetch(imageUri);
         const blob = await imageResponse.blob();
 
@@ -215,24 +215,25 @@ const uploadImages = async () => {
       }
       
       setUploadedImageKeys(imageKeys);
-      showAlert('Success', `${imageKeys.length} image(s) uploaded successfully!`);
+      showAlert(t.successTitle || 'Success', `${imageKeys.length} image(s) uploaded successfully!`);
     } catch (error: any) {
-      showAlert('Upload Failed', error.message);
+      showAlert(t.failedTitle || 'Upload Failed', error.message);
     } finally {
       setIsUploading(false);
     }
   };
+
   const handleCreateProduct = () => {
     if (!category.trim() || !name.trim() || !description.trim() || !price) {
-      showAlert('Error', 'Please fill in all required fields');
+      showAlert(t.failedTitle || 'Error', 'Please fill in all required fields');
       return;
     }
     if (!isService && !quantity) {
-      showAlert('Error', 'Please enter the quantity');
+      showAlert(t.failedTitle || 'Error', 'Please enter the quantity');
       return;
     }
     if (uploadedImageKeys.length === 0) {
-      showAlert('Error', 'Please upload your picked images first');
+      showAlert(t.failedTitle || 'Error', 'Please upload your picked images first');
       return;
     }
 
@@ -248,6 +249,7 @@ const uploadImages = async () => {
 
     createProductMutation.mutate(productData);
   };
+
   const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -280,7 +282,9 @@ const uploadImages = async () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{isService ? 'Add New Service' : 'Add New Product'}</Text>
+        <Text style={styles.headerTitle}>
+          {isService ? 'Add New Service' : (t.addProduct || 'Add New Product')}
+        </Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <FontAwesome name="times" size={24} color="#2D2416" />
         </TouchableOpacity>
@@ -324,7 +328,7 @@ const uploadImages = async () => {
           multiline
         />
 
-        {/* PRICE FIELD - Shows Unit dropdown for Service and Rent */}
+        {/* PRICE FIELD */}
         <View style={styles.parallelContainer}>
           <View style={{ flex: 2 }}>
             <TextInput
@@ -409,7 +413,9 @@ const uploadImages = async () => {
           onPress={handleCreateProduct}
           disabled={createProductMutation.isPending || uploadedImageKeys.length === 0}
         >
-          <Text style={styles.createButtonText}>Create {isService ? 'Service' : 'Product'}</Text>
+          <Text style={styles.createButtonText}>
+            {isService ? (t.createServiceBtn || 'Create Service') : (t.addProduct || 'Create Product')}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -433,7 +439,6 @@ const uploadImages = async () => {
         onClose={() => setShowUnitModal(false)}
       />
 
-      {/* DYNAMIC UNIT MODAL FOR SERVICE/RENT */}
       <SelectionModal 
         visible={showServiceUnitModal}
         data={isService ? SERVICE_UNITS : RENT_UNITS}

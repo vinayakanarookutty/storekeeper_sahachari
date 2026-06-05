@@ -21,6 +21,8 @@ import {
 } from 'react-native';
 import { getToken } from './services/auth';
 import { styles } from './styles/product-detail.style';
+import { useLanguage } from './contexts/LanguageContext';
+
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const { width, height } = Dimensions.get('window');
@@ -48,6 +50,11 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const queryClient = useQueryClient();
+  
+  // Cast t as any to bypass missing property errors shown in image_7ea1fe.png and image_7ea277.png
+  const { t: untypedT } = useLanguage();
+  const t = untypedT as any;
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [offerValue, setOfferValue] = useState('');
@@ -107,20 +114,20 @@ export default function ProductDetailScreen() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to add offer');
+        throw new Error(error.message || t.failedAddOffer || 'Failed to add offer');
       }
 
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', 'Offer added successfully!');
+      Alert.alert(t.successTitle || 'Success', t.offerAddedSuccess || 'Offer added successfully!');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setShowOfferModal(false);
       resetOfferForm();
       router.back();
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to add offer');
+      Alert.alert(t.failedTitle || 'Error', error.message || t.failedAddOffer || 'Failed to add offer');
     },
   });
 
@@ -137,18 +144,18 @@ export default function ProductDetailScreen() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete offer');
+        throw new Error(t.failedDeleteOffer || 'Failed to delete offer');
       }
 
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', 'Offer deleted successfully!');
+      Alert.alert(t.successTitle || 'Success', t.offerDeletedSuccess || 'Offer deleted successfully!');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       router.back();
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to delete offer');
+      Alert.alert(t.failedTitle || 'Error', error.message || t.failedDeleteOffer || 'Failed to delete offer');
     },
   });
 
@@ -164,15 +171,18 @@ export default function ProductDetailScreen() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete product');
+        throw new Error(isService ? (t.failedDeleteService || 'Failed to delete service') : (t.failedDeleteProduct || 'Failed to delete product'));
       }
 
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', `${isService ? 'Service' : 'Product'} deleted successfully!`, [
+      const successMsg = isService 
+        ? (t.serviceDeletedSuccess || 'Service deleted successfully!') 
+        : (t.productDeletedSuccess || 'Product deleted successfully!');
+      Alert.alert(t.successTitle || 'Success', successMsg, [
         {
-          text: 'OK',
+          text: t.ok || 'OK',
           onPress: () => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
             router.back();
@@ -181,7 +191,10 @@ export default function ProductDetailScreen() {
       ]);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || `Failed to delete ${isService ? 'service' : 'product'}`);
+      const fallbackError = isService 
+        ? (t.failedDeleteService || 'Failed to delete service') 
+        : (t.failedDeleteProduct || 'Failed to delete product');
+      Alert.alert(t.failedTitle || 'Error', error.message || fallbackError);
     },
   });
 
@@ -196,40 +209,42 @@ export default function ProductDetailScreen() {
   };
 
   const handleDelete = () => {
-  const title = `Delete ${isService ? 'Service' : 'Product'}`;
-  const message = `Are you sure you want to delete this ${isService ? 'service' : 'product'}? This action cannot be undone.`;
+    const title = isService 
+      ? (t.deleteServiceTitle || 'Delete Service') 
+      : (t.deleteProductTitle || 'Delete Product');
+    const message = isService 
+      ? (t.deleteServiceConfirm || 'Are you sure you want to delete this service? This action cannot be undone.') 
+      : (t.deleteProductConfirm || 'Are you sure you want to delete this product? This action cannot be undone.');
 
-  if (Platform.OS === 'web') {
-    // Standard web browser confirmation dialog
-    const confirmed = window.confirm(`${title}\n\n${message}`);
-    if (confirmed) {
-      deleteProductMutation.mutate(product._id);
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`${title}\n\n${message}`);
+      if (confirmed) {
+        deleteProductMutation.mutate(product._id);
+      }
+    } else {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: t.cancel || 'Cancel', style: 'cancel' },
+          {
+            text: t.delete || 'Delete',
+            style: 'destructive',
+            onPress: () => deleteProductMutation.mutate(product._id),
+          },
+        ]
+      );
     }
-  } else {
-    // Native mobile alert behavior
-    Alert.alert(
-      title,
-      message,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteProductMutation.mutate(product._id),
-        },
-      ]
-    );
-  }
-};
+  };
 
   const handleDeleteOffer = () => {
     Alert.alert(
-      'Delete Offer',
-      'Are you sure you want to delete this offer?',
+      t.deleteOfferTitle || 'Delete Offer',
+      t.deleteOfferConfirm || 'Are you sure you want to delete this offer?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.cancel || 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: t.delete || 'Delete',
           style: 'destructive',
           onPress: () => deleteOfferMutation.mutate(),
         },
@@ -244,19 +259,18 @@ export default function ProductDetailScreen() {
   };
 
   const handleAddOffer = () => {
-    // Validation
     if (!offerValue || parseFloat(offerValue) <= 0) {
-      Alert.alert('Error', 'Please enter a valid offer value');
+      Alert.alert(t.failedTitle || 'Error', t.invalidOfferValueError || 'Please enter a valid offer value');
       return;
     }
 
     if (parseFloat(offerValue) > 100) {
-      Alert.alert('Error', 'Discount cannot exceed 100%');
+      Alert.alert(t.failedTitle || 'Error', t.offerExceedLimitError || 'Discount cannot exceed 100%');
       return;
     }
 
     if (endDate <= startDate) {
-      Alert.alert('Error', 'End date must be after start date');
+      Alert.alert(t.failedTitle || 'Error', t.dateOrderError || 'End date must be after start date');
       return;
     }
 
@@ -311,7 +325,7 @@ export default function ProductDetailScreen() {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" />
-        <Text style={styles.errorText}>Product not found</Text>
+        <Text style={styles.errorText}>{t.productNotFound || 'Product not found'}</Text>
       </View>
     );
   }
@@ -359,7 +373,7 @@ export default function ProductDetailScreen() {
             ) : (
               <View style={styles.noImageContainer}>
                 <FontAwesome name="image" size={80} color="#DAA520" />
-                <Text style={styles.noImageText}>No images available</Text>
+                <Text style={styles.noImageText}>{t.noImages || 'No images available'}</Text>
               </View>
             )}
           </ScrollView>
@@ -373,7 +387,7 @@ export default function ProductDetailScreen() {
               style={styles.offerBadge}
             >
               <FontAwesome name="tag" size={16} color="#fff" />
-              <Text style={styles.offerBadgeText}>{activeOffer.value}% OFF</Text>
+              <Text style={styles.offerBadgeText}>{activeOffer.value}% {t.offLabel || 'OFF'}</Text>
             </LinearGradient>
           )}
 
@@ -409,13 +423,15 @@ export default function ProductDetailScreen() {
           <View style={styles.badgesRow}>
             <View style={styles.categoryBadge}>
               <FontAwesome name="tag" size={12} color="#2E7D32" />
-              <Text style={styles.categoryText}>{product.category}</Text>
+              <Text style={styles.categoryText}>
+                {product.category ? (t[product.category.toLowerCase()] || product.category) : ''}
+              </Text>
             </View>
             {!isService && (
               <View style={[styles.stockBadge, product.quantity < 10 && styles.lowStockBadge]}>
                 <FontAwesome name="cube" size={12} color={product.quantity < 10 ? '#D32F2F' : '#666'} />
                 <Text style={[styles.stockText, product.quantity < 10 && styles.lowStockText]}>
-                  {product.quantity} in stock
+                  {product.quantity} {t.inStock || 'in stock'}
                 </Text>
               </View>
             )}
@@ -450,12 +466,12 @@ export default function ProductDetailScreen() {
               {activeOffer && (
                 <View style={styles.savingsChip}>
                   <Text style={styles.savingsText}>
-                    Save ₹{Math.round(numericPrice - discountedPrice!).toLocaleString('en-IN')}
+                    {t.saveLabel || 'Save'} ₹{Math.round(numericPrice - discountedPrice!).toLocaleString('en-IN')}
                   </Text>
                 </View>
               )}
             </View>
-            <Text style={styles.priceLabel}>per unit</Text>
+            <Text style={styles.priceLabel}>{t.perUnit || 'per unit'}</Text>
           </LinearGradient>
 
           {/* Active Offers Section */}
@@ -464,7 +480,7 @@ export default function ProductDetailScreen() {
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionHeader}>
                   <FontAwesome name="percent" size={18} color="#FF6B6B" />
-                  <Text style={styles.sectionTitle}>Active Offers</Text>
+                  <Text style={styles.sectionTitle}>{t.activeOffers || 'Active Offers'}</Text>
                 </View>
               </View>
               {product.offers.map((offer, index) => {
@@ -488,12 +504,12 @@ export default function ProductDetailScreen() {
                           style={styles.offerBadgeSmall}
                         >
                           <FontAwesome name="percent" size={14} color="#fff" />
-                          <Text style={styles.offerValueText}>{offer.value}% OFF</Text>
+                          <Text style={styles.offerValueText}>{offer.value}% {t.offLabel || 'OFF'}</Text>
                         </LinearGradient>
                         {isOfferActive() && (
                           <View style={styles.activeIndicator}>
                             <View style={styles.activeDotIndicator} />
-                            <Text style={styles.activeText}>Active</Text>
+                            <Text style={styles.activeText}>{t.statusActive || 'Active'}</Text>
                           </View>
                         )}
                       </View>
@@ -525,12 +541,12 @@ export default function ProductDetailScreen() {
           <View style={styles.descriptionSection}>
             <View style={styles.sectionHeader}>
               <FontAwesome name="align-left" size={18} color="#4A90E2" />
-              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.sectionTitle}>{t.description || 'Description'}</Text>
             </View>
             <Text style={styles.productDescription}>{product.description}</Text>
           </View>
 
-          {/* Product Stats with Gradient - Hide quantity for services */}
+          {/* Product Stats with Gradient */}
           <LinearGradient
             colors={['#F8F9FA', '#FFFFFF']}
             style={styles.statsContainer}
@@ -550,7 +566,9 @@ export default function ProductDetailScreen() {
                   : numericPrice * (isService ? 1 : product.quantity)
                 ).toLocaleString('en-IN')}
               </Text>
-              <Text style={styles.statLabel}>{isService ? 'Service Price' : 'Total Value'}</Text>
+              <Text style={styles.statLabel}>
+                {isService ? (t.servicePriceLabel || 'Service Price') : (t.totalValueLabel || 'Total Value')}
+              </Text>
             </View>
             {!isService && (
               <>
@@ -565,7 +583,7 @@ export default function ProductDetailScreen() {
                     </LinearGradient>
                   </View>
                   <Text style={styles.statValue}>{product.quantity}</Text>
-                  <Text style={styles.statLabel}>Units Available</Text>
+                  <Text style={styles.statLabel}>{t.unitsAvailable || 'Units Available'}</Text>
                 </View>
               </>
             )}
@@ -593,7 +611,7 @@ export default function ProductDetailScreen() {
             style={styles.offerButton}
           >
             <FontAwesome name="percent" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Add Offer</Text>
+            <Text style={styles.buttonText}>{t.addOffer || 'Add Offer'}</Text>
           </LinearGradient>
         </TouchableOpacity>
 
@@ -642,7 +660,7 @@ export default function ProductDetailScreen() {
                 >
                   <FontAwesome name="percent" size={20} color="#fff" />
                 </LinearGradient>
-                <Text style={styles.modalTitle}>Add New Offer</Text>
+                <Text style={styles.modalTitle}>{t.addNewOfferTitle || 'Add New Offer'}</Text>
               </View>
               <TouchableOpacity onPress={() => setShowOfferModal(false)}>
                 <FontAwesome name="times-circle" size={28} color="#999" />
@@ -652,12 +670,12 @@ export default function ProductDetailScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Discount Value Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Discount Percentage</Text>
+                <Text style={styles.inputLabel}>{t.discountPercentageLabel || 'Discount Percentage'}</Text>
                 <View style={styles.inputWrapper}>
                   <FontAwesome name="percent" size={18} color="#4A90E2" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter discount (e.g., 10)"
+                    placeholder={t.discountPlaceholder || 'Enter discount (e.g., 10)'}
                     value={offerValue}
                     onChangeText={setOfferValue}
                     keyboardType="numeric"
@@ -668,7 +686,7 @@ export default function ProductDetailScreen() {
 
               {/* Start Date Picker */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Start Date</Text>
+                <Text style={styles.inputLabel}>{t.startDateLabel || 'Start Date'}</Text>
                 <TouchableOpacity 
                   style={styles.datePickerButton}
                   onPress={() => setShowStartDatePicker(true)}
@@ -691,7 +709,7 @@ export default function ProductDetailScreen() {
 
               {/* End Date Picker */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>End Date</Text>
+                <Text style={styles.inputLabel}>{t.endDateLabel || 'End Date'}</Text>
                 <TouchableOpacity 
                   style={styles.datePickerButton}
                   onPress={() => setShowEndDatePicker(true)}
@@ -715,20 +733,20 @@ export default function ProductDetailScreen() {
               {/* Preview Card */}
               {offerValue && parseFloat(offerValue) > 0 && (
                 <View style={styles.previewSection}>
-                  <Text style={styles.previewLabel}>Preview</Text>
+                  <Text style={styles.previewLabel}>{t.previewLabel || 'Preview'}</Text>
                   <LinearGradient
                     colors={['#FFE5E5', '#FFF0F0']}
                     style={styles.previewCard}
                   >
                     <View style={styles.previewBadge}>
                       <FontAwesome name="percent" size={16} color="#fff" />
-                      <Text style={styles.previewBadgeText}>{offerValue}% OFF</Text>
+                      <Text style={styles.previewBadgeText}>{offerValue}% {t.offLabel || 'OFF'}</Text>
                     </View>
                     <Text style={styles.previewPrice}>
                       ₹{numericPrice.toLocaleString('en-IN')} → ₹{Math.round(numericPrice - (numericPrice * parseFloat(offerValue) / 100)).toLocaleString('en-IN')}
                     </Text>
                     <Text style={styles.previewSavings}>
-                      You save ₹{Math.round(numericPrice * parseFloat(offerValue) / 100).toLocaleString('en-IN')} per unit
+                      {t.previewSavingsPrefix || 'You save'} ₹{Math.round(numericPrice * parseFloat(offerValue) / 100).toLocaleString('en-IN')} {t.previewSavingsSuffix || 'per unit'}
                     </Text>
                   </LinearGradient>
                 </View>
@@ -743,7 +761,7 @@ export default function ProductDetailScreen() {
                     resetOfferForm();
                   }}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>{t.cancel || 'Cancel'}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -758,7 +776,7 @@ export default function ProductDetailScreen() {
                   >
                     <FontAwesome name="check" size={18} color="#fff" />
                     <Text style={styles.saveButtonText}>
-                      {addOfferMutation.isPending ? 'Adding...' : 'Add Offer'}
+                      {addOfferMutation.isPending ? (t.addingState || 'Adding...') : (t.addOffer || 'Add Offer')}
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -770,4 +788,3 @@ export default function ProductDetailScreen() {
     </View>
   );
 }
-

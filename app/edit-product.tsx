@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { getToken } from './services/auth';
 import { styles } from './styles/add-edit-common.style';
+import { useLanguage } from './contexts/LanguageContext';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
@@ -28,7 +29,6 @@ const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
 const RENT_UNITS = ['Hour', 'Day', 'Week', 'Month'];
 const SERVICE_UNITS = ['Hour', 'Day', 'Service'];
 
-// Add below your S3_BASE_URL constant definition
 const showAlert = (title: string, message: string, onConfirm?: () => void) => {
   if (Platform.OS === 'web') {
     alert(`${title}: ${message}`);
@@ -55,10 +55,11 @@ export default function EditProductScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { t } = useLanguage();
   
   const product = params.product ? JSON.parse(params.product as string) : null;
 
-  // FIX: Parse existing price AND units properly for all categories
+  // Parse existing price AND units properly for all categories
   const parsePriceData = () => {
     if (!product?.price) return { val: '', unit: 'kg' };
     const parts = product.price.toString().split('/');
@@ -82,7 +83,7 @@ export default function EditProductScreen() {
   const [price, setPrice] = useState(initialPriceInfo.val);
   const [serviceUnit, setServiceUnit] = useState(initialPriceInfo.unit);
   const [quantity, setQuantity] = useState(product?.quantity?.toString() || '');
-  const [unit, setUnit] = useState(initialPriceInfo.unit); // FIX: Dynamic assignment, not hardcoded to 'kg'
+  const [unit, setUnit] = useState(initialPriceInfo.unit);
   
   const [existingImages, setExistingImages] = useState<string[]>(product?.images || []);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -117,14 +118,13 @@ export default function EditProductScreen() {
       return response.json();
     },
     onSuccess: () => {
-      // Fix: Now uses web-safe alert mapping to ensure redirect executes
-      showAlert('Success', 'Updated successfully!', () => {
+      showAlert(t.successTitle || 'Success', 'Updated successfully!', () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         router.back();
       });
     },
     onError: (error: any) => {
-      showAlert('Error', error.message || 'Failed to update item');
+      showAlert(t.failedTitle || 'Error', error.message || 'Failed to update item');
     },
   });
 
@@ -148,7 +148,6 @@ export default function EditProductScreen() {
         let fileExtension = 'jpg';
         let fileType = 'image/jpeg';
 
-        // Web environment image metadata adjustment
         if (Platform.OS === 'web') {
           if (uri.includes('image/png') || uri.endsWith('.png')) {
             fileExtension = 'png';
@@ -172,27 +171,27 @@ export default function EditProductScreen() {
       }
       setUploadedImageKeys(prev => [...prev, ...newKeys]);
       setSelectedImages([]);
-      showAlert('Success', 'New images uploaded!');
+      showAlert(t.successTitle || 'Success', 'New images uploaded!');
     } catch (e) {
-      showAlert('Error', 'Upload failed');
+      showAlert(t.failedTitle || 'Error', 'Upload failed');
     } finally {
       setIsUploading(false);
     }
   };
 
- const handleUpdateProduct = () => {
+  const handleUpdateProduct = () => {
     if (!category.trim() || !name.trim() || !description.trim() || !price) {
-      showAlert('Error', 'Please fill in all required fields');
+      showAlert(t.failedTitle || 'Error', 'Please fill in all required fields');
       return;
     }
     if (!isService && !quantity) {
-      showAlert('Error', 'Please enter the quantity');
+      showAlert(t.failedTitle || 'Error', 'Please enter the quantity');
       return;
     }
     
     const finalImages = [...existingImages, ...uploadedImageKeys];
     if (finalImages.length === 0) {
-      showAlert('Error', 'Please keep or upload at least one image');
+      showAlert(t.failedTitle || 'Error', 'Please keep or upload at least one image');
       return;
     }
 
@@ -210,7 +209,7 @@ export default function EditProductScreen() {
     const currentId = product?._id; 
 
     if (!currentId) {
-      return showAlert('Error', 'Could not locate an active Product ID to update');
+      return showAlert(t.failedTitle || 'Error', 'Could not locate an active Product ID to update');
     }
 
     updateProductMutation.mutate({
@@ -246,7 +245,9 @@ export default function EditProductScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Edit {isService ? 'Service' : 'Product'}</Text>
+        <Text style={styles.headerTitle}>
+          {isService ? 'Edit Service' : (t.myInventory ? 'Edit Product' : 'Edit Item')}
+        </Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <FontAwesome name="times" size={24} color="#2D2416" />
         </TouchableOpacity>
@@ -334,7 +335,9 @@ export default function EditProductScreen() {
           onPress={handleUpdateProduct}
           disabled={updateProductMutation.isPending}
         >
-          <Text style={styles.createButtonText}>Save Changes</Text>
+          <Text style={styles.createButtonText}>
+            {isService ? (t.createServiceBtn || 'Save Changes') : (t.addProduct || 'Save Changes')}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -345,7 +348,6 @@ export default function EditProductScreen() {
         title="Select Category" 
         onSelect={(item: string) => { 
           setCategory(item); 
-          // FIX: Automatically keep unit states contextually synchronized on live selection
           if (item === 'Service') {
             setServiceUnit('Hour');
           } else if (item === 'Rent') {

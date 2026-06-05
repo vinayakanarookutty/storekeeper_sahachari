@@ -2,8 +2,6 @@ import axios from 'axios';
 import * as DocumentPicker from 'expo-document-picker';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-
 import {
   Alert,
   View,
@@ -13,19 +11,28 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-
 import { FontAwesome } from '@expo/vector-icons';
+import { useLanguage } from './contexts/LanguageContext';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+  if (Platform.OS === 'web') {
+    alert(`${title}: ${message}`);
+    if (onConfirm) onConfirm();
+  } else {
+    Alert.alert(title, message, onConfirm ? [{ text: 'OK', onPress: onConfirm }] : undefined);
+  }
+};
+
 export default function BulkUploadScreen() {
+  const { t } = useLanguage();
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   /* =========================
      PICK FILE
   ========================= */
-
   const pickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -40,13 +47,11 @@ export default function BulkUploadScreen() {
       if (result.canceled) return;
 
       const file = result.assets[0];
-
       setSelectedFile(file);
     } catch (error) {
       console.log(error);
-
-      Alert.alert(
-        'Error',
+      showAlert(
+        t.failedTitle || 'Error',
         'Failed to select file'
       );
     }
@@ -55,100 +60,88 @@ export default function BulkUploadScreen() {
   /* =========================
      IMPORT PRODUCTS
   ========================= */
-
   const handleImport = async () => {
-  try {
-    if (!selectedFile) {
-      Alert.alert('No File', 'Please choose an Excel or CSV file');
-      return;
-    }
+    try {
+      if (!selectedFile) {
+        showAlert(t.failedTitle || 'No File', 'Please choose an Excel or CSV file');
+        return;
+      }
 
-    setLoading(true);
+      setLoading(true);
+      const formData = new FormData();
 
-    const formData = new FormData();
-
-    // ==========================================
-    //  FIX: HANDLE WEB VS MOBILE FILE ATTACHMENT
-    // ==========================================
-    if (Platform.OS === 'web') {
-      // On web, expo-document-picker provides the native DOM File object under .file
-      if (selectedFile.file) {
-        formData.append('file', selectedFile.file);
+      // FIX: HANDLE WEB VS MOBILE FILE ATTACHMENT
+      if (Platform.OS === 'web') {
+        if (selectedFile.file) {
+          formData.append('file', selectedFile.file);
+        } else {
+          const response = await fetch(selectedFile.uri);
+          const blob = await response.blob();
+          formData.append('file', blob, selectedFile.name);
+        }
       } else {
-        // Fallback if .file is missing: Convert the URI/base64 to a real Blob object
-        const response = await fetch(selectedFile.uri);
-        const blob = await response.blob();
-        formData.append('file', blob, selectedFile.name);
+        formData.append('file', {
+          uri: selectedFile.uri,
+          name: selectedFile.name,
+          type:
+            selectedFile.mimeType ||
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        } as any);
       }
-    } else {
-      // On Native Mobile (iOS / Android)
-      formData.append('file', {
-        uri: selectedFile.uri,
-        name: selectedFile.name,
-        type:
-          selectedFile.mimeType ||
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      } as any);
-    }
 
-    // GET TOKEN
-    let token = '';
-    if (Platform.OS === 'web') {
-      token = localStorage.getItem('jwt_token') || '';
-    } else {
-      token = (await AsyncStorage.getItem('jwt_token')) || '';
-    }
-
-    // Send the request
-    const response = await axios.post(
-      `${API_URL}/storekeeper/bulk-upload`,
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // Let the browser/operating system set the multi-part boundaries automatically
-          'Content-Type': 'multipart/form-data',
-        },
+      // GET TOKEN
+      let token = '';
+      if (Platform.OS === 'web') {
+        token = localStorage.getItem('jwt_token') || '';
+      } else {
+        token = (await AsyncStorage.getItem('jwt_token')) || '';
       }
-    );
 
-    Alert.alert(
-      'Success',
-      `${response.data.count || 0} products imported successfully`
-    );
+      // Send the request
+      const response = await axios.post(
+        `${API_URL}/storekeeper/bulk-upload`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
 
-    setSelectedFile(null);
-  } catch (error: any) {
-    console.log("Upload Error:", error?.response?.data || error);
+      showAlert(
+        t.successTitle || 'Success',
+        `${response.data.count || 0} products imported successfully`
+      );
 
-    Alert.alert(
-      'Upload Failed',
-      error?.response?.data?.message || 'Something went wrong'
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+      setSelectedFile(null);
+    } catch (error: any) {
+      console.log("Upload Error:", error?.response?.data || error);
+      showAlert(
+        t.failedTitle || 'Upload Failed',
+        error?.response?.data?.message || 'Something went wrong'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
       {/* =========================
-          HEADER
+           HEADER
       ========================= */}
-
       <Text style={styles.title}>
-        Bulk Upload Products
+        {t.bulkUpload || 'Bulk Upload Products'}
       </Text>
 
       <Text style={styles.subtitle}>
-        Upload Excel or CSV files to import
-        products quickly
+        Upload Excel or CSV files to import products quickly
       </Text>
 
       {/* =========================
-          FILE PICKER
+           FILE PICKER
       ========================= */}
-
       <TouchableOpacity
         style={styles.uploadBox}
         onPress={pickFile}
@@ -175,7 +168,6 @@ export default function BulkUploadScreen() {
               size={18}
               color="#1A140B"
             />
-
             <Text
               style={styles.fileName}
               numberOfLines={1}
@@ -187,9 +179,8 @@ export default function BulkUploadScreen() {
       </TouchableOpacity>
 
       {/* =========================
-          IMPORT BUTTON
+           IMPORT BUTTON
       ========================= */}
-
       <TouchableOpacity
         style={[
           styles.importButton,
@@ -207,7 +198,6 @@ export default function BulkUploadScreen() {
               size={16}
               color="#fff"
             />
-
             <Text style={styles.importButtonText}>
               Import Products
             </Text>
@@ -221,7 +211,6 @@ export default function BulkUploadScreen() {
 /* =========================
    STYLES
 ========================= */
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -229,91 +218,66 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 70 : 40,
   },
-
   title: {
     fontSize: 28,
     fontWeight: '800',
     color: '#1A140B',
     marginBottom: 10,
   },
-
   subtitle: {
     fontSize: 14,
     color: '#777',
     lineHeight: 22,
     marginBottom: 30,
   },
-
   uploadBox: {
     minHeight: 240,
-
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#DAA520',
-
     borderRadius: 24,
-
     backgroundColor: '#FFF9E8',
-
     justifyContent: 'center',
     alignItems: 'center',
-
     padding: 24,
   },
-
   uploadText: {
     marginTop: 16,
     fontSize: 18,
     fontWeight: '700',
     color: '#1A140B',
   },
-
   supportText: {
     marginTop: 8,
     fontSize: 13,
     color: '#777',
   },
-
   filePreview: {
     marginTop: 24,
-
     flexDirection: 'row',
     alignItems: 'center',
-
     backgroundColor: '#fff',
-
     paddingHorizontal: 14,
     paddingVertical: 10,
-
     borderRadius: 12,
-
     width: '100%',
   },
-
   fileName: {
     marginLeft: 10,
     flex: 1,
     color: '#1A140B',
     fontWeight: '600',
   },
-
   importButton: {
     marginTop: 30,
-
     backgroundColor: '#DAA520',
-
     borderRadius: 16,
-
     paddingVertical: 16,
-
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-
     gap: 10,
-
     elevation: 4,
-
     shadowColor: '#DAA520',
     shadowOffset: {
       width: 0,
@@ -322,11 +286,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
   },
-
   disabledButton: {
     opacity: 0.7,
   },
-
   importButtonText: {
     color: '#fff',
     fontSize: 16,

@@ -1,4 +1,4 @@
-import { StyleSheet, Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
   container: {
@@ -293,4 +293,55 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
   },
+
+  titleRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+},
+
+languageToggle: {
+  width: 88,
+  height: 36,
+  flexDirection: 'row',
+  backgroundColor: '#EFE7D3',
+  borderRadius: 18,
+  position: 'relative',
+  overflow: 'hidden',
+},
+
+toggleSlider: {
+  position: 'absolute',
+  width: 44,
+  height: 36,
+  backgroundColor: '#DAA520',
+  borderRadius: 18,
+  left: 0,
+  top: 0,
+},
+
+langButton: {
+  width: 44,
+  height: 36,
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 2,
+},
+
+langText: {
+  color: '#666',
+  fontSize: 14,
+  fontWeight: '600',
+},
+
+langTextActive: {
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: '700',
+},
+
+languageToggleContainer: {
+  marginTop: 12,
+  alignItems: 'flex-start',
+},
 });

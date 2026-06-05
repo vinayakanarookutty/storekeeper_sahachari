@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
+
 import {
   ActivityIndicator,
   Alert,
@@ -19,7 +21,6 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { getToken } from '../services/auth';
 import { styles } from '../tab_style/two.style';
-styles
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
@@ -54,6 +55,7 @@ interface EditModalProps {
   onSave: (field: string, value: string) => void;
   isLoading: boolean;
 }
+
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web') {
     alert(`${title}: ${message}`);
@@ -79,8 +81,10 @@ const showConfirm = (title: string, message: string, onConfirm: () => void) => {
     );
   }
 };
+
 function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditModalProps) {
   const [editValue, setEditValue] = useState(value);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (visible) setEditValue(value);
@@ -88,10 +92,10 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
 
   const getFieldLabel = () => {
     switch (field) {
-      case 'address': return 'Primary Address';
-      case 'address2': return 'Secondary Address';
-      case 'mobileNumber': return 'Mobile Number';
-      case 'serviceablePincodes': return 'Serviceable Pincodes';
+      case 'address': return t.primaryAddress;
+      case 'address2': return t.secondaryAddress;
+      case 'mobileNumber': return t.mobileNumber;
+      case 'serviceablePincodes': return t.servicePincodes;
       default: return '';
     }
   };
@@ -101,7 +105,7 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Edit {getFieldLabel()}</Text>
+            <Text style={styles.modalTitle}>{t.confirmTitle || 'Edit'} {getFieldLabel()}</Text>
             <TouchableOpacity onPress={onClose}><FontAwesome name="times" size={20} color={COLORS.textDark} /></TouchableOpacity>
           </View>
 
@@ -109,7 +113,7 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
             style={[styles.modalInput, (field === 'address' || field === 'address2') && styles.textArea]}
             value={editValue}
             onChangeText={setEditValue}
-            placeholder={`Enter ${getFieldLabel().toLowerCase()}`}
+            placeholder="..."
             multiline={field === 'address' || field === 'address2'}
             keyboardType={field === 'mobileNumber' ? 'phone-pad' : 'default'}
             editable={!isLoading}
@@ -124,7 +128,7 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
               onPress={() => field && onSave(field, editValue)}
               disabled={isLoading}
             >
-              {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+              {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -137,6 +141,7 @@ export default function TabTwoScreen() {
   const { token, clearAuthToken } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
   
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -154,7 +159,6 @@ export default function TabTwoScreen() {
     enabled: !!token,
   });
 
-  // 1. REFRESH LOGIC
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refetch();
@@ -190,10 +194,10 @@ export default function TabTwoScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       setEditModalVisible(false);
-      showAlert('Success', 'Profile updated successfully!'); // <-- Changed here
+      showAlert(t.successTitle || 'Success', t.statusUpdatedSuccess || 'Profile updated successfully!');
     },
     onError: (error: any) => {
-      showAlert('Error', error.message || 'Failed to update profile'); // <-- Changed here
+      showAlert(t.failedTitle || 'Error', error.message || 'Failed to update profile');
     },
   });
 
@@ -235,10 +239,10 @@ export default function TabTwoScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
-      showAlert('Success', 'Profile picture updated!'); // <-- Changed here
+      showAlert(t.successTitle || 'Success', 'Profile picture updated!');
     },
     onError: (error: any) => {
-      showAlert('Error', error.message || 'Upload failed'); // <-- Changed here
+      showAlert(t.failedTitle || 'Error', error.message || 'Upload failed');
     },
   });
 
@@ -270,7 +274,6 @@ export default function TabTwoScreen() {
     <ScrollView 
       style={styles.container} 
       showsVerticalScrollIndicator={false}
-      // 2. REFRESH CONTROL COMPONENT
       refreshControl={
         <RefreshControl 
           refreshing={refreshing} 
@@ -299,12 +302,14 @@ export default function TabTwoScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Contact Information</Text>
+        <Text style={styles.sectionTitle}>
+          {t.contactInformation}
+        </Text>
         {[
-          { label: 'Mobile Number', field: 'mobileNumber', icon: 'phone' },
-          { label: 'Primary Address', field: 'address', icon: 'map-marker' },
-          { label: 'Secondary Address', field: 'address2', icon: 'building' },
-          { label: 'Service Pincodes', field: 'serviceablePincodes', icon: 'envelope-o' }
+          { label: t.mobileNumber, field: 'mobileNumber', icon: 'phone' },
+          { label: t.primaryAddress, field: 'address', icon: 'map-marker' },
+          { label: t.secondaryAddress, field: 'address2', icon: 'building' },
+          { label: t.servicePincodes, field: 'serviceablePincodes', icon: 'envelope-o' }
         ].map((item, idx) => (
           <TouchableOpacity key={idx} style={styles.infoCard} onPress={() => handleEditPress(item.field as any)}>
             <View style={styles.infoIconBg}><FontAwesome name={item.icon as any} size={16} color={COLORS.primary} /></View>
@@ -313,7 +318,7 @@ export default function TabTwoScreen() {
               <Text style={styles.infoValue} numberOfLines={1}>
                 {item.field === 'serviceablePincodes' 
                   ? (userData?.serviceablePincodes?.join(', ') || 'Add pincodes')
-                  : (userData?.[item.field as keyof UserProfile] as string || `Add ${item.label.toLowerCase()}`)}
+                  : (userData?.[item.field as keyof UserProfile] as string || `Add ${item.label?.toLowerCase()}`)}
               </Text>
             </View>
             <FontAwesome name="chevron-right" size={12} color={COLORS.border} />
@@ -321,12 +326,11 @@ export default function TabTwoScreen() {
         ))}
       </View>
 
-      {/* Update your Log Out touchable button to this structure: */}
       <TouchableOpacity 
         style={styles.logoutBtn} 
         onPress={() => {
           showConfirm(
-            'Logout',
+            t.logout || 'Logout',
             'Are you sure you want to logout?',
             async () => {
               await clearAuthToken();
@@ -335,7 +339,9 @@ export default function TabTwoScreen() {
           );
         }}
       >
-        <Text style={styles.logoutText}>Log Out</Text>
+        <Text style={styles.logoutText}>
+          {t.logout}
+        </Text>
       </TouchableOpacity>
 
       <EditModal

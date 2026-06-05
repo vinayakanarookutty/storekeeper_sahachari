@@ -1,7 +1,10 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated } from 'react-native';
+import { useLanguage } from '../contexts/LanguageContext';
+
 import {
   ActivityIndicator,
   FlatList,
@@ -14,7 +17,6 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { getToken } from '../services/auth';
 import { styles } from '../tab_style/index.style';
-styles
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
@@ -41,6 +43,16 @@ interface Product {
 export default function TabOneScreen() {
   const { token } = useAuth();
   const router = useRouter();
+  const { language, setLanguage, t } = useLanguage();
+  const slideAnim = useRef(new Animated.Value(language === 'en' ? 0 : 1)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: language === 'en' ? 0 : 1,
+      useNativeDriver: true,
+    }).start();
+  }, [language]);
+
   const { width } = useWindowDimensions();
 
   const numColumns = useMemo(() => {
@@ -76,6 +88,84 @@ export default function TabOneScreen() {
     });
   };
 
+  // CLEANED WORKFLOW HEADER DESIGN INCORPORATED INTO FLATLIST TRACK
+  const renderHeader = () => {
+    return (
+      <View style={[styles.header, { paddingTop: 5, paddingBottom: 10 }]}>
+        {/* Title Header Wrapper Row - Decreased height and lifted contents */}
+        <View style={{ position: 'relative', width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 45 }}>
+          <View style={{ paddingRight: 90, justifyContent: 'center' }}>
+            <Text style={[styles.title, { marginTop: 0, lineHeight: 34 }]}>
+              {t.myInventory}
+            </Text>
+          </View>
+
+          {/* Absolute Positioned Language Toggle capsule - Lifted right into the center of the row track */}
+          <View style={[styles.languageToggleContainer, { position: 'absolute', right: 0, top: 4 }]}>
+            <View style={styles.languageToggle}>
+              <Animated.View
+                style={[
+                  styles.toggleSlider,
+                  {
+                    transform: [
+                      {
+                        translateX: slideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 44],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+
+              <TouchableOpacity
+                style={styles.langButton}
+                onPress={() => setLanguage('en')}
+              >
+                <Text style={language === 'en' ? styles.langTextActive : styles.langText}>
+                  EN
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.langButton}
+                onPress={() => setLanguage('ml')}
+              >
+                <Text style={language === 'ml' ? styles.langTextActive : styles.langText}>
+                  മ
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Action Button Grid - Dynamically formatted 50/50 flex distribution layout with tightened top margin */}
+        <View style={[styles.actionButtons, { flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }]}>
+          <TouchableOpacity
+            style={[styles.bulkButton, { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginRight: 6 }]}
+            onPress={() => router.push('/bulk-upload')}
+          >
+            <FontAwesome name="upload" size={14} color="#fff" style={{ marginRight: 6 }} />
+            <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>
+              {t.bulkUpload}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.addButton, { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginLeft: 6 }]}
+            onPress={() => router.push('/add-product')}
+          >
+            <FontAwesome name="plus" size={14} color="#fff" style={{ marginRight: 6 }} />
+            <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>
+              {t.addProduct}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   const renderProduct = ({ item }: { item: Product }) => {
     const getActiveOffer = () => {
       if (!item.offers || item.offers.length === 0) return null;
@@ -88,7 +178,6 @@ export default function TabOneScreen() {
     };
 
     const activeOffer = getActiveOffer();
-    console.log('PRICE VALUE:', item.price);
     const numericPrice = typeof item.price === 'string'
       ? parseFloat(item.price.replace(/[^0-9.]/g, ''))
       : item.price;
@@ -139,7 +228,6 @@ export default function TabOneScreen() {
                 <Text style={styles.discountedPrice}>
                   ₹{discountedPrice}{priceUnit}
                 </Text>
-
                 <Text style={styles.originalPriceText}>
                   ₹{numericPrice}{priceUnit}
                 </Text>
@@ -153,7 +241,9 @@ export default function TabOneScreen() {
             <View style={styles.cardFooter}>
               <View style={styles.stockInfo}>
                 <FontAwesome name="cube" size={10} color="#856404" />
-                <Text style={styles.stockText}>{item.quantity} in stock</Text>
+                <Text style={styles.stockText}>
+                  {item.quantity} {t.inStock}
+                </Text>
               </View>
             </View>
           )}
@@ -165,31 +255,6 @@ export default function TabOneScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.maxWidthWrapper}>
-        <View style={styles.header}>
-  <View style={styles.headerTop}>
-    <Text style={styles.welcomeText}>Hello Storekeeper,</Text>
-    <Text style={styles.title}>My Inventory</Text>
-  </View>
-
-  <View style={styles.actionButtons}>
-    <TouchableOpacity
-      style={styles.bulkButton}
-      onPress={() => router.push('/bulk-upload')}
-    >
-      <FontAwesome name="upload" size={14} color="#fff" />
-      <Text style={styles.buttonText}>Bulk Upload</Text>
-    </TouchableOpacity>
-
-    <TouchableOpacity
-      style={styles.addButton}
-      onPress={() => router.push('/add-product')}
-    >
-      <FontAwesome name="plus" size={14} color="#fff" />
-      <Text style={styles.buttonText}>Add Product</Text>
-    </TouchableOpacity>
-  </View>
-</View>
-
         {isLoading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color="#DAA520" />
@@ -202,18 +267,30 @@ export default function TabOneScreen() {
             keyExtractor={(item) => item._id}
             numColumns={numColumns}
             columnWrapperStyle={styles.columnWrapper}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[styles.list, { paddingBottom: 80 }]} // Extra padding so bottom items aren't obscured by the tab bar
+            refreshControl={
+              <React.Fragment>
+                {/* Fallback pattern context container if platform rendering is required */}
+              </React.Fragment>
+            }
             refreshing={isLoading}
             onRefresh={refetch}
             showsVerticalScrollIndicator={false}
+            
+            // ATTACH THE HEADERS DIRECTLY TO THE SCROLL FLOW CAPABILITY HERE:
+            ListHeaderComponent={renderHeader}
           />
         ) : (
-          <View style={styles.centerContainer}>
-            <FontAwesome name="folder-open-o" size={60} color="#E0D6C3" />
-            <Text style={styles.emptyText}>No products listed</Text>
-            <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/add-product')}>
-              <Text style={styles.emptyButtonText}>Create your first product</Text>
-            </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            {/* If there are no products, render the header on top of the empty information card */}
+            {renderHeader()}
+            <View style={[styles.centerContainer, { marginTop: 40 }]}>
+              <FontAwesome name="folder-open-o" size={60} color="#E0D6C3" />
+              <Text style={styles.emptyText}>{t.noProducts}</Text>
+              <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/add-product')}>
+                <Text style={styles.emptyButtonText}>{t.createFirstProduct}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </View>
