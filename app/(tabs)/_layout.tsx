@@ -1,19 +1,15 @@
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useColorScheme } from '@/components/useColorScheme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs, useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import {
-  Alert,
-  Pressable,
   StyleSheet,
   View,
   Platform,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext'; // IMPORT LANGUAGE CONTEXT HOOK
+import { useLanguage } from '../contexts/LanguageContext';
 
-// Custom Tab Icon Component
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
@@ -36,97 +32,46 @@ function TabBarIcon(props: {
   );
 }
 
-const showLogoutConfirmation = (onConfirm: () => void) => {
-  if (Platform.OS === 'web') {
-    const confirmed = window.confirm('Logout\n\nAre you sure you want to logout?');
-    if (confirmed) {
-      onConfirm();
-    }
-  } else {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: onConfirm },
-      ]
-    );
-  }
-};
-
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
-  const { token, clearAuthToken } = useAuth();
-  const { t } = useLanguage(); // ACCESS TRANSLATIONS OBJECT
+  const { token } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
-  // Theme colors
   const theme = {
-    background: colorScheme === 'dark' ? '#121212' : '#F4F6F8',
+    background: colorScheme === 'dark' ? '#121212' : '#FDFCF7',
     card: colorScheme === 'dark' ? '#1E1E1E' : '#FFFFFF',
-    text: colorScheme === 'dark' ? '#FFFFFF' : '#1A1A1A',
-    inactive: colorScheme === 'dark' ? '#8E8E93' : '#7A7A7A',
-    primary: '#DAA520',
+    text: colorScheme === 'dark' ? '#FFFFFF' : '#1A140B',
+    inactive: colorScheme === 'dark' ? '#8E8E93' : '#A0AEC0',
+    primary: '#DAA520', 
     border: colorScheme === 'dark' ? '#2C2C2E' : '#E5E7EB',
   };
 
-  // Redirect if user not logged in
   useEffect(() => {
     if (!token) {
       router.replace('./login');
     }
   }, [token]);
 
-  // Logout function
-  const handleLogout = () => {
-    showLogoutConfirmation(async () => {
-      await clearAuthToken();
-      router.replace('/login');
-    });
-  };
-
   return (
     <Tabs
       screenOptions={{
-        headerShown: useClientOnlyValue(false, true),
+        headerShown: false, 
 
-        // HEADER STYLE
-        headerStyle: {
-          backgroundColor: theme.card,
-          borderBottomWidth: 0,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-
-        headerTitleStyle: {
-          fontSize: 20,
-          fontWeight: '700',
-          color: theme.text,
-        },
-
-        headerTintColor: theme.text,
-
-        // TAB BAR STYLE
-        tabBarStyle: {
-          position: 'absolute',
-          bottom: 1,
-          left: 15,
-          right: 15,
+        tabBarStyle: { 
           height: 72,
-          borderRadius: 22,
+          borderRadius: 24,
           backgroundColor: theme.card,
           borderTopWidth: 0,
-
           paddingTop: 10,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-
-          elevation: 10,
-          shadowColor: '#000',
+          paddingBottom: Platform.OS === 'ios' ? 14 : 10,
+          elevation: 8,
+          shadowColor: '#DAA520', 
           shadowOpacity: 0.08,
-          shadowRadius: 12,
+          shadowRadius: 16,
           shadowOffset: {
             width: 0,
-            height: 4,
+            height: 6,
           },
         },
 
@@ -144,31 +89,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t.homeTab, // TRANSLATED "HOME"
+          title: t.homeTab,
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="home"
               color={color}
               focused={focused}
             />
-          ),
-          headerRight: () => (
-            <Pressable
-              onPress={handleLogout}
-              style={({ pressed }) => [
-                styles.logoutButton,
-                {
-                  backgroundColor: pressed
-                    ? '#E5E7EB'
-                    : theme.background,
-                },
-              ]}>
-              <FontAwesome
-                name="sign-out"
-                size={18}
-                color="#EF4444"
-              />
-            </Pressable>
           ),
         }}
       />
@@ -177,7 +104,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="three"
         options={{
-          title: t.ordersTab, // TRANSLATED "ORDERS"
+          title: t.ordersTab,
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="shopping-bag"
@@ -192,7 +119,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="Analytics"
         options={{
-          title: t.analyticsTab, // TRANSLATED "ANALYTICS"
+          title: t.analyticsTab,
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               name="bar-chart"
@@ -203,18 +130,11 @@ export default function TabLayout() {
         }}
       />
 
-      {/* PROFILE TAB */}
+      {/* PROFILE SCREEN (HIDDEN FROM BOTTOM TAB BAR) */}
       <Tabs.Screen
         name="two"
         options={{
-          title: t.profileTab, // TRANSLATED "PROFILE"
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon
-              name="user"
-              color={color}
-              focused={focused}
-            />
-          ),
+          href: null, 
         }}
       />
     </Tabs>
@@ -223,23 +143,13 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   iconContainer: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 14,
   },
-
   activeIconContainer: {
-    backgroundColor: 'rgba(37, 99, 235, 0.12)',
-  },
-
-  logoutButton: {
-    marginRight: 16,
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(218, 165, 32, 0.08)', 
   },
 });

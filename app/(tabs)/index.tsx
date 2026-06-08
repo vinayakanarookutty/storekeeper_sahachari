@@ -1,22 +1,24 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient'; // Clean premium background container gradient
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated } from 'react-native';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { getToken } from '../services/auth';
+import { styles } from '../tab_style/index.style';
 
 import {
   ActivityIndicator,
   FlatList,
   Image,
   Text,
+  RefreshControl,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useAuth } from '../contexts/AuthContext';
-import { getToken } from '../services/auth';
-import { styles } from '../tab_style/index.style';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
@@ -45,7 +47,19 @@ export default function TabOneScreen() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const slideAnim = useRef(new Animated.Value(language === 'en' ? 0 : 1)).current;
-
+// Add this hook inside your TabOneScreen component function:
+const { data: userData } = useQuery<any>({
+  queryKey: ['currentUser'],
+  queryFn: async () => {
+    const authToken = await getToken();
+    const res = await fetch(`${API_BASE_URL}/users/me`, { 
+      headers: { 'Authorization': `Bearer ${authToken}` } 
+    });
+    if (!res.ok) throw new Error('Failed to fetch user');
+    return res.json();
+  },
+  enabled: !!token, // Only runs if the user auth token is valid and present
+});
   useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: language === 'en' ? 0 : 1,
@@ -87,80 +101,97 @@ export default function TabOneScreen() {
       params: { product: JSON.stringify(product) },
     });
   };
-
-  // CLEANED WORKFLOW HEADER DESIGN INCORPORATED INTO FLATLIST TRACK
+// Update this section inside your index.tsx file:
   const renderHeader = () => {
     return (
-      <View style={[styles.header, { paddingTop: 5, paddingBottom: 10 }]}>
-        {/* Title Header Wrapper Row - Decreased height and lifted contents */}
-        <View style={{ position: 'relative', width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 45 }}>
-          <View style={{ paddingRight: 90, justifyContent: 'center' }}>
-            <Text style={[styles.title, { marginTop: 0, lineHeight: 34 }]}>
-              {t.myInventory}
-            </Text>
-          </View>
-
-          {/* Absolute Positioned Language Toggle capsule - Lifted right into the center of the row track */}
-          <View style={[styles.languageToggleContainer, { position: 'absolute', right: 0, top: 4 }]}>
-            <View style={styles.languageToggle}>
-              <Animated.View
-                style={[
-                  styles.toggleSlider,
-                  {
-                    transform: [
+      <View style={{ backgroundColor: '#FDFCF7' }}>
+        {/* GOLDEN DESIGN GRADIENT LAYER */}
+        <LinearGradient 
+          colors={['#DAA520', '#F4C430']} 
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradient}
+        >
+          <View style={styles.headerTopRow}>
+            {/* Left Side: Brand Name & Language Selector Options */}
+            <View style={styles.headerLeft}>
+              <Text style={styles.title} numberOfLines={1}>
+                Sahachari
+              </Text>
+              <View style={styles.subtitleContainer}>
+                <View style={styles.headerLineAccent} />
+                <Text style={styles.subtitleText} numberOfLines={1}>
+                   My Store
+                </Text>
+              </View>
+              
+              {/* Language Switch Capsule Component */}
+              <View style={styles.languageToggleContainer}>
+                <View style={styles.languageToggle}>
+                  <Animated.View
+                    style={[
+                      styles.toggleSlider,
                       {
-                        translateX: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, 44],
-                        }),
+                        transform: [
+                          {
+                            translateX: slideAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0, 42],
+                            }),
+                          },
+                        ],
                       },
-                    ],
-                  },
-                ]}
-              />
+                    ]}
+                  />
 
-              <TouchableOpacity
-                style={styles.langButton}
-                onPress={() => setLanguage('en')}
-              >
-                <Text style={language === 'en' ? styles.langTextActive : styles.langText}>
-                  EN
-                </Text>
-              </TouchableOpacity>
+                  <TouchableOpacity style={styles.langButton} onPress={() => setLanguage('en')}>
+                    <Text style={language === 'en' ? styles.langTextActive : styles.langText}>EN</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.langButton}
-                onPress={() => setLanguage('ml')}
+                  <TouchableOpacity style={styles.langButton} onPress={() => setLanguage('ml')}>
+                    <Text style={language === 'ml' ? styles.langTextActive : styles.langText}>മ</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* Right Side: LINKED INTERACTIVE AVATAR WINDOW */}
+            <View style={styles.headerRightActions}>
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => router.push('/two')} // Navigate directly to your profile tab screen code!
+                style={styles.avatarContainer}
               >
-                <Text style={language === 'ml' ? styles.langTextActive : styles.langText}>
-                  മ
-                </Text>
+                <Image 
+  source={{ 
+    uri: userData?.image 
+      ? `${S3_BASE_URL}/${userData.image}` 
+      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb' // The fallback profile image if data is missing
+  }} 
+  style={styles.avatarImage} 
+/>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
-        {/* Action Button Grid - Dynamically formatted 50/50 flex distribution layout with tightened top margin */}
-        <View style={[styles.actionButtons, { flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }]}>
-          <TouchableOpacity
-            style={[styles.bulkButton, { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginRight: 6 }]}
-            onPress={() => router.push('/bulk-upload')}
-          >
-            <FontAwesome name="upload" size={14} color="#fff" style={{ marginRight: 6 }} />
-            <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>
-              {t.bulkUpload}
-            </Text>
-          </TouchableOpacity>
+        {/* Action Button Segment */}
+        <View style={styles.actionButtonsContainer}>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.bulkButton} onPress={() => router.push('/bulk-upload')}>
+              <FontAwesome name="upload" size={14} color="#fff" />
+              <Text style={styles.buttonText} numberOfLines={1}>
+                {t.bulkUpload}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.addButton, { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginLeft: 6 }]}
-            onPress={() => router.push('/add-product')}
-          >
-            <FontAwesome name="plus" size={14} color="#fff" style={{ marginRight: 6 }} />
-            <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>
-              {t.addProduct}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.addButton} onPress={() => router.push('/add-product')}>
+              <FontAwesome name="plus" size={14} color="#fff" />
+              <Text style={styles.buttonText} numberOfLines={1}>
+                {t.addProduct}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -183,7 +214,6 @@ export default function TabOneScreen() {
       : item.price;
 
     const priceString = String(item.price);
-
     const priceUnit = priceString.includes('/')
       ? '/' + priceString.split('/')[1].trim()
       : '';
@@ -240,7 +270,7 @@ export default function TabOneScreen() {
           {item.category !== 'Service' && (
             <View style={styles.cardFooter}>
               <View style={styles.stockInfo}>
-                <FontAwesome name="cube" size={10} color="#856404" />
+                <FontAwesome name="cube" size={10} color="#D97706" />
                 <Text style={styles.stockText}>
                   {item.quantity} {t.inStock}
                 </Text>
@@ -257,7 +287,7 @@ export default function TabOneScreen() {
       <View style={styles.maxWidthWrapper}>
         {isLoading ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#DAA520" />
+            <ActivityIndicator size="large" color="#2563EB" />
           </View>
         ) : products && products.length > 0 ? (
           <FlatList
@@ -267,22 +297,20 @@ export default function TabOneScreen() {
             keyExtractor={(item) => item._id}
             numColumns={numColumns}
             columnWrapperStyle={styles.columnWrapper}
-            contentContainerStyle={[styles.list, { paddingBottom: 80 }]} // Extra padding so bottom items aren't obscured by the tab bar
+            contentContainerStyle={styles.list}
             refreshControl={
-              <React.Fragment>
-                {/* Fallback pattern context container if platform rendering is required */}
-              </React.Fragment>
+              <RefreshControl
+                refreshing={isLoading}
+                onRefresh={refetch}
+                tintColor="#2563EB"
+                colors={["#2563EB"]}
+              />
             }
-            refreshing={isLoading}
-            onRefresh={refetch}
             showsVerticalScrollIndicator={false}
-            
-            // ATTACH THE HEADERS DIRECTLY TO THE SCROLL FLOW CAPABILITY HERE:
             ListHeaderComponent={renderHeader}
           />
         ) : (
           <View style={{ flex: 1 }}>
-            {/* If there are no products, render the header on top of the empty information card */}
             {renderHeader()}
             <View style={[styles.centerContainer, { marginTop: 40 }]}>
               <FontAwesome name="folder-open-o" size={60} color="#E0D6C3" />

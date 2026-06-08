@@ -173,7 +173,7 @@ export default function AnalyticsScreen() {
 
     const sortedTimeline = Object.keys(timelineMap).sort().map(key => ({ label: key, ...timelineMap[key] }));
     const limitedTimeline = sortedTimeline.slice(-6);
-    const peakWindow = sortedTimeline.reduce((max, curr) => (curr.revenue > max.revenue ? curr : max), sortedTimeline[0] || { label: 'N/A', revenue: 0 });
+    const peakWindow = sortedTimeline.reduce((max, curr) => (max.revenue > max.revenue ? curr : max), sortedTimeline[0] || { label: 'N/A', revenue: 0 });
 
     return {
       totalRevenue,
@@ -228,20 +228,8 @@ export default function AnalyticsScreen() {
   }
 
   return (
-    <ScrollView 
-      style={[styles.container, { backgroundColor: theme.background }]} 
-      contentContainerStyle={styles.scrollContent}
-      refreshControl = {
-        <RefreshControl
-          refreshing={chartView === 'Stock' ? isProductsRefetching : isOrdersRefetching}
-          onRefresh={handleRefresh}
-          colors={[theme.primary]}            
-          tintColor={theme.primary}           
-          progressBackgroundColor={theme.card} 
-        />
-      }
-    >
-      {/* View Engine Toggle Bar */}
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      {/* ─── FIXED CONTAINER: Keeps the toggle fixed at the top layout level ─── */}
       <View style={[styles.toggleContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <TouchableOpacity
           style={[styles.toggleButton, chartView === 'daily' && { backgroundColor: theme.primary }]}
@@ -263,188 +251,204 @@ export default function AnalyticsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ─── RENDER ENGINE A: STOCK VIEW ──────────────────────────────────────── */}
-      {chartView === 'Stock' && stockAnalytics && (
-        <>
-          {/* Inventory Grid Matrix */}
-          <View style={styles.gridRow}>
-            <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.createProductBtn || 'Unique Products'}</Text>
-              <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalUniqueProducts}</Text>
-            </View>
-            <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.stockQty || 'Total Stock'}</Text>
-              <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalItemsStocked}</Text>
-            </View>
-          </View>
-
-          <View style={styles.gridRow}>
-            <View style={[styles.metricCard, { backgroundColor: theme.card, borderColor: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.border, borderWidth: stockAnalytics.lowStockCount > 0 ? 1 : 0 }]}>
-              <Text style={[styles.metricLabel, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.subText }]}>{t.inStock ? `${t.stock} (≤5)` : 'Low Stock Alerts (≤5)'}</Text>
-              <Text style={[styles.metricValue, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.text }]}>
-                {stockAnalytics.lowStockCount} {t.noProducts ? t.noProducts.split(' ').pop() : 'Items'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Category Distribution Chart */}
-          {stockAnalytics.categoryLabels.length > 0 && (
-            <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.selectCategory || 'Top Stock Categories'}</Text>
-              <BarChart
-                data={{
-                  labels: stockAnalytics.categoryLabels,
-                  datasets: [{ data: stockAnalytics.categoryVolumes }],
-                }}
-                width={SCREEN_WIDTH - 64}
-                height={200}
-                yAxisLabel=""
-                yAxisSuffix=""
-                chartConfig={{
-                  ...chartConfig,
-                  color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, 
-                }}
-                style={styles.chartCanvas}
-                verticalLabelRotation={15} 
-              />
-            </View>
-          )}
-
-          {/* Tabular Detailed Inventory Logs */}
-          <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-            <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.myInventory?.toUpperCase() || 'ALL CATEGORY BREAKDOWN'}</Text>
-            {stockAnalytics.allCategoriesBreakdown.map(([catName, qty], idx) => (
-              <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                <Text style={{ color: theme.text, fontWeight: '600', flex: 2 }}>{catName}</Text>
-                <Text style={{ color: theme.primary, fontWeight: '700', flex: 1, textAlign: 'right' }}>{qty} Units</Text>
+      {/* ─── SCROLLABLE DATA MATRIX CONTAINER ─── */}
+      <ScrollView 
+        style={[styles.container, { backgroundColor: theme.background }]} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl = {
+          <RefreshControl
+            refreshing={chartView === 'Stock' ? isProductsRefetching : isOrdersRefetching}
+            onRefresh={handleRefresh}
+            colors={[theme.primary]}            
+            tintColor={theme.primary}           
+            progressBackgroundColor={theme.card} 
+          />
+        }
+       >
+        {/* ─── RENDER ENGINE A: STOCK VIEW ──────────────────────────────────────── */}
+        {chartView === 'Stock' && stockAnalytics && (
+          <>
+            {/* Inventory Grid Matrix */}
+            <View style={styles.gridRow}>
+              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.createProductBtn || 'Unique Products'}</Text>
+                <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalUniqueProducts}</Text>
               </View>
-            ))}
-          </View>
-        </>
-      )}
-
-      {/* ─── RENDER ENGINE B: ORDERS VIEW (Daily / Monthly) ───────────────────── */}
-      {chartView !== 'Stock' && orderAnalytics && (
-        <>
-          {/* Metrics Grid Matrix */}
-          <View style={styles.gridRow}>
-            <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.totalRevenue}</Text>
-              <Text style={[styles.metricValue, { color: theme.text }]}>
-                ₹{orderAnalytics.totalRevenue.toLocaleString('en-IN')}
-              </Text>
-            </View>
-            <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.metricLabel, { color: theme.subText }]}>Avg Order Value</Text>
-              <Text style={[styles.metricValue, { color: theme.text }]}>
-                ₹{Math.round(orderAnalytics.avgOrderValue).toLocaleString('en-IN')}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.gridRow}>
-            <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.totalOrders}</Text>
-              <Text style={[styles.metricValue, { color: theme.text }]}>{orders.length}</Text>
-            </View>
-            <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.metricLabel, { color: theme.subText }]}>Peak Performance</Text>
-              <Text style={[styles.metricValue, { color: theme.text, fontSize: 15 }]} numberOfLines={1}>
-                {orderAnalytics.peakWindow.label} (₹{orderAnalytics.peakWindow.revenue})
-              </Text>
-            </View>
-          </View>
-
-          {/* Revenue Chart Layout */}
-          {orderAnalytics.chartLabels.length > 0 && (
-            <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.totalRevenue} Timeline (₹)</Text>
-              <LineChart
-                data={{
-                  labels: orderAnalytics.chartLabels,
-                  datasets: [{ data: orderAnalytics.chartRevenues }],
-                }}
-                width={SCREEN_WIDTH - 64} 
-                height={180}
-                yAxisLabel="₹"
-                yAxisSuffix=""
-                chartConfig={chartConfig}
-                bezier
-                style={styles.chartCanvas}
-              />
-            </View>
-          )}
-
-          {/* Orders Count Tracker Bar Graph */}
-          {orderAnalytics.chartLabels.length > 0 && (
-            <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.totalOrders} Tracker</Text>
-              <BarChart
-                data={{
-                  labels: orderAnalytics.chartLabels,
-                  datasets: [{ data: orderAnalytics.chartOrdersCount }],
-                }}
-                width={SCREEN_WIDTH - 64}
-                height={180}
-                yAxisLabel=""
-                yAxisSuffix=""
-                chartConfig={{
-                  ...chartConfig,
-                  color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
-                }}
-                style={styles.chartCanvas}
-              />
-            </View>
-          )}
-
-          {/* Table Breakdown Logging */}
-          <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-            <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.totalRevenue?.toUpperCase()} TIMELINE BREAKDOWN</Text>
-            {orderAnalytics.sortedTimeline.map((item, idx) => (
-              <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                <Text style={{ color: theme.text, fontWeight: '600' }}>{item.label}</Text>
-                <Text style={{ color: theme.subText }}>{item.counts} {t.totalOrders ? t.totalOrders.split(' ').pop() : 'Orders'}</Text>
-                <Text style={{ color: theme.primary, fontWeight: '700' }}>₹{item.revenue}</Text>
+              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.stockQty || 'Total Stock'}</Text>
+                <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalItemsStocked}</Text>
               </View>
-            ))}
-          </View>
+            </View>
 
-          {/* Order Status Allocation Progress Tracks */}
-          <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-            <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.all || 'ORDER STATUS ALLOCATION'}</Text>
-            {Object.entries(orderAnalytics.statusMap).map(([statusName, count], idx) => {
-              const allocationPercentage = ((count / orders.length) * 100).toFixed(0);
-              const statusColor = STATUS_COLORS[statusName] ?? '#9ca3af';
+            <View style={styles.gridRow}>
+              <View style={[styles.metricCard, { backgroundColor: theme.card, borderColor: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.border, borderWidth: stockAnalytics.lowStockCount > 0 ? 1 : 0 }]}>
+                <Text style={[styles.metricLabel, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.subText }]}>{t.inStock ? `${t.stock} (≤5)` : 'Low Stock Alerts (≤5)'}</Text>
+                <Text style={[styles.metricValue, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.text }]}>
+                  {stockAnalytics.lowStockCount} {t.noProducts ? t.noProducts.split(' ').pop() : 'Items'}
+                </Text>
+              </View>
+            </View>
 
-              return (
-                <View key={idx} style={styles.statusRowContainer}>
-                  <View style={styles.statusMetaTextRow}>
-                    <View style={styles.statusIndicatorLabel}>
-                      <View style={[styles.colorDot, { backgroundColor: statusColor }]} />
-                      <Text style={[styles.statusTextName, { color: theme.text }]}>{getStatusLabel(statusName)}</Text>
-                    </View>
-                    <Text style={[styles.statusCountVal, { color: theme.text }]}>
-                      {count} ({allocationPercentage}%)
-                    </Text>
-                  </View>
-                  <View style={[styles.progressBarBackground, { backgroundColor: isDark ? '#2c2c2e' : '#e5e7eb' }]}>
-                    <View style={[styles.progressBarFill, { backgroundColor: statusColor, width: `${allocationPercentage}%` as any }]} /> 
-                  </View>
+            {/* Category Distribution Chart */}
+            {stockAnalytics.categoryLabels.length > 0 && (
+              <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.selectCategory || 'Top Stock Categories'}</Text>
+                <BarChart
+                  data={{
+                    labels: stockAnalytics.categoryLabels,
+                    datasets: [{ data: stockAnalytics.categoryVolumes }],
+                  }}
+                  width={SCREEN_WIDTH - 64}
+                  height={200}
+                  yAxisLabel=""
+                  yAxisSuffix=""
+                  chartConfig={{
+                    ...chartConfig,
+                    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, 
+                  }}
+                  style={styles.chartCanvas}
+                  verticalLabelRotation={15} 
+                />
+              </View>
+            )}
+
+            {/* Tabular Detailed Inventory Logs */}
+            <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+              <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.myInventory?.toUpperCase() || 'ALL CATEGORY BREAKDOWN'}</Text>
+              {stockAnalytics.allCategoriesBreakdown.map(([catName, qty], idx) => (
+                <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                  <Text style={{ color: theme.text, fontWeight: '600', flex: 2 }}>{catName}</Text>
+                  <Text style={{ color: theme.primary, fontWeight: '700', flex: 1, textAlign: 'right' }}>{qty} Units</Text>
                 </View>
-              );
-            })}
-          </View>
-        </>
-      )}
+              ))}
+            </View>
+          </>
+        )}
 
-      {/* Empty State Layout Layer Exception Case */}
-      {((chartView === 'Stock' && !stockAnalytics) || (chartView !== 'Stock' && !orderAnalytics)) && (
-        <View style={styles.centerContainer}>
-          <Text style={{ color: theme.subText, marginTop: 40, textAlign: 'center' }}>
-            {t.noOrdersFound || 'No information profile logs available for this database module.'}
-          </Text>
-        </View>
-      )}
-    </ScrollView>
+        {/* ─── RENDER ENGINE B: ORDERS VIEW (Daily / Monthly) ───────────────────── */}
+        {chartView !== 'Stock' && orderAnalytics && (
+          <>
+            {/* Metrics Grid Matrix */}
+            <View style={styles.gridRow}>
+              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.totalRevenue}</Text>
+                <Text style={[styles.metricValue, { color: theme.text }]}>
+                  ₹{orderAnalytics.totalRevenue.toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>Avg Order Value</Text>
+                <Text style={[styles.metricValue, { color: theme.text }]}>
+                  ₹{Math.round(orderAnalytics.avgOrderValue).toLocaleString('en-IN')}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.gridRow}>
+              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.totalOrders}</Text>
+                <Text style={[styles.metricValue, { color: theme.text }]}>{orders.length}</Text>
+              </View>
+              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>Peak Performance</Text>
+                <Text style={[styles.metricValue, { color: theme.text, fontSize: 15 }]} numberOfLines={1}>
+                  {orderAnalytics.peakWindow.label} (₹{orderAnalytics.peakWindow.revenue})
+                </Text>
+              </View>
+            </View>
+
+            {/* Revenue Chart Layout */}
+            {orderAnalytics.chartLabels.length > 0 && (
+              <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.totalRevenue} Timeline (₹)</Text>
+                <LineChart
+                  data={{
+                    labels: orderAnalytics.chartLabels,
+                    datasets: [{ data: orderAnalytics.chartRevenues }],
+                  }}
+                  width={SCREEN_WIDTH - 64} 
+                  height={180}
+                  yAxisLabel="₹"
+                  yAxisSuffix=""
+                  chartConfig={chartConfig}
+                  bezier
+                  style={styles.chartCanvas}
+                />
+              </View>
+            )}
+
+            {/* Orders Count Tracker Bar Graph */}
+            {orderAnalytics.chartLabels.length > 0 && (
+              <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.totalOrders} Tracker</Text>
+                <BarChart
+                  data={{
+                    labels: orderAnalytics.chartLabels,
+                    datasets: [{ data: orderAnalytics.chartOrdersCount }],
+                  }}
+                  width={SCREEN_WIDTH - 64}
+                  height={180}
+                  yAxisLabel=""
+                  yAxisSuffix=""
+                  chartConfig={{
+                    ...chartConfig,
+                    color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+                  }}
+                  style={styles.chartCanvas}
+                />
+              </View>
+            )}
+
+            {/* Table Breakdown Logging */}
+            <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+              <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.totalRevenue?.toUpperCase()} TIMELINE BREAKDOWN</Text>
+              {orderAnalytics.sortedTimeline.map((item, idx) => (
+                <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                  <Text style={{ color: theme.text, fontWeight: '600' }}>{item.label}</Text>
+                  <Text style={{ color: theme.subText }}>{item.counts} {t.totalOrders ? t.totalOrders.split(' ').pop() : 'Orders'}</Text>
+                  <Text style={{ color: theme.primary, fontWeight: '700' }}>₹{item.revenue}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Order Status Allocation Progress Tracks */}
+            <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+              <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.all || 'ORDER STATUS ALLOCATION'}</Text>
+              {Object.entries(orderAnalytics.statusMap).map(([statusName, count], idx) => {
+                const allocationPercentage = ((count / orders.length) * 100).toFixed(0);
+                const statusColor = STATUS_COLORS[statusName] ?? '#9ca3af';
+
+                return (
+                  <View key={idx} style={styles.statusRowContainer}>
+                    <View style={styles.statusMetaTextRow}>
+                      <View style={styles.statusIndicatorLabel}>
+                        <View style={[styles.colorDot, { backgroundColor: statusColor }]} />
+                        <Text style={[styles.statusTextName, { color: theme.text }]}>{getStatusLabel(statusName)}</Text>
+                      </View>
+                      <Text style={[styles.statusCountVal, { color: theme.text }]}>
+                        {count} ({allocationPercentage}%)
+                      </Text>
+                    </View>
+                    <View style={[styles.progressBarBackground, { backgroundColor: isDark ? '#2c2c2e' : '#e5e7eb' }]}>
+                      <View style={[styles.progressBarFill, { backgroundColor: statusColor, width: `${allocationPercentage}%` as any }]} /> 
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {/* Empty State Layout Layer Exception Case */}
+        {((chartView === 'Stock' && !stockAnalytics) || (chartView !== 'Stock' && !orderAnalytics)) && (
+          <View style={styles.centerContainer}>
+            <Text style={{ color: theme.subText, marginTop: 40, textAlign: 'center' }}>
+              {t.noOrdersFound || 'No information profile logs available for this database module.'}
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }

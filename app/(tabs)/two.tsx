@@ -65,7 +65,7 @@ const showAlert = (title: string, message: string) => {
 };
 
 const showConfirm = (title: string, message: string, onConfirm: () => void) => {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === 'web' ) {
     const confirmed = window.confirm(`${title}\n\n${message}`);
     if (confirmed) {
       onConfirm();
