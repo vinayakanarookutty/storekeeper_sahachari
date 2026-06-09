@@ -228,18 +228,22 @@ const { data: userData } = useQuery<any>({
         onPress={() => handleProductPress(item)}
         activeOpacity={0.8}
       >
-        <View style={[styles.imageWrapper, { height: cardWidth }]}>
-          {item.images && item.images.length > 0 ? (
-            <Image
-              source={{ uri: `${S3_BASE_URL}/${item.images[0]}` }}
-              style={styles.productImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.noImagePlaceholder}>
-              <FontAwesome name="image" size={30} color="#E0D6C3" />
-            </View>
-          )}
+       <View style={[styles.imageWrapper, { height: cardWidth }]}>
+  {item.images && item.images.length > 0 ? (
+    <Image
+      source={{
+        uri: item.images[0].startsWith('http') 
+          ? item.images[0] 
+          : `${S3_BASE_URL}/${item.images[0]}`
+      }}
+      style={styles.productImage}
+      resizeMode="cover"
+    />
+  ) : (
+    <View style={styles.noImagePlaceholder}>
+      <FontAwesome name="image" size={30} color="#E0D6C3" />
+    </View>
+  )}
 
           {activeOffer && (
             <View style={styles.offerBadge}>

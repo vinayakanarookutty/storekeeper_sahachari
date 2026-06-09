@@ -359,7 +359,9 @@ export default function ProductDetailScreen() {
               product.images.map((imageKey, index) => (
                 <View key={index} style={styles.imageContainer}>
                   <Image
-                    source={{ uri: `${S3_BASE_URL}/${imageKey}` }}
+                    source={{ uri: imageKey.startsWith('http') ? imageKey 
+                      : `${S3_BASE_URL}/${imageKey}`
+                     }}
                     style={styles.productImage}
                     resizeMode="cover"
                   />
