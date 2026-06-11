@@ -85,6 +85,14 @@ export default function AddProductScreen() {
   const isRent = category === 'Rent';
   const needsTimeUnit = isService || isRent;
 
+  // DYNAMIC LOOKUP HELPER FOR TRANSLATED LABELS
+  const getLocalizedUnitLabel = (unitValue: string): string => {
+    if (!t || !t.units) return unitValue;
+    // Safe lookup against your LanguageContext dictionary schema
+    const localized = (t.units as Record<string, string>)[unitValue];
+    return typeof localized === 'string' ? localized : unitValue;
+  };
+
   const createProductMutation = useMutation({
     mutationFn: async (productData: ProductData) => {
       const token = await getToken();
@@ -104,7 +112,6 @@ export default function AddProductScreen() {
       return response.json();
     },
     onSuccess: () => {
-      // Replaced missing key with generic string or success context fallback
       showAlert(t.successTitle || 'Success', 'Created successfully!', () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         router.back();
@@ -250,7 +257,8 @@ export default function AddProductScreen() {
     createProductMutation.mutate(productData);
   };
 
-  const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
+  // LOCALIZED SELECTION MODAL
+  const SelectionModal = ({ visible, data, title, onSelect, onClose, isUnitModal = false }: any) => (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.modalOverlay}>
@@ -269,7 +277,9 @@ export default function AddProductScreen() {
                   style={styles.modalItem} 
                   onPress={() => onSelect(item)}
                 >
-                  <Text style={styles.modalItemText}>{item}</Text>
+                  <Text style={styles.modalItemText}>
+                    {isUnitModal ? getLocalizedUnitLabel(item) : item}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
@@ -283,7 +293,7 @@ export default function AddProductScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {isService ? 'Add New Service' : (t.addProduct || 'Add New Product')}
+          {isService ? (t.addNewService || 'Add New Service') : (t.addNewProduct || 'Add New Product')}
         </Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <FontAwesome name="times" size={24} color="#2D2416" />
@@ -295,6 +305,7 @@ export default function AddProductScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        {/* CATEGORY INPUT */}
         <TouchableOpacity 
           style={styles.inputWrapper} 
           onPress={() => setShowCategoryModal(true)}
@@ -302,7 +313,7 @@ export default function AddProductScreen() {
           <View pointerEvents="none">
             <TextInput
               style={[styles.input, { marginBottom: 0 }]}
-              placeholder="Select Category *"
+              placeholder={t.selectCategory ? `${t.selectCategory} *` : "Select Category *"}
               placeholderTextColor="#A89378"
               value={category}
               editable={false}
@@ -313,7 +324,7 @@ export default function AddProductScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder={isService ? "Service Name *" : "Product Name *"}
+          placeholder={isService ? (t.serviceName || "Service Name *") : (t.productName || "Product Name *")}
           placeholderTextColor="#A89378"
           value={name}
           onChangeText={setName}
@@ -321,7 +332,7 @@ export default function AddProductScreen() {
 
         <TextInput
           style={[styles.input, styles.textArea]}
-          placeholder="Description *"
+          placeholder={t.description ? `${t.description} *` : "Description *"}
           placeholderTextColor="#A89378"
           value={description}
           onChangeText={setDescription}
@@ -333,7 +344,7 @@ export default function AddProductScreen() {
           <View style={{ flex: 2 }}>
             <TextInput
               style={styles.input}
-              placeholder="Price *"
+              placeholder={t.price ? `${t.price} *` : "Price *"}
               placeholderTextColor="#A89378"
               value={price}
               onChangeText={setPrice}
@@ -346,7 +357,7 @@ export default function AddProductScreen() {
                 style={styles.unitSelector} 
                 onPress={() => setShowServiceUnitModal(true)}
               >
-                <Text style={styles.unitText}>/ {serviceUnit}</Text>
+                <Text style={styles.unitText}>/ {getLocalizedUnitLabel(serviceUnit)}</Text>
                 <FontAwesome name="caret-down" size={16} color="#DAA520" />
               </TouchableOpacity>
             </View>
@@ -360,7 +371,7 @@ export default function AddProductScreen() {
               <View style={{ flex: 2 }}>
                 <TextInput
                   style={styles.input}
-                  placeholder={isRent ? "Stock (Unit) *" : "Stock *"}
+                  placeholder={isRent ? `${t.stockQty || 'Stock'} (Unit) *` : `${t.stockQty || 'Stock'} *`}
                   placeholderTextColor="#A89378"
                   value={quantity}
                   onChangeText={setQuantity}
@@ -374,7 +385,7 @@ export default function AddProductScreen() {
                     style={styles.unitSelector} 
                     onPress={() => setShowUnitModal(true)}
                   >
-                    <Text style={styles.unitText}>{unit}</Text>
+                    <Text style={styles.unitText}>{getLocalizedUnitLabel(unit)}</Text>
                     <FontAwesome name="caret-down" size={16} color="#DAA520" />
                   </TouchableOpacity>
                 </View>
@@ -383,11 +394,12 @@ export default function AddProductScreen() {
           </View>
         )}
 
+        {/* IMAGES SECTION */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Images</Text>
+          <Text style={styles.sectionTitle}>{t.images || 'Images'}</Text>
           <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
             <FontAwesome name="image" size={24} color="#DAA520" />
-            <Text style={styles.pickButtonText}>Pick Images</Text>
+            <Text style={styles.pickButtonText}>{t.pickImages || 'Pick Images'}</Text>
           </TouchableOpacity>
 
           <View style={styles.imagesContainer}>
@@ -403,7 +415,7 @@ export default function AddProductScreen() {
 
           {selectedImages.length > 0 && uploadedImageKeys.length === 0 && (
             <TouchableOpacity style={styles.uploadButton} onPress={uploadImages} disabled={isUploading}>
-              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>Upload</Text>}
+              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>{t.upload || 'Upload'}</Text>}
             </TouchableOpacity>
           )}
         </View>
@@ -414,7 +426,7 @@ export default function AddProductScreen() {
           disabled={createProductMutation.isPending || uploadedImageKeys.length === 0}
         >
           <Text style={styles.createButtonText}>
-            {isService ? (t.createServiceBtn || 'Create Service') : (t.addProduct || 'Create Product')}
+            {isService ? (t.createServiceBtn || 'Create Service') : (t.createProductBtn || 'Create Product')}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -423,7 +435,7 @@ export default function AddProductScreen() {
       <SelectionModal 
         visible={showCategoryModal}
         data={PRODUCT_CATEGORIES}
-        title="Select Category"
+        title={t.selectCategory || "Select Category"}
         onSelect={handleSelectCategory}
         onClose={() => setShowCategoryModal(false)}
       />
@@ -431,7 +443,8 @@ export default function AddProductScreen() {
       <SelectionModal 
         visible={showUnitModal}
         data={UNITS}
-        title="Select Unit"
+        title={t.selectUnit || "Select Unit"}
+        isUnitModal={true}
         onSelect={(item: string) => {
           setUnit(item);
           setShowUnitModal(false);
@@ -443,6 +456,7 @@ export default function AddProductScreen() {
         visible={showServiceUnitModal}
         data={isService ? SERVICE_UNITS : RENT_UNITS}
         title={isService ? "Select Service Unit" : "Select Rental Unit"}
+        isUnitModal={true}
         onSelect={(item: string) => {
           setServiceUnit(item);
           setShowServiceUnitModal(false);

@@ -1,3 +1,5 @@
+// D:\storekeeper_sahachari\app\(tabs)\Analytics.tsx
+
 import React, { useState, useMemo } from 'react';
 import {
   Text,
@@ -128,17 +130,37 @@ export default function AnalyticsScreen() {
     style: { borderRadius: 16 },
   };
 
+  // Helper localizer mapping for categories (handles bidirectional space/language variations)
+  const getLocalizedCategory = (category: string) => {
+    if (!category) return '';
+    
+    // Normalize casing and trim leading/trailing white space
+    const normalized = category.trim().toLowerCase();
+    
+    // Fallback lookups for explicit Malayalam strings from DB
+    if (normalized === 'ഭക്ഷണം') return t.food;
+    if (normalized === 'പാനീയങ്ങൾ') return t.beverages;
+    if (normalized === 'സേവനം') return t.service;
+    if (normalized === 'ഹോംമെയ്ഡ്' || normalized === 'ഹോം മെയ്ഡ്') return t['home made'];
+    if (normalized === 'പച്ചക്കറികളുംപഴങ്ങളും' || normalized === 'പച്ചക്കറികളും പഴങ്ങളും') return t['vegetables and fruits'];
+    if (normalized === 'ഫാസ്റ്റ്ഫുഡ്' || normalized === 'ഫാസ്റ്റ് ഫുഡ്') return t['fast food'];
+    if (normalized === 'സ്നാക്ക്സ്') return t.snacks;
+    
+    // Standard contextual dictionary lookup mapping via lowercase dictionary structures
+    return (t as any)[normalized] || category;
+  };
+
   // Dynamic mapper for database statuses to localized UI labels
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'PLACED': return t.statusPlaced || t.placed;
-      case 'READY': return t.statusReady || t.ready;
-      case 'ACCEPTED': return t.statusAccepted || t.accepted;
-      case 'PICKED_UP': return t.statusPickedUp || status;
-      case 'DELIVERED': return t.statusCompleted || t.delivered;
-      case 'CANCELLED': 
-      case 'REJECTED': return t.statusRejected || t.rejected;
-      case 'FAILED': return t.statusFailed || (t as any)[status.toLowerCase()] || 'FAILED';
+      case 'PLACED': return t.statusPlaced;
+      case 'READY': return t.statusReady;
+      case 'ACCEPTED': return t.statusAccepted;
+      case 'PICKED_UP': return t.statusPickedUp;
+      case 'DELIVERED': return t.statusCompleted;
+      case 'CANCELLED': return t.statusCancelled;
+      case 'REJECTED': return t.statusRejected;
+      case 'FAILED': return t.statusFailed;
       default: return (t as any)[status.toLowerCase()] || status;
     }
   };
@@ -173,7 +195,7 @@ export default function AnalyticsScreen() {
 
     const sortedTimeline = Object.keys(timelineMap).sort().map(key => ({ label: key, ...timelineMap[key] }));
     const limitedTimeline = sortedTimeline.slice(-6);
-    const peakWindow = sortedTimeline.reduce((max, curr) => (max.revenue > max.revenue ? curr : max), sortedTimeline[0] || { label: 'N/A', revenue: 0 });
+    const peakWindow = sortedTimeline.reduce((max, curr) => (curr.revenue > max.revenue ? curr : max), sortedTimeline[0] || { label: 'N/A', revenue: 0 });
 
     return {
       totalRevenue,
@@ -212,11 +234,11 @@ export default function AnalyticsScreen() {
       totalUniqueProducts: products.length,
       totalItemsStocked,
       lowStockCount,
-      categoryLabels: topCategories,
+      categoryLabels: topCategories.map(cat => getLocalizedCategory(cat)),
       categoryVolumes: topCategories.map(cat => categoryMap[cat]),
       allCategoriesBreakdown: Object.entries(categoryMap).sort((a, b) => b[1] - a[1])
     };
-  }, [products, chartView]);
+  }, [products, chartView, t]);
 
   const isDataLoading = chartView === 'Stock' ? isProductsLoading : isOrdersLoading;
   if (isDataLoading) {
@@ -272,20 +294,20 @@ export default function AnalyticsScreen() {
             {/* Inventory Grid Matrix */}
             <View style={styles.gridRow}>
               <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.createProductBtn || 'Unique Products'}</Text>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.uniqueProducts}</Text>
                 <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalUniqueProducts}</Text>
               </View>
               <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.stockQty || 'Total Stock'}</Text>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.totalStock}</Text>
                 <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalItemsStocked}</Text>
               </View>
             </View>
 
             <View style={styles.gridRow}>
               <View style={[styles.metricCard, { backgroundColor: theme.card, borderColor: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.border, borderWidth: stockAnalytics.lowStockCount > 0 ? 1 : 0 }]}>
-                <Text style={[styles.metricLabel, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.subText }]}>{t.inStock ? `${t.stock} (≤5)` : 'Low Stock Alerts (≤5)'}</Text>
+                <Text style={[styles.metricLabel, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.subText }]}>{t.lowStockAlerts}</Text>
                 <Text style={[styles.metricValue, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.text }]}>
-                  {stockAnalytics.lowStockCount} {t.noProducts ? t.noProducts.split(' ').pop() : 'Items'}
+                  {stockAnalytics.lowStockCount} {t.itemsLabel}
                 </Text>
               </View>
             </View>
@@ -293,7 +315,7 @@ export default function AnalyticsScreen() {
             {/* Category Distribution Chart */}
             {stockAnalytics.categoryLabels.length > 0 && (
               <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.selectCategory || 'Top Stock Categories'}</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.topStockCategories}</Text>
                 <BarChart
                   data={{
                     labels: stockAnalytics.categoryLabels,
@@ -315,11 +337,15 @@ export default function AnalyticsScreen() {
 
             {/* Tabular Detailed Inventory Logs */}
             <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.myInventory?.toUpperCase() || 'ALL CATEGORY BREAKDOWN'}</Text>
+              <Text style={[styles.sectionTitle, { color: theme.subText }]}>
+                {t.categoryBreakdownTitle}
+              </Text>
               {stockAnalytics.allCategoriesBreakdown.map(([catName, qty], idx) => (
                 <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                  <Text style={{ color: theme.text, fontWeight: '600', flex: 2 }}>{catName}</Text>
-                  <Text style={{ color: theme.primary, fontWeight: '700', flex: 1, textAlign: 'right' }}>{qty} Units</Text>
+                  <Text style={{ color: theme.text, fontWeight: '600', flex: 2 }}>
+                    {getLocalizedCategory(catName)}
+                  </Text>
+                  <Text style={{ color: theme.primary, fontWeight: '700', flex: 1, textAlign: 'right' }}>{qty} {t.unitsLabel}</Text>
                 </View>
               ))}
             </View>
@@ -338,7 +364,7 @@ export default function AnalyticsScreen() {
                 </Text>
               </View>
               <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.metricLabel, { color: theme.subText }]}>Avg Order Value</Text>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.avgOrderValue}</Text>
                 <Text style={[styles.metricValue, { color: theme.text }]}>
                   ₹{Math.round(orderAnalytics.avgOrderValue).toLocaleString('en-IN')}
                 </Text>
@@ -351,7 +377,7 @@ export default function AnalyticsScreen() {
                 <Text style={[styles.metricValue, { color: theme.text }]}>{orders.length}</Text>
               </View>
               <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.metricLabel, { color: theme.subText }]}>Peak Performance</Text>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.peakPerformance}</Text>
                 <Text style={[styles.metricValue, { color: theme.text, fontSize: 15 }]} numberOfLines={1}>
                   {orderAnalytics.peakWindow.label} (₹{orderAnalytics.peakWindow.revenue})
                 </Text>
@@ -361,7 +387,7 @@ export default function AnalyticsScreen() {
             {/* Revenue Chart Layout */}
             {orderAnalytics.chartLabels.length > 0 && (
               <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.totalRevenue} Timeline (₹)</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.revenueTimelineTitle}</Text>
                 <LineChart
                   data={{
                     labels: orderAnalytics.chartLabels,
@@ -381,7 +407,7 @@ export default function AnalyticsScreen() {
             {/* Orders Count Tracker Bar Graph */}
             {orderAnalytics.chartLabels.length > 0 && (
               <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.totalOrders} Tracker</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.ordersTrackerTitle}</Text>
                 <BarChart
                   data={{
                     labels: orderAnalytics.chartLabels,
@@ -402,11 +428,13 @@ export default function AnalyticsScreen() {
 
             {/* Table Breakdown Logging */}
             <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.totalRevenue?.toUpperCase()} TIMELINE BREAKDOWN</Text>
+              <Text style={[styles.sectionTitle, { color: theme.subText }]}>
+                {t.revenueTimelineBreakdown}
+              </Text>
               {orderAnalytics.sortedTimeline.map((item, idx) => (
                 <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
                   <Text style={{ color: theme.text, fontWeight: '600' }}>{item.label}</Text>
-                  <Text style={{ color: theme.subText }}>{item.counts} {t.totalOrders ? t.totalOrders.split(' ').pop() : 'Orders'}</Text>
+                  <Text style={{ color: theme.subText }}>{item.counts} {t.ordersLabel}</Text>
                   <Text style={{ color: theme.primary, fontWeight: '700' }}>₹{item.revenue}</Text>
                 </View>
               ))}
@@ -414,7 +442,7 @@ export default function AnalyticsScreen() {
 
             {/* Order Status Allocation Progress Tracks */}
             <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.all || 'ORDER STATUS ALLOCATION'}</Text>
+              <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.orderStatusAllocation}</Text>
               {Object.entries(orderAnalytics.statusMap).map(([statusName, count], idx) => {
                 const allocationPercentage = ((count / orders.length) * 100).toFixed(0);
                 const statusColor = STATUS_COLORS[statusName] ?? '#9ca3af';
@@ -444,7 +472,7 @@ export default function AnalyticsScreen() {
         {((chartView === 'Stock' && !stockAnalytics) || (chartView !== 'Stock' && !orderAnalytics)) && (
           <View style={styles.centerContainer}>
             <Text style={{ color: theme.subText, marginTop: 40, textAlign: 'center' }}>
-              {t.noOrdersFound || 'No information profile logs available for this database module.'}
+              {t.noOrdersFound}
             </Text>
           </View>
         )}

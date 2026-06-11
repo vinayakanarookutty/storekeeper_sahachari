@@ -103,7 +103,7 @@ export default function BulkUploadScreen() {
         formData,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
           },
         }
@@ -129,18 +129,18 @@ export default function BulkUploadScreen() {
   return (
     <View style={styles.container}>
       {/* =========================
-           HEADER
+           LOCALIZED HEADER
       ========================= */}
       <Text style={styles.title}>
         {t.bulkUpload || 'Bulk Upload Products'}
       </Text>
 
       <Text style={styles.subtitle}>
-        Upload Excel or CSV files to import products quickly
+        {t.bulkUploadSubtitle || 'Upload Excel or CSV files to import products quickly'}
       </Text>
 
       {/* =========================
-           FILE PICKER
+           LOCALIZED FILE PICKER AREA
       ========================= */}
       <TouchableOpacity
         style={styles.uploadBox}
@@ -154,11 +154,11 @@ export default function BulkUploadScreen() {
         />
 
         <Text style={styles.uploadText}>
-          Tap to choose file
+          {t.tapToChooseFile || 'Tap to choose file'}
         </Text>
 
         <Text style={styles.supportText}>
-          Supports .xlsx and .csv
+          {t.supportsExtensions || 'Supports .xlsx and .csv'}
         </Text>
 
         {selectedFile && (
@@ -179,7 +179,7 @@ export default function BulkUploadScreen() {
       </TouchableOpacity>
 
       {/* =========================
-           IMPORT BUTTON
+           LOCALIZED IMPORT BUTTON
       ========================= */}
       <TouchableOpacity
         style={[
@@ -199,7 +199,7 @@ export default function BulkUploadScreen() {
               color="#fff"
             />
             <Text style={styles.importButtonText}>
-              Import Products
+              {t.importProductsBtn || 'Import Products'}
             </Text>
           </>
         )}

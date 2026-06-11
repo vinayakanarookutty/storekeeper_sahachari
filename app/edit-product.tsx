@@ -1,3 +1,4 @@
+// D:\storekeeper_sahachari\app\edit-product.tsx
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -59,7 +60,6 @@ export default function EditProductScreen() {
   
   const product = params.product ? JSON.parse(params.product as string) : null;
 
-  // Parse existing price AND units properly for all categories
   const parsePriceData = () => {
     if (!product?.price) return { val: '', unit: 'kg' };
     const parts = product.price.toString().split('/');
@@ -97,6 +97,21 @@ export default function EditProductScreen() {
   const isService = category === 'Service';
   const isRent = category === 'Rent';
   const needsTimeUnit = isService || isRent;
+
+  // SAFE DICTIONARY RESOLVER FOR CATS & UNITS
+  const translateKey = (target: string, group: 'categories' | 'units' = 'categories'): string => {
+    if (!target) return '';
+    const lookupKey = target.toLowerCase().trim();
+    const contextMap = t as any;
+
+    if (group === 'units' && contextMap.units && typeof contextMap.units === 'object') {
+      if (lookupKey in contextMap.units) return contextMap.units[lookupKey];
+    }
+    if (lookupKey in contextMap) {
+      return contextMap[lookupKey];
+    }
+    return target; 
+  };
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ProductData }) => {
@@ -218,7 +233,7 @@ export default function EditProductScreen() {
     });
   };
 
-  const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
+  const SelectionModal = ({ visible, data, title, onSelect, onClose, isUnitMode = false }: any) => (
     <Modal visible={visible} transparent animationType="slide">
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.modalOverlay}>
@@ -232,7 +247,9 @@ export default function EditProductScreen() {
               keyExtractor={(item) => item}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.modalItem} onPress={() => onSelect(item)}>
-                  <Text style={styles.modalItemText}>{item}</Text>
+                  <Text style={styles.modalItemText}>
+                    {translateKey(item, isUnitMode ? 'units' : 'categories')}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
@@ -246,7 +263,7 @@ export default function EditProductScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {isService ? 'Edit Service' : (t.myInventory ? 'Edit Product' : 'Edit Item')}
+          {isService ? (t.editService || 'Edit Service') : (t.editProduct || 'Edit Product')}
         </Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <FontAwesome name="times" size={24} color="#2D2416" />
@@ -256,22 +273,48 @@ export default function EditProductScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* CATEGORY SELECTOR */}
         <TouchableOpacity style={styles.inputWrapper} onPress={() => setShowCategoryModal(true)}>
-          <TextInput style={[styles.input, { marginBottom: 0 }]} value={category} editable={false} placeholder="Category *" placeholderTextColor="#A89378" />
+          <TextInput 
+            style={[styles.input, { marginBottom: 0 }]} 
+            value={translateKey(category, 'categories')} 
+            editable={false} 
+            placeholder={t.selectCategory ? `${t.selectCategory} *` : "Category *"} 
+            placeholderTextColor="#A89378" 
+          />
           <FontAwesome name="chevron-down" size={14} color="#A89378" style={styles.inputIcon} />
         </TouchableOpacity>
 
-        <TextInput style={styles.input} placeholder="Name *" value={name} onChangeText={setName} placeholderTextColor="#A89378" />
-        <TextInput style={[styles.input, styles.textArea]} placeholder="Description *" value={description} onChangeText={setDescription} multiline placeholderTextColor="#A89378" />
+        <TextInput 
+          style={styles.input} 
+          placeholder={isService ? `${t.serviceName || 'Service Name'} *` : `${t.productName || 'Product Name'} *`} 
+          value={name} 
+          onChangeText={setName} 
+          placeholderTextColor="#A89378" 
+        />
+        <TextInput 
+          style={[styles.input, styles.textArea]} 
+          placeholder={t.description ? `${t.description} *` : "Description *"} 
+          value={description} 
+          onChangeText={setDescription} 
+          multiline 
+          placeholderTextColor="#A89378" 
+        />
 
         {/* PRICE & DYNAMIC UNIT */}
         <View style={styles.parallelContainer}>
           <View style={{ flex: 2 }}>
-            <TextInput style={styles.input} placeholder="Price *" value={price} onChangeText={setPrice} keyboardType="numeric" placeholderTextColor="#A89378" />
+            <TextInput 
+              style={styles.input} 
+              placeholder={t.price ? `${t.price} *` : "Price *"} 
+              value={price} 
+              onChangeText={setPrice} 
+              keyboardType="numeric" 
+              placeholderTextColor="#A89378" 
+            />
           </View>
           {needsTimeUnit && (
             <View style={{ flex: 1.5, marginLeft: 10 }}>
               <TouchableOpacity style={styles.unitSelector} onPress={() => setShowServiceUnitModal(true)}>
-                <Text style={styles.unitText}>/ {serviceUnit}</Text>
+                <Text style={styles.unitText}>/ {translateKey(serviceUnit, 'units')}</Text>
                 <FontAwesome name="caret-down" size={16} color="#DAA520" />
               </TouchableOpacity>
             </View>
@@ -282,12 +325,19 @@ export default function EditProductScreen() {
         {!isService && (
           <View style={styles.parallelContainer}>
             <View style={{ flex: 2 }}>
-              <TextInput style={styles.input} placeholder={isRent ? "Stock (Unit) *" : "Stock *"} value={quantity} onChangeText={setQuantity} keyboardType="numeric" placeholderTextColor="#A89378" />
+              <TextInput 
+                style={styles.input} 
+                placeholder={isRent ? `${t.stockQty || 'Stock'} (Unit) *` : `${t.stockQty || 'Stock'} *`} 
+                value={quantity} 
+                onChangeText={setQuantity} 
+                keyboardType="numeric" 
+                placeholderTextColor="#A89378" 
+              />
             </View>
             {!isRent && (
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <TouchableOpacity style={styles.unitSelector} onPress={() => setShowUnitModal(true)}>
-                  <Text style={styles.unitText}>{unit}</Text>
+                  <Text style={styles.unitText}>{translateKey(unit, 'units')}</Text>
                   <FontAwesome name="caret-down" size={16} color="#DAA520" />
                 </TouchableOpacity>
               </View>
@@ -297,7 +347,7 @@ export default function EditProductScreen() {
 
         {/* IMAGE MANAGEMENT */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Manage Images</Text>
+          <Text style={styles.sectionTitle}>{t.manageImages || 'Manage Images'}</Text>
           
           <View style={styles.imagesContainer}>
             {existingImages.map((img, index) => (
@@ -320,12 +370,12 @@ export default function EditProductScreen() {
 
           <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
             <FontAwesome name="plus" size={20} color="#DAA520" />
-            <Text style={styles.pickButtonText}>Add New Images</Text>
+            <Text style={styles.pickButtonText}>{t.addNewImages || 'Add New Images'}</Text>
           </TouchableOpacity>
 
           {selectedImages.length > 0 && (
             <TouchableOpacity style={styles.uploadButton} onPress={uploadImages} disabled={isUploading}>
-              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>Upload Selection</Text>}
+              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>{t.uploadSelection || 'Upload Selection'}</Text>}
             </TouchableOpacity>
           )}
         </View>
@@ -336,7 +386,7 @@ export default function EditProductScreen() {
           disabled={updateProductMutation.isPending}
         >
           <Text style={styles.createButtonText}>
-            {isService ? (t.createServiceBtn || 'Save Changes') : (t.addProduct || 'Save Changes')}
+            {t.saveLabel || 'Save Changes'}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -345,7 +395,8 @@ export default function EditProductScreen() {
       <SelectionModal 
         visible={showCategoryModal} 
         data={PRODUCT_CATEGORIES} 
-        title="Select Category" 
+        title={t.selectCategory || "Select Category"} 
+        isUnitMode={false}
         onSelect={(item: string) => { 
           setCategory(item); 
           if (item === 'Service') {
@@ -363,7 +414,8 @@ export default function EditProductScreen() {
       <SelectionModal 
         visible={showUnitModal} 
         data={UNITS} 
-        title="Select Unit" 
+        title={t.selectUnit || "Select Unit"} 
+        isUnitMode={true}
         onSelect={(item: string) => { 
           setUnit(item); 
           setShowUnitModal(false); 
@@ -374,7 +426,8 @@ export default function EditProductScreen() {
       <SelectionModal 
         visible={showServiceUnitModal} 
         data={isService ? SERVICE_UNITS : RENT_UNITS} 
-        title="Select Unit" 
+        title={t.selectUnit || "Select Unit"} 
+        isUnitMode={true}
         onSelect={(item: string) => { 
           setServiceUnit(item); 
           setShowServiceUnitModal(false); 

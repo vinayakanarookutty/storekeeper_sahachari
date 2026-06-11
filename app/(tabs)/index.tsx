@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient'; // Clean premium background container gradient
+import { LinearGradient } from 'expo-linear-gradient'; 
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated } from 'react-native';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -47,19 +47,20 @@ export default function TabOneScreen() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const slideAnim = useRef(new Animated.Value(language === 'en' ? 0 : 1)).current;
-// Add this hook inside your TabOneScreen component function:
-const { data: userData } = useQuery<any>({
-  queryKey: ['currentUser'],
-  queryFn: async () => {
-    const authToken = await getToken();
-    const res = await fetch(`${API_BASE_URL}/users/me`, { 
-      headers: { 'Authorization': `Bearer ${authToken}` } 
-    });
-    if (!res.ok) throw new Error('Failed to fetch user');
-    return res.json();
-  },
-  enabled: !!token, // Only runs if the user auth token is valid and present
-});
+
+  const { data: userData } = useQuery<any>({
+    queryKey: ['currentUser'],
+    queryFn: async () => {
+      const authToken = await getToken();
+      const res = await fetch(`${API_BASE_URL}/users/me`, { 
+        headers: { 'Authorization': `Bearer ${authToken}` } 
+      });
+      if (!res.ok) throw new Error('Failed to fetch user');
+      return res.json();
+    },
+    enabled: !!token, 
+  });
+
   useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: language === 'en' ? 0 : 1,
@@ -101,11 +102,10 @@ const { data: userData } = useQuery<any>({
       params: { product: JSON.stringify(product) },
     });
   };
-// Update this section inside your index.tsx file:
+
   const renderHeader = () => {
     return (
       <View style={{ backgroundColor: '#FDFCF7' }}>
-        {/* GOLDEN DESIGN GRADIENT LAYER */}
         <LinearGradient 
           colors={['#DAA520', '#F4C430']} 
           start={{ x: 0, y: 0 }}
@@ -113,19 +113,17 @@ const { data: userData } = useQuery<any>({
           style={styles.headerGradient}
         >
           <View style={styles.headerTopRow}>
-            {/* Left Side: Brand Name & Language Selector Options */}
             <View style={styles.headerLeft}>
               <Text style={styles.title} numberOfLines={1}>
-                Sahachari
+                {t.sahachari}
               </Text>
               <View style={styles.subtitleContainer}>
                 <View style={styles.headerLineAccent} />
                 <Text style={styles.subtitleText} numberOfLines={1}>
-                   My Store
+                   {t.myStore}
                 </Text>
               </View>
               
-              {/* Language Switch Capsule Component */}
               <View style={styles.languageToggleContainer}>
                 <View style={styles.languageToggle}>
                   <Animated.View
@@ -155,27 +153,25 @@ const { data: userData } = useQuery<any>({
               </View>
             </View>
 
-            {/* Right Side: LINKED INTERACTIVE AVATAR WINDOW */}
             <View style={styles.headerRightActions}>
               <TouchableOpacity 
                 activeOpacity={0.8}
-                onPress={() => router.push('/two')} // Navigate directly to your profile tab screen code!
+                onPress={() => router.push('/two')} 
                 style={styles.avatarContainer}
               >
                 <Image 
-  source={{ 
-    uri: userData?.image 
-      ? `${S3_BASE_URL}/${userData.image}` 
-      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb' // The fallback profile image if data is missing
-  }} 
-  style={styles.avatarImage} 
-/>
+                  source={{ 
+                    uri: userData?.image 
+                      ? `${S3_BASE_URL}/${userData.image}` 
+                      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb' 
+                  }} 
+                  style={styles.avatarImage} 
+                />
               </TouchableOpacity>
             </View>
           </View>
         </LinearGradient>
 
-        {/* Action Button Segment */}
         <View style={styles.actionButtonsContainer}>
           <View style={styles.actionButtons}>
             <TouchableOpacity style={styles.bulkButton} onPress={() => router.push('/bulk-upload')}>
@@ -214,13 +210,77 @@ const { data: userData } = useQuery<any>({
       : item.price;
 
     const priceString = String(item.price);
-    const priceUnit = priceString.includes('/')
-      ? '/' + priceString.split('/')[1].trim()
-      : '';
+    
+    // ─── DYNAMIC EXPLICIT UNIT LOCALIZER ───
+    const getTranslatedUnit = (rawPriceStr: string) => {
+      if (!rawPriceStr.includes('/')) return '';
+      
+      const rawUnit = rawPriceStr.split('/')[1].trim().toLowerCase();
+      
+      if (language === 'ml') {
+        if (rawUnit === 'kg' || rawUnit === 'kilogram' || rawUnit === 'കിലോലോഗ്രാം') return '/കിലോഗ്രാം';
+        if (rawUnit === 'grams' || rawUnit === 'gram' || rawUnit === 'ഗ്രാം') return '/ഗ്രാം';
+        if (rawUnit === 'liters' || rawUnit === 'liter' || rawUnit === 'ലിറ്റർ') return '/ലിറ്റർ';
+        if (rawUnit === 'ml' || rawUnit === 'milliliter' || rawUnit === 'മില്ലിലിറ്റർ') return '/മില്ലിലിറ്റർ';
+        if (rawUnit === 'pcs' || rawUnit === 'piece' || rawUnit === 'എണ്ണം') return '/എണ്ണം';
+        if (rawUnit === 'packet' || rawUnit === 'pkt' || rawUnit === 'പാക്കറ്റ്') return '/പാക്കറ്റ്';
+        if (rawUnit === 'bottle' || rawUnit === 'കുപ്പി') return '/കുപ്പി';
+        if (rawUnit === 'hour' || rawUnit === 'മണിക്കൂർ') return '/മണിക്കൂർ';
+        if (rawUnit === 'box' || rawUnit === 'പെട്ടി') return '/പെട്ടി';
+      }
+      
+      // Fallback to original English unit string if language is 'en' or untranslated
+      return '/' + rawPriceStr.split('/')[1].trim();
+    };
+
+    const priceUnit = getTranslatedUnit(priceString);
 
     const discountedPrice = activeOffer
       ? Math.round(numericPrice - (numericPrice * activeOffer.value / 100))
       : null;
+
+    // ─── BULLETPROOF EXPLICIT DYNAMIC LOCALIZER ───
+    const getTranslatedCategory = (category: string) => {
+      if (!category) return '';
+      
+      const normalized = category.toLowerCase().trim().replace(/\s+/g, '');
+
+      if (language === 'ml') {
+        if (normalized === 'fastfood' || normalized === 'ഫാസ്റ്റ്ഫുഡ്') return 'ഫാസ്റ്റ് ഫുഡ്';
+        if (normalized === 'snacks' || normalized === 'സ്നാക്ക്സ്' || normalized === 'സ്നാക്സ്') return 'സ്നാക്ക്സ്';
+        if (normalized === 'food' || normalized === 'ഭക്ഷണം') return 'ഭക്ഷണം';
+        if (normalized === 'service' || normalized === 'സേവനം') return 'സേവനം';
+        if (normalized === 'drinks' || normalized === 'പാനീയങ്ങൾ') return 'പാനീയങ്ങൾ';
+        if (normalized === 'homemade' || normalized === 'ഹോംമേഡ്') return 'ഹോം മെയ്ഡ്';
+        
+        if (normalized.includes('vegetable') || normalized.includes('fruit') || normalized === 'പച്ചക്കറികളുംപഴങ്ങളും') {
+          return 'പച്ചക്കറികളും പഴങ്ങളും';
+        }
+      } else {
+        if (normalized === 'fastfood' || normalized === 'ഫാസ്റ്റ്ഫുഡ്') return 'Fast Food';
+        if (normalized === 'snacks' || normalized === 'സ്നാക്ക്സ്' || normalized === 'സ്നാക്സ്') return 'Snacks';
+        if (normalized === 'food' || normalized === 'ഭക്ഷണം') return 'Food';
+        if (normalized === 'service' || normalized === 'സേവനം') return 'Service';
+        if (normalized === 'drinks' || normalized === 'പാനീയങ്ങൾ') return 'Drinks';
+        if (normalized === 'homemade' || normalized === 'ഹോംമേഡ്') return 'Home Made';
+        
+        if (normalized.includes('vegetable') || normalized.includes('fruit') || normalized === 'പച്ചക്കറികളുംപഴങ്ങളും') {
+          return 'Vegetables and Fruits';
+        }
+      }
+
+      return (t as any)[normalized] || category;
+    };
+
+    const translatedCategory = getTranslatedCategory(item.category);
+
+    // Dynamic localization fallback strategy for single base values without slash structures
+    const renderBasePriceText = () => {
+      if (!priceString.includes('/')) {
+        return `₹${item.price}`;
+      }
+      return `₹${numericPrice}${priceUnit}`;
+    };
 
     return (
       <TouchableOpacity
@@ -253,7 +313,10 @@ const { data: userData } = useQuery<any>({
         </View>
 
         <View style={styles.productInfo}>
-          <Text style={styles.categoryText} numberOfLines={1}>{item.category}</Text>
+          <Text style={styles.categoryText} numberOfLines={1}>
+            {translatedCategory}
+          </Text>
+          
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
 
           <View style={styles.priceRow}>
@@ -267,7 +330,7 @@ const { data: userData } = useQuery<any>({
                 </Text>
               </View>
             ) : (
-              <Text style={styles.priceText}>₹{item.price}</Text>
+              <Text style={styles.priceText}>{renderBasePriceText()}</Text>
             )}
           </View>
 

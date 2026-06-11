@@ -64,7 +64,7 @@ const showAlert = (title: string, message: string) => {
   }
 };
 
-const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+const showConfirm = (title: string, message: string, onConfirm: () => void, cancelText = 'Cancel', confirmText = 'Log Out') => {
   if (Platform.OS === 'web' ) {
     const confirmed = window.confirm(`${title}\n\n${message}`);
     if (confirmed) {
@@ -75,8 +75,8 @@ const showConfirm = (title: string, message: string, onConfirm: () => void) => {
       title,
       message,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Log Out', style: 'destructive', onPress: onConfirm }
+        { text: cancelText, style: 'cancel' },
+        { text: confirmText, style: 'destructive', onPress: onConfirm }
       ]
     );
   }
@@ -84,7 +84,7 @@ const showConfirm = (title: string, message: string, onConfirm: () => void) => {
 
 function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditModalProps) {
   const [editValue, setEditValue] = useState(value);
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   useEffect(() => {
     if (visible) setEditValue(value);
@@ -93,19 +93,22 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
   const getFieldLabel = () => {
     switch (field) {
       case 'address': return t.primaryAddress;
-      case 'address2': return t.secondaryAddress;
+      case 'address2': return language === 'ml' ? 'രണ്ടാം വിലാസം' : t.secondaryAddress;
       case 'mobileNumber': return t.mobileNumber;
       case 'serviceablePincodes': return t.servicePincodes;
       default: return '';
     }
   };
 
+  const cancelLabel = language === 'ml' ? 'റദ്ദാക്കുക' : 'Cancel';
+  const saveLabel = language === 'ml' ? 'സേവ് ചെയ്യുക' : 'Save';
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t.confirmTitle || 'Edit'} {getFieldLabel()}</Text>
+            <Text style={styles.modalTitle}>{t.confirmTitle || (language === 'ml' ? 'മാറ്റങ്ങൾ വരുത്തുക' : 'Edit')} {getFieldLabel()}</Text>
             <TouchableOpacity onPress={onClose}><FontAwesome name="times" size={20} color={COLORS.textDark} /></TouchableOpacity>
           </View>
 
@@ -121,14 +124,14 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
 
           <View style={styles.modalButtons}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={isLoading}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={styles.cancelBtnText}>{cancelLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.saveBtn, isLoading && { opacity: 0.7 }]} 
               onPress={() => field && onSave(field, editValue)}
               disabled={isLoading}
             >
-              {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+              {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{saveLabel}</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -141,7 +144,7 @@ export default function TabTwoScreen() {
   const { token, clearAuthToken } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -194,10 +197,13 @@ export default function TabTwoScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       setEditModalVisible(false);
-      showAlert(t.successTitle || 'Success', t.statusUpdatedSuccess || 'Profile updated successfully!');
+      showAlert(
+        t.successTitle || (language === 'ml' ? 'വിജയകരം' : 'Success'), 
+        t.statusUpdatedSuccess || (language === 'ml' ? 'പ്രൊഫൈൽ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു!' : 'Profile updated successfully!')
+      );
     },
     onError: (error: any) => {
-      showAlert(t.failedTitle || 'Error', error.message || 'Failed to update profile');
+      showAlert(t.failedTitle || (language === 'ml' ? 'പിശക്' : 'Error'), error.message || 'Failed to update profile');
     },
   });
 
@@ -239,10 +245,13 @@ export default function TabTwoScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
-      showAlert(t.successTitle || 'Success', 'Profile picture updated!');
+      showAlert(
+        t.successTitle || (language === 'ml' ? 'വിജയകരം' : 'Success'), 
+        language === 'ml' ? 'പ്രൊഫൈൽ ചിത്രം മാറ്റിയിരിക്കുന്നു!' : 'Profile picture updated!'
+      );
     },
     onError: (error: any) => {
-      showAlert(t.failedTitle || 'Error', error.message || 'Upload failed');
+      showAlert(t.failedTitle || (language === 'ml' ? 'പിശക്' : 'Error'), error.message || 'Upload failed');
     },
   });
 
@@ -268,6 +277,18 @@ export default function TabTwoScreen() {
     setEditingField(field as string);
     setEditInitialValue(val);
     setEditModalVisible(true);
+  };
+
+  // ─── LOCAL VALUE INLINE TRANSLATION MATRIX ───
+  const getPlaceholderValue = (field: string, label: string) => {
+    if (language === 'ml') {
+      if (field === 'mobileNumber') return 'മൊബൈൽ നമ്പർ ചേർക്കുക';
+      if (field === 'address') return 'പ്രധാന വിലാസം ചേർക്കുക';
+      if (field === 'address2') return 'രണ്ടാം വിലാസം ചേർക്കുക';
+      if (field === 'serviceablePincodes') return 'പിൻകോഡുകൾ ചേർക്കുക';
+      return `${label} ചേർക്കുക`;
+    }
+    return `Add ${label?.toLowerCase()}`;
   };
 
   return (
@@ -297,7 +318,7 @@ export default function TabTwoScreen() {
             <FontAwesome name="camera" size={14} color="#fff" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.userName}>{userData?.name || 'User'}</Text>
+        <Text style={styles.userName}>{userData?.name || (language === 'ml' ? 'ഉപയോക്താവ്' : 'User')}</Text>
         <Text style={styles.userEmail}>{userData?.email}</Text>
       </View>
 
@@ -308,7 +329,7 @@ export default function TabTwoScreen() {
         {[
           { label: t.mobileNumber, field: 'mobileNumber', icon: 'phone' },
           { label: t.primaryAddress, field: 'address', icon: 'map-marker' },
-          { label: t.secondaryAddress, field: 'address2', icon: 'building' },
+          { label: language === 'ml' ? 'രണ്ടാം വിലാസം' : t.secondaryAddress, field: 'address2', icon: 'building' },
           { label: t.servicePincodes, field: 'serviceablePincodes', icon: 'envelope-o' }
         ].map((item, idx) => (
           <TouchableOpacity key={idx} style={styles.infoCard} onPress={() => handleEditPress(item.field as any)}>
@@ -317,8 +338,8 @@ export default function TabTwoScreen() {
               <Text style={styles.infoLabel}>{item.label}</Text>
               <Text style={styles.infoValue} numberOfLines={1}>
                 {item.field === 'serviceablePincodes' 
-                  ? (userData?.serviceablePincodes?.join(', ') || 'Add pincodes')
-                  : (userData?.[item.field as keyof UserProfile] as string || `Add ${item.label?.toLowerCase()}`)}
+                  ? (userData?.serviceablePincodes && userData.serviceablePincodes.length > 0 ? userData.serviceablePincodes.join(', ') : getPlaceholderValue(item.field, item.label))
+                  : (userData?.[item.field as keyof UserProfile] as string || getPlaceholderValue(item.field, item.label))}
               </Text>
             </View>
             <FontAwesome name="chevron-right" size={12} color={COLORS.border} />
@@ -329,13 +350,20 @@ export default function TabTwoScreen() {
       <TouchableOpacity 
         style={styles.logoutBtn} 
         onPress={() => {
+          const logOutTitle = t.logout || (language === 'ml' ? 'ലോഗ് ഔട്ട്' : 'Logout');
+          const logoutMsg = language === 'ml' ? 'നിങ്ങൾക്ക് തീർച്ചയായും ലോഗ് ഔട്ട് ചെയ്യണോ?' : 'Are you sure you want to logout?';
+          const cancelLabel = language === 'ml' ? 'റദ്ദാക്കുക' : 'Cancel';
+          const confirmLabel = language === 'ml' ? 'ലോഗ് ഔട്ട്' : 'Log Out';
+
           showConfirm(
-            t.logout || 'Logout',
-            'Are you sure you want to logout?',
+            logOutTitle,
+            logoutMsg,
             async () => {
               await clearAuthToken();
               router.replace('/login');
-            }
+            },
+            cancelLabel,
+            confirmLabel
           );
         }}
       >
