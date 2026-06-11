@@ -89,22 +89,22 @@ export default function TabOneScreen() {
 
     const activeOffer = getActiveOffer();
     console.log('PRICE VALUE:', item.price);
-    const numericPrice = typeof item.price === 'string' 
-      ? parseFloat(item.price.replace(/[^0-9.]/g, '')) 
+    const numericPrice = typeof item.price === 'string'
+      ? parseFloat(item.price.replace(/[^0-9.]/g, ''))
       : item.price;
 
-      const priceString = String(item.price);
+    const priceString = String(item.price);
 
-const priceUnit = priceString.includes('/')
-  ? '/' + priceString.split('/')[1].trim()
-  : '';
-    
-    const discountedPrice = activeOffer 
+    const priceUnit = priceString.includes('/')
+      ? '/' + priceString.split('/')[1].trim()
+      : '';
+
+    const discountedPrice = activeOffer
       ? Math.round(numericPrice - (numericPrice * activeOffer.value / 100))
       : null;
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.productCard, { width: cardWidth }]}
         onPress={() => handleProductPress(item)}
         activeOpacity={0.8}
@@ -128,21 +128,21 @@ const priceUnit = priceString.includes('/')
             </View>
           )}
         </View>
-        
+
         <View style={styles.productInfo}>
           <Text style={styles.categoryText} numberOfLines={1}>{item.category}</Text>
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-          
+
           <View style={styles.priceRow}>
             {activeOffer ? (
               <View style={styles.priceContainer}>
                 <Text style={styles.discountedPrice}>
-  ₹{discountedPrice}{priceUnit}
-</Text>
+                  ₹{discountedPrice}{priceUnit}
+                </Text>
 
-<Text style={styles.originalPriceText}>
-  ₹{numericPrice}{priceUnit}
-</Text>
+                <Text style={styles.originalPriceText}>
+                  ₹{numericPrice}{priceUnit}
+                </Text>
               </View>
             ) : (
               <Text style={styles.priceText}>₹{item.price}</Text>
@@ -150,13 +150,13 @@ const priceUnit = priceString.includes('/')
           </View>
 
           {item.category !== 'Service' && (
-  <View style={styles.cardFooter}>
-    <View style={styles.stockInfo}>
-      <FontAwesome name="cube" size={10} color="#856404" />
-      <Text style={styles.stockText}>{item.quantity} in stock</Text>
-    </View>
-  </View>
-)}
+            <View style={styles.cardFooter}>
+              <View style={styles.stockInfo}>
+                <FontAwesome name="cube" size={10} color="#856404" />
+                <Text style={styles.stockText}>{item.quantity} in stock</Text>
+              </View>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -166,18 +166,29 @@ const priceUnit = priceString.includes('/')
     <View style={styles.container}>
       <View style={styles.maxWidthWrapper}>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.welcomeText}>Hello Storekeeper,</Text>
-            <Text style={styles.title}>My Inventory</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => router.push('/add-product')}
-          >
-            <FontAwesome name="plus" size={14} color="#fff" />
-            <Text style={styles.addButtonText}>Add Product</Text>
-          </TouchableOpacity>
-        </View>
+  <View style={styles.headerTop}>
+    <Text style={styles.welcomeText}>Hello Storekeeper,</Text>
+    <Text style={styles.title}>My Inventory</Text>
+  </View>
+
+  <View style={styles.actionButtons}>
+    <TouchableOpacity
+      style={styles.bulkButton}
+      onPress={() => router.push('/bulk-upload')}
+    >
+      <FontAwesome name="upload" size={14} color="#fff" />
+      <Text style={styles.buttonText}>Bulk Upload</Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={styles.addButton}
+      onPress={() => router.push('/add-product')}
+    >
+      <FontAwesome name="plus" size={14} color="#fff" />
+      <Text style={styles.buttonText}>Add Product</Text>
+    </TouchableOpacity>
+  </View>
+</View>
 
         {isLoading ? (
           <View style={styles.centerContainer}>

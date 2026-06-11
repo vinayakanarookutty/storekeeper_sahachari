@@ -20,39 +20,60 @@ import {
   View,
 } from 'react-native';
 import { getToken } from '../services/auth';
+<<<<<<< HEAD
 import {
   clearBadge,
   registerForPushNotificationsAsync,
   sendNewOrderNotification,
 } from '../services/notifications'; // adjust path if needed
 import { styles } from '../tab_style/three.style';
+=======
+import { screenStyles } from '../tab_style/three.style';
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+<<<<<<< HEAD
 const S3_BASE_URL =
   process.env.EXPO_PUBLIC_S3_BASE_URL ||
   'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
+=======
+const S3_BASE_URL = process.env.EXEXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
 const PRODUCT_STEPS = ['PLACED', 'READY', 'ACCEPTED', 'PICKED_UP', 'DELIVERED'];
 const SERVICE_STEPS = ['PLACED', 'ACCEPTED', 'DELIVERED'];
 
-// Add this below your API_BASE_URL / constant definitions
-const showConfirmation = (
-  title: string, 
-  message: string, 
-  onConfirm: () => void
-) => {
+// Map structural workflow steps to specific visual icons
+const STEP_ICON_CONFIG: Record<string, { icon: string; label: string }> = {
+  PLACED: { icon: 'shopping-cart', label: 'Placed' },
+  READY: { icon: 'clock-o', label: 'Ready' },
+  ACCEPTED: { icon: 'thumbs-up', label: 'Accepted' },
+  PICKED_UP: { icon: 'motorcycle', label: 'Picked Up' },
+  DELIVERED: { icon: 'check-circle', label: 'Delivered' },
+};
+
+// Global mapping for all backend enum states (combining badge styling and icon assets)
+const STATUS_CONFIG = {
+  PLACED: { color: '#DAA520', icon: 'shopping-cart', label: 'Order Placed' },
+  READY: { color: '#FF9800', icon: 'clock-o', label: 'Ready' },
+  ACCEPTED: { color: '#2E7D32', icon: 'check-circle', label: 'Accepted' },
+  PICKED_UP: { color: '#9C27B0', icon: 'motorcycle', label: 'Picked Up' },
+  DELIVERED: { color: '#4CAF50', icon: 'check-circle', label: 'Completed' },
+  REJECTED: { color: '#D32F2F', icon: 'times-circle', label: 'Rejected' }, 
+  FAILED: { color: '#757575', icon: 'exclamation-triangle', label: 'Failed' },
+  CANCEL_PENDING: { color: '#E65100', icon: 'exclamation-circle', label: 'Cancel Requested' },
+  CANCELLED: { color: '#D32F2F', icon: 'ban', label: 'Cancelled' },
+};
+
+const showConfirmation = (title: string, message: string, onConfirm: () => void) => {
   if (Platform.OS === 'web') {
-    // web browsers natively support confirm blocks which returns a boolean
     const confirmed = window.confirm(`${title}\n\n${message}`);
-    if (confirmed) {
-      onConfirm();
-    }
+    if (confirmed) onConfirm();
   } else {
-    // Mobile devices use the standard React Native multi-button array
     Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Confirm', onPress: onConfirm },
@@ -68,6 +89,7 @@ const showAlert = (title: string, message: string) => {
   }
 };
 
+<<<<<<< HEAD
 // Status Configuration - Matches your Backend Enums
 const STATUS_CONFIG = {
   PLACED:    { color: '#DAA520', icon: 'shopping-cart', label: 'Order Placed' },
@@ -78,11 +100,14 @@ const STATUS_CONFIG = {
   CANCELLED: { color: '#D32F2F', icon: 'times-circle',  label: 'Rejected' },
 };
 
+=======
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
 export default function OrdersScreen() {
   const queryClient = useQueryClient();
   const [selectedFilter, setSelectedFilter] = useState('ALL');
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
 
+<<<<<<< HEAD
   // ── Track previous order IDs so we can detect genuinely NEW orders ──────────
   const previousOrderIds = useRef<Set<string>>(new Set());
   const isFirstLoad = useRef<boolean>(true);
@@ -134,6 +159,9 @@ export default function OrdersScreen() {
   }, []);
 
   // ── Fetch Orders (polls every 30s) ───────────────────────────────────────────
+=======
+  // 1. Fetch Orders with Auto-Polling
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
   const { data: orders, isLoading, refetch } = useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
@@ -189,6 +217,7 @@ export default function OrdersScreen() {
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, endpoint }: { orderId: string; endpoint: string }) => {
       const token = await getToken();
+<<<<<<< HEAD
       const response = await fetch(
         `${API_BASE_URL}/storekeeper/orders/${orderId}/${endpoint}`,
         {
@@ -199,16 +228,25 @@ export default function OrdersScreen() {
           },
         }
       );
+=======
+      const response = await fetch(`${API_BASE_URL}/storekeeper/orders/${orderId}/${endpoint}`, {
+        method: 'POST',
+        headers: { 
+          Authorization: `Bearer ${token}`, 
+          'Content-Type': 'application/json' 
+        },
+      });
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Update failed');
       return result;
     },
-   onSuccess: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      showAlert('Success', 'Order status updated'); // <-- Changed to showAlert
+      showAlert('Success', 'Order status updated');
     },
     onError: (error: any) => {
-      showAlert('Action Failed', error.message); // <-- Changed to showAlert
+      showAlert('Action Failed', error.message);
     }
   });
 
@@ -221,7 +259,6 @@ export default function OrdersScreen() {
   };
 
   const toggleExpand = (orderId: string) => {
-    // Only execute layout animations on native mobile platforms
     if (Platform.OS !== 'web') {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
@@ -229,7 +266,11 @@ export default function OrdersScreen() {
   };
 
   const renderActionButtons = (order: any) => {
+<<<<<<< HEAD
     if (['DELIVERED', 'CANCELLED', 'PICKED_UP'].includes(order.status)) return null;
+=======
+    if (['DELIVERED', 'CANCELLED', 'REJECTED', 'FAILED', 'PICKED_UP', 'CANCEL_PENDING'].includes(order.status)) return null;
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
 
     const isServiceOrRent = order.items.some(
       (i: any) => i.productId?.category === 'Service' || i.productId?.category === 'Rent'
@@ -237,7 +278,7 @@ export default function OrdersScreen() {
     const isSelfPickup = order.paymentMethod === 'SELF_PICKUP';
 
     return (
-      <View style={[styles.actionsContainer, { gap: 10, marginTop: 15 }]}>
+      <View style={screenStyles.actionsContainer}>
         {order.status === 'PLACED' && (
           <>
             <TouchableOpacity
@@ -250,6 +291,7 @@ export default function OrdersScreen() {
                 )
               }
             >
+<<<<<<< HEAD
               <LinearGradient
                 colors={['#4CAF50', '#2E7D32']}
                 style={styles.actionButtonGradient}
@@ -257,6 +299,10 @@ export default function OrdersScreen() {
                 <Text style={styles.actionButtonText}>
                   {isServiceOrRent ? 'ACCEPT' : 'MARK READY'}
                 </Text>
+=======
+              <LinearGradient colors={['#4CAF50', '#2E7D32']} style={screenStyles.actionButtonGradient}>
+                <Text style={screenStyles.actionButtonText}>{isServiceOrRent ? 'ACCEPT' : 'MARK READY'}</Text>
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
               </LinearGradient>
             </TouchableOpacity>
 
@@ -264,16 +310,22 @@ export default function OrdersScreen() {
               style={{ flex: 1 }}
               onPress={() => handleAction(order._id, 'reject', 'Reject Order')}
             >
+<<<<<<< HEAD
               <LinearGradient
                 colors={['#F44336', '#D32F2F']}
                 style={styles.actionButtonGradient}
               >
                 <Text style={styles.actionButtonText}>REJECT</Text>
+=======
+              <LinearGradient colors={['#F44336', '#D32F2F']} style={screenStyles.actionButtonGradient}>
+                <Text style={screenStyles.actionButtonText}>REJECT</Text>
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
               </LinearGradient>
             </TouchableOpacity>
           </>
         )}
 
+<<<<<<< HEAD
         {(order.status === 'READY' || order.status === 'ACCEPTED') &&
           (isServiceOrRent || isSelfPickup) && (
             <TouchableOpacity
@@ -285,6 +337,15 @@ export default function OrdersScreen() {
                 style={styles.actionButtonGradient}
               >
                 <Text style={styles.actionButtonText}>COMPLETE / DELIVER</Text>
+=======
+        {(order.status === 'READY' || order.status === 'ACCEPTED') && (isServiceOrRent || isSelfPickup) && (
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              onPress={() => handleAction(order._id, 'deliver', 'Complete Order')}
+            >
+              <LinearGradient colors={['#2196F3', '#1976D2']} style={screenStyles.actionButtonGradient}>
+                <Text style={screenStyles.actionButtonText}>COMPLETE / DELIVER</Text>
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
               </LinearGradient>
             </TouchableOpacity>
           )}
@@ -300,6 +361,7 @@ export default function OrdersScreen() {
     const steps = isServiceOrRent ? SERVICE_STEPS : PRODUCT_STEPS;
     const currentStep = steps.indexOf(order.status);
     const isExpanded = expandedOrders[order._id];
+<<<<<<< HEAD
     const statusInfo =
       STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.PLACED;
 
@@ -327,11 +389,39 @@ export default function OrdersScreen() {
               ]}
             >
               <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>
+=======
+    const statusInfo = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.PLACED;
+    
+    const showCancelIndicator = order.status === 'CANCEL_PENDING' || order.status === 'CANCELLED';
+
+    return (
+      <View style={screenStyles.orderCard}>
+        <LinearGradient colors={['#FFFFFF', '#FDFBF0']} style={screenStyles.orderCardGradient}>
+          
+          {/* Header */}
+          <View style={screenStyles.orderHeader}>
+            <View style={screenStyles.headerLeftRef}>
+              {showCancelIndicator && (
+                <FontAwesome 
+                  name={statusInfo.icon as any} 
+                  size={16} 
+                  color={statusInfo.color} 
+                />
+              )}
+              <Text style={screenStyles.orderIdLabel}>REF: #{order.checkoutId?.toUpperCase()}</Text>
+            </View>
+            
+            {/* Dynamic Status Badge displaying both an explicit status Icon + Text label */}
+            <View style={[screenStyles.statusBadge, { backgroundColor: statusInfo.color + '12', borderColor: statusInfo.color }]}>
+              <FontAwesome name={statusInfo.icon as any} size={11} color={statusInfo.color} />
+              <Text style={[screenStyles.statusBadgeText, { color: statusInfo.color }]}>
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
                 {statusInfo.label}
               </Text>
             </View>
           </View>
 
+<<<<<<< HEAD
           {/* Customer Info */}
           <TouchableOpacity
             onPress={() => toggleExpand(order._id)}
@@ -349,6 +439,20 @@ export default function OrdersScreen() {
                   <Text style={styles.avatarText}>
                     {order.userId?.name?.charAt(0) || '?'}
                   </Text>
+=======
+          <Text style={screenStyles.dateText}>
+            {new Date(order.createdAt).toLocaleDateString()}
+          </Text>
+
+          {/* Customer Info Card */}
+          <TouchableOpacity onPress={() => toggleExpand(order._id)} style={screenStyles.customerCard}>
+            <View style={screenStyles.customerRow}>
+                <View style={screenStyles.customerMainLeft}>
+                  <View style={screenStyles.avatarCircle}>
+                    <Text style={screenStyles.avatarText}>{order.userId?.name?.charAt(0) || '?'}</Text>
+                  </View>
+                  <Text style={screenStyles.customerNameMain}>{order.userId?.name || 'Unknown'}</Text>
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
                 </View>
                 <Text style={styles.customerNameMain}>
                   {order.userId?.name || 'Unknown'}
@@ -361,6 +465,7 @@ export default function OrdersScreen() {
               />
             </View>
             {isExpanded && (
+<<<<<<< HEAD
               <View style={styles.expandedDetails}>
                 <Text style={styles.detailText}>
                   <FontAwesome name="phone" /> {order.deliveryAddress?.phone}
@@ -381,12 +486,21 @@ export default function OrdersScreen() {
                     <Text style={{ fontSize: 10, color: '#1976D2', fontWeight: 'bold' }}>
                       SELF PICKUP ORDER
                     </Text>
+=======
+              <View style={screenStyles.expandedDetails}>
+                <Text style={screenStyles.detailText}><FontAwesome name="phone" /> {order.deliveryAddress?.phone}</Text>
+                <Text style={screenStyles.detailText}><FontAwesome name="map-marker" /> {order.deliveryAddress?.street}, {order.deliveryAddress?.city}</Text>
+                {order.paymentMethod === 'SELF_PICKUP' && (
+                  <View style={screenStyles.selfPickupBadge}>
+                    <Text style={screenStyles.selfPickupText}>SELF PICKUP ORDER</Text>
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
                   </View>
                 )}
               </View>
             )}
           </TouchableOpacity>
 
+<<<<<<< HEAD
           {/* Steps Progress */}
           {order.status !== 'CANCELLED' && (
             <View style={styles.progressContainer}>
@@ -415,11 +529,31 @@ export default function OrdersScreen() {
                   </Text>
                 </View>
               ))}
+=======
+          {/* Steps Progress Tracker - Using functional Workflow Tracking Icons */}
+          {!['CANCELLED', 'CANCEL_PENDING', 'REJECTED', 'FAILED'].includes(order.status) && (
+            <View style={screenStyles.progressContainer}>
+              {steps.map((step, index) => {
+                const isCompletedOrCurrent = index <= currentStep;
+                const stepMeta = STEP_ICON_CONFIG[step] || { icon: 'circle', label: step };
+                return (
+                  <View key={step} style={screenStyles.stepBlock}>
+                    <View style={[screenStyles.progressIconCircle, { backgroundColor: isCompletedOrCurrent ? '#DAA520' : '#E0E0E0' }]}>
+                      <FontAwesome name={stepMeta.icon as any} size={11} color={isCompletedOrCurrent ? '#fff' : '#999'} />
+                    </View>
+                    <Text style={[screenStyles.progressText, { color: isCompletedOrCurrent ? '#DAA520' : '#999' }]}>
+                      {stepMeta.label}
+                    </Text>
+                  </View>
+                );
+              })}
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
             </View>
           )}
 
           {/* Items List */}
           {order.items.map((item: any) => (
+<<<<<<< HEAD
             <View key={item._id} style={styles.itemRowImproved}>
               <Image
                 source={{ uri: `${S3_BASE_URL}/${item.productId?.images?.[0]}` }}
@@ -433,14 +567,25 @@ export default function OrdersScreen() {
                 <Text style={styles.itemCatSmall}>
                   Qty: {item.quantity} | {item.productId?.category}
                 </Text>
+=======
+            <View key={item._id} style={screenStyles.itemRowImproved}>
+              <Image 
+                source={{ uri: `${S3_BASE_URL}/${item.productId?.images?.[0]}` }} 
+                style={screenStyles.itemImageSmall} 
+                defaultSource={require('../../assets/images/icon.png')} 
+              />
+              <View style={screenStyles.itemInfo}>
+                <Text style={screenStyles.itemNameSmall} numberOfLines={1}>{item.productId?.name}</Text>
+                <Text style={screenStyles.itemCatSmall}>Qty: {item.quantity} | {item.productId?.category}</Text>
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
               </View>
-              <Text style={styles.itemPriceSmall}>₹{item.price}</Text>
+              <Text style={screenStyles.itemPriceSmall}>₹{item.price}</Text>
             </View>
           ))}
 
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Grand Total</Text>
-            <Text style={styles.totalValue}>₹{order.totalAmount}</Text>
+          <View style={screenStyles.totalRow}>
+            <Text style={screenStyles.totalLabel}>Grand Total</Text>
+            <Text style={screenStyles.totalValue}>₹{order.itemsSubtotal}</Text>
           </View>
 
           {renderActionButtons(order)}
@@ -451,15 +596,16 @@ export default function OrdersScreen() {
 
   if (isLoading && !orders) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={screenStyles.centered}>
         <ActivityIndicator size="large" color="#DAA520" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenStyles.container}>
       <StatusBar barStyle="dark-content" />
+<<<<<<< HEAD
 
       {/* Filter Bar */}
       <View
@@ -503,6 +649,26 @@ export default function OrdersScreen() {
               </TouchableOpacity>
             )
           )}
+=======
+      
+      {/* Scrollable Filter View */}
+      <View style={screenStyles.filterBarContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15 }}>
+          {['ALL', 'PLACED', 'READY', 'ACCEPTED', 'DELIVERED', 'CANCEL_PENDING', 'CANCELLED', 'REJECTED'].map((filter) => (
+             <TouchableOpacity 
+               key={filter}
+               onPress={() => setSelectedFilter(filter)}
+               style={[
+                   screenStyles.filterTabButton,
+                   selectedFilter === filter && { backgroundColor: '#DAA520' }
+               ]}
+             >
+               <Text style={[screenStyles.filterTabText, { color: selectedFilter === filter ? '#fff' : '#666' }]}>
+                   {filter === 'CANCEL_PENDING' ? 'CANCEL REQ.' : filter}
+               </Text>
+             </TouchableOpacity>
+          ))}
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
         </ScrollView>
       </View>
 
@@ -519,12 +685,19 @@ export default function OrdersScreen() {
           />
         }
         ListEmptyComponent={
+<<<<<<< HEAD
           <View style={{ marginTop: 100, alignItems: 'center' }}>
             <FontAwesome name="inbox" size={50} color="#ddd" />
             <Text style={{ color: '#999', marginTop: 10, fontSize: 16 }}>
               No orders found
             </Text>
           </View>
+=======
+            <View style={screenStyles.emptyContainer}>
+                <FontAwesome name="inbox" size={50} color="#ddd" />
+                <Text style={screenStyles.emptyText}>No orders found</Text>
+            </View>
+>>>>>>> 236a8d2d2f496262cb08d7e58a3e637c0d664586
         }
       />
     </View>
