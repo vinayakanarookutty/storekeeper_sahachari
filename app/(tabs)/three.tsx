@@ -1,12 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
-<<<<<<< HEAD
 import * as Notifications from 'expo-notifications';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-=======
-import React, { useMemo, useState } from 'react';
->>>>>>> 46db4b634d249e8839d3783c3cfb8c85b8de648c
 import {
   ActivityIndicator,
   Alert,
@@ -21,7 +17,6 @@ import {
   Text,
   TouchableOpacity,
   UIManager,
-<<<<<<< HEAD
   View,
 } from 'react-native';
 import { getToken } from '../services/auth';
@@ -30,13 +25,7 @@ import {
   registerForPushNotificationsAsync,
   sendNewOrderNotification,
 } from '../services/notifications'; // adjust path if needed
-import { styles } from './tab_style/three.style';
-=======
-  View
-} from 'react-native';
-import { getToken } from '../services/auth';
 import { styles } from '../tab_style/three.style';
->>>>>>> 46db4b634d249e8839d3783c3cfb8c85b8de648c
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -50,8 +39,6 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const PRODUCT_STEPS = ['PLACED', 'READY', 'ACCEPTED', 'PICKED_UP', 'DELIVERED'];
 const SERVICE_STEPS = ['PLACED', 'ACCEPTED', 'DELIVERED'];
 
-<<<<<<< HEAD
-=======
 // Add this below your API_BASE_URL / constant definitions
 const showConfirmation = (
   title: string, 
@@ -82,7 +69,6 @@ const showAlert = (title: string, message: string) => {
 };
 
 // Status Configuration - Matches your Backend Enums
->>>>>>> 46db4b634d249e8839d3783c3cfb8c85b8de648c
 const STATUS_CONFIG = {
   PLACED:    { color: '#DAA520', icon: 'shopping-cart', label: 'Order Placed' },
   READY:     { color: '#FF9800', icon: 'clock-o',       label: 'Ready' },
@@ -222,13 +208,8 @@ export default function OrdersScreen() {
       showAlert('Success', 'Order status updated'); // <-- Changed to showAlert
     },
     onError: (error: any) => {
-<<<<<<< HEAD
-      Alert.alert('Action Failed', error.message);
-    },
-=======
       showAlert('Action Failed', error.message); // <-- Changed to showAlert
     }
->>>>>>> 46db4b634d249e8839d3783c3cfb8c85b8de648c
   });
 
   const handleAction = (orderId: string, endpoint: string, label: string) => {
@@ -240,16 +221,11 @@ export default function OrdersScreen() {
   };
 
   const toggleExpand = (orderId: string) => {
-<<<<<<< HEAD
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedOrders((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
-=======
     // Only execute layout animations on native mobile platforms
     if (Platform.OS !== 'web') {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
     setExpandedOrders(prev => ({ ...prev, [orderId]: !prev[orderId] }));
->>>>>>> 46db4b634d249e8839d3783c3cfb8c85b8de648c
   };
 
   const renderActionButtons = (order: any) => {
