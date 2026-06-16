@@ -100,6 +100,21 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
     }
   };
 
+  // ─── GRAMMATICALLY CORRECT TITLE STRATEGY FOR MALAYALAM SOV ORDER ───
+  const getModalTitle = () => {
+    if (language === 'ml') {
+      switch (field) {
+        case 'mobileNumber': return 'മൊബൈൽ നമ്പർ ഉറപ്പാക്കുക';
+        case 'address': return 'പ്രധാന വിലാസം ഉറപ്പാക്കുക';
+        case 'address2': return 'രണ്ടാം വിലാസം ഉറപ്പാക്കുക';
+        case 'serviceablePincodes': return 'സർവീസ് പിൻകോഡുകൾ ഉറപ്പാക്കുക';
+        default: return t.confirmTitle || 'ഉറപ്പാക്കുക';
+      }
+    }
+    // Fallback default structure for English compilation environments
+    return `${t.confirmTitle || 'Edit'} ${getFieldLabel()}`;
+  };
+
   const cancelLabel = language === 'ml' ? 'റദ്ദാക്കുക' : 'Cancel';
   const saveLabel = language === 'ml' ? 'സേവ് ചെയ്യുക' : 'Save';
 
@@ -108,7 +123,7 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t.confirmTitle || (language === 'ml' ? 'മാറ്റങ്ങൾ വരുത്തുക' : 'Edit')} {getFieldLabel()}</Text>
+            <Text style={styles.modalTitle}>{getModalTitle()}</Text>
             <TouchableOpacity onPress={onClose}><FontAwesome name="times" size={20} color={COLORS.textDark} /></TouchableOpacity>
           </View>
 
@@ -198,12 +213,12 @@ export default function TabTwoScreen() {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       setEditModalVisible(false);
       showAlert(
-        t.successTitle || (language === 'ml' ? 'വിജയകരം' : 'Success'), 
+        t.successTitle || (language === 'ml' ? 'സക്സസ്' : 'Success'), 
         t.statusUpdatedSuccess || (language === 'ml' ? 'പ്രൊഫൈൽ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു!' : 'Profile updated successfully!')
       );
     },
     onError: (error: any) => {
-      showAlert(t.failedTitle || (language === 'ml' ? 'പിശക്' : 'Error'), error.message || 'Failed to update profile');
+      showAlert(t.failedTitle || (language === 'ml' ? 'എറർ' : 'Error'), error.message || 'Failed to update profile');
     },
   });
 
@@ -246,12 +261,12 @@ export default function TabTwoScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       showAlert(
-        t.successTitle || (language === 'ml' ? 'വിജയകരം' : 'Success'), 
+        t.successTitle || (language === 'ml' ? 'സക്സസ്' : 'Success'), 
         language === 'ml' ? 'പ്രൊഫൈൽ ചിത്രം മാറ്റിയിരിക്കുന്നു!' : 'Profile picture updated!'
       );
     },
     onError: (error: any) => {
-      showAlert(t.failedTitle || (language === 'ml' ? 'പിശക്' : 'Error'), error.message || 'Upload failed');
+      showAlert(t.failedTitle || (language === 'ml' ? 'എറർ' : 'Error'), error.message || 'Upload failed');
     },
   });
 

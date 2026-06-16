@@ -1,11 +1,11 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useQuery } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient'; 
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated } from 'react-native';
-import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { getToken } from '../services/auth';
 import { styles } from '../tab_style/index.style';
 
@@ -13,8 +13,8 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Text,
   RefreshControl,
+  Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -157,7 +157,7 @@ export default function TabOneScreen() {
               <TouchableOpacity 
                 activeOpacity={0.8}
                 onPress={() => router.push('/two')} 
-                style={styles.avatarContainer}
+                // style={styles.avatarContainer}
               >
                 <Image 
                   source={{ 

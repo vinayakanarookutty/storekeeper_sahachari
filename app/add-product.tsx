@@ -88,7 +88,6 @@ export default function AddProductScreen() {
   // DYNAMIC LOOKUP HELPER FOR TRANSLATED LABELS
   const getLocalizedUnitLabel = (unitValue: string): string => {
     if (!t || !t.units) return unitValue;
-    // Safe lookup against your LanguageContext dictionary schema
     const localized = (t.units as Record<string, string>)[unitValue];
     return typeof localized === 'string' ? localized : unitValue;
   };
@@ -186,11 +185,12 @@ export default function AddProductScreen() {
             fileType = 'image/png';
           }
         } else {
-          const cleanPath = imageUri.split(':http')[0].replace('blob:', '');
-          const extensionMatch = cleanPath.match(/\.([a-zA-Z0-9]+)$/);
-          if (extensionMatch) {
-            fileExtension = extensionMatch[1].toLowerCase();
-            fileType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
+          // Native clean path strategy for file extension parsing
+          const uriParts = imageUri.split('.');
+          const ext = uriParts[uriParts.length - 1].toLowerCase();
+          if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+            fileExtension = ext;
+            fileType = ext === 'png' ? 'image/png' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
           }
         }
 
@@ -368,7 +368,7 @@ export default function AddProductScreen() {
         {!isService && (
           <View style={styles.section}>
             <View style={styles.parallelContainer}>
-              <View style={{ flex: 2 }}>
+              <View style={{ flex: 1.5 }}>
                 <TextInput
                   style={styles.input}
                   placeholder={isRent ? `${t.stockQty || 'Stock'} (Unit) *` : `${t.stockQty || 'Stock'} *`}
@@ -380,12 +380,19 @@ export default function AddProductScreen() {
               </View>
 
               {!isRent && (
-                <View style={{ flex: 1, marginLeft: 10 }}>
+                <View style={{ flex: 1.3, marginLeft: 10, minWidth: 115 }}>
                   <TouchableOpacity 
                     style={styles.unitSelector} 
                     onPress={() => setShowUnitModal(true)}
                   >
-                    <Text style={styles.unitText}>{getLocalizedUnitLabel(unit)}</Text>
+                    <Text 
+                      style={[styles.unitText, { flex: 1, marginRight: 4 }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit={true}
+                      minimumFontScale={0.7}
+                    >
+                      {getLocalizedUnitLabel(unit)}
+                    </Text>
                     <FontAwesome name="caret-down" size={16} color="#DAA520" />
                   </TouchableOpacity>
                 </View>
@@ -437,7 +444,7 @@ export default function AddProductScreen() {
         data={PRODUCT_CATEGORIES}
         title={t.selectCategory || "Select Category"}
         onSelect={handleSelectCategory}
-        onClose={() => setShowCategoryModal(false)}
+        close={(() => setShowCategoryModal(false))}
       />
 
       <SelectionModal 

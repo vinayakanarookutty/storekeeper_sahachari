@@ -168,6 +168,14 @@ export default function EditProductScreen() {
             fileExtension = 'png';
             fileType = 'image/png';
           }
+        } else {
+          // Robust physical device file extension parser
+          const uriParts = uri.split('.');
+          const ext = uriParts[uriParts.length - 1].toLowerCase();
+          if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+            fileExtension = ext;
+            fileType = ext === 'png' ? 'image/png' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+          }
         }
 
         const fileName = `edit_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
@@ -324,7 +332,7 @@ export default function EditProductScreen() {
         {/* STOCK & UNIT */}
         {!isService && (
           <View style={styles.parallelContainer}>
-            <View style={{ flex: 2 }}>
+            <View style={{ flex: 1.5 }}>
               <TextInput 
                 style={styles.input} 
                 placeholder={isRent ? `${t.stockQty || 'Stock'} (Unit) *` : `${t.stockQty || 'Stock'} *`} 
@@ -335,9 +343,16 @@ export default function EditProductScreen() {
               />
             </View>
             {!isRent && (
-              <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={{ flex: 1.3, marginLeft: 10, minWidth: 115 }}>
                 <TouchableOpacity style={styles.unitSelector} onPress={() => setShowUnitModal(true)}>
-                  <Text style={styles.unitText}>{translateKey(unit, 'units')}</Text>
+                  <Text 
+                    style={[styles.unitText, { flex: 1, marginRight: 4 }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit={true}
+                    minimumFontScale={0.7}
+                  >
+                    {translateKey(unit, 'units')}
+                  </Text>
                   <FontAwesome name="caret-down" size={16} color="#DAA520" />
                 </TouchableOpacity>
               </View>

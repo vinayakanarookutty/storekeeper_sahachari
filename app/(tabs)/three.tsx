@@ -93,11 +93,28 @@ export default function OrdersScreen() {
     refetchInterval: 30000, 
   });
 
-  // 2. Filter Logic
+  // 2. Filter Logic (FIXED to separate user/admin structural rejections from cancellations)
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
     if (selectedFilter === 'ALL') return orders;
-    return orders.filter((o: any) => o.status === selectedFilter);
+
+    return orders.filter((o: any) => {
+      const orderStatus = o.status?.toUpperCase();
+      const cancellationSource = o.cancelledBy?.toLowerCase() || '';
+
+      if (selectedFilter === 'REJECTED') {
+        return (
+          orderStatus === 'REJECTED' ||
+          (orderStatus === 'CANCELLED' && (cancellationSource === 'user' || cancellationSource === 'admin' || cancellationSource === 'superadmin'))
+        );
+      }
+
+      if (selectedFilter === 'CANCELLED') {
+        return orderStatus === 'CANCELLED' && cancellationSource !== 'user' && cancellationSource !== 'admin' && cancellationSource !== 'superadmin';
+      }
+
+      return o.status === selectedFilter;
+    });
   }, [orders, selectedFilter]);
 
   // 3. Status Update Mutation
@@ -197,7 +214,12 @@ export default function OrdersScreen() {
     const currentStep = steps.indexOf(order.status);
     const isExpanded = expandedOrders[order._id];
     
-    const statusInfo = STATUS_CONFIG[order.status] || STATUS_CONFIG.PLACED;
+    // UI Visual status fallback routing logic
+    let displayStatus = order.status;
+    if (order.status === 'CANCELLED' && (order.cancelledBy === 'user' || order.cancelledBy === 'admin' || order.cancelledBy === 'superadmin')) {
+      displayStatus = 'REJECTED';
+    }
+    const statusInfo = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.PLACED;
     const showCancelIndicator = order.status === 'CANCEL_PENDING' || order.status === 'CANCELLED';
 
     return (
@@ -212,6 +234,7 @@ export default function OrdersScreen() {
                   name={statusInfo.icon as any} 
                   size={16} 
                   color={statusInfo.color} 
+                  优质
                 />
               )}
               <Text style={screenStyles.orderIdLabel}>
@@ -330,7 +353,7 @@ export default function OrdersScreen() {
              else if (filter === 'DELIVERED') displayLabel = t.delivered || 'DELIVERED';
              else if (filter === 'REJECTED') displayLabel = t.rejected || 'REJECTED';
              else if (filter === 'CANCEL_PENDING') displayLabel = t.cancelRequestedShort || 'CANCEL REQ.';
-             else if (filter === 'CANCELLED') displayLabel = t.statusCancelled || 'CANCELLED'; // FIX: Changed from t.statusRejected to t.statusCancelled
+             else if (filter === 'CANCELLED') displayLabel = t.statusCancelled || 'CANCELLED';
 
              return (
                <TouchableOpacity 

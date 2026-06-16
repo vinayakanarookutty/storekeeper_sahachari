@@ -1,10 +1,23 @@
 // D:\storekeeper_sahachari\app\contexts\LanguageContext.tsx
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Language = 'en' | 'ml';
 
+const STORAGE_KEY = 'sahachari_user_language';
+
 const translations = {
   en: {
+    // Auth / Login Screen Keys
+    welcomeBack: 'Welcome Back',
+    loginSubtitle: 'Log in to your account',
+    emailPlaceholder: 'Email',
+    passwordPlaceholder: 'Password',
+    logInLabel: 'Log In',
+    forgotPasswordLabel: 'Forgot Password?',
+    fillFieldsMsg: 'Please fill in all fields',
+    errorTitle: 'Error',
+
     // Home
     sahachari: 'Sahachari',
     myStore: 'My Store', 
@@ -196,6 +209,16 @@ const translations = {
     }
   },
   ml: {
+    // Auth / Login Screen Keys
+    welcomeBack: 'വീണ്ടും സ്വാഗതം',
+    loginSubtitle: 'നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് ലോഗിൻ ചെയ്യുക',
+    emailPlaceholder: 'ഇമെയിൽ',
+    passwordPlaceholder: 'പാസ്‌വേഡ്',
+    logInLabel: 'ലോഗിൻ ചെയ്യുക',
+    forgotPasswordLabel: 'പാസ്‌വേഡ് മറന്നുപോയോ?',
+    fillFieldsMsg: 'ദയവായി എല്ലാ ഫീൽഡുകളും പൂരിപ്പിക്കുക',
+    errorTitle: 'പിശക്',
+
     // Home
     sahachari: 'സഹചാരി',
     myStore: 'എൻ്റെ സ്റ്റോർ', 
@@ -273,7 +296,7 @@ const translations = {
     itemsLabel: 'ഇനങ്ങൾ',
     topStockCategories: 'കൂടുതൽ സ്റ്റോക്കുള്ള വിഭാഗങ്ങൾ',
     categoryBreakdownTitle: 'സഹചാരി കാറ്റഗറി തിരിച്ചുള്ള വിവരങ്ങൾ',
-    unitsLabel: 'യൂணிറ്റുകൾ',
+    unitsLabel: 'യൂണിറ്റുകൾ',
     avgOrderValue: 'ശരാശരി ഓർഡർ മൂല്യം',
     peakPerformance: 'മികച്ച പ്രകടനം',
     revenueTimelineTitle: 'ആകെ വരുമാന സമയരേഖ (₹)',
@@ -390,14 +413,39 @@ const translations = {
 
 interface LanguageContextType {
   language: Language;
-  setLanguage: (lang: Language) => void;
+  setLanguage: (lang: Language) => Promise<void>;
   t: typeof translations.en;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguageState] = useState<Language>('en');
+
+  // Load language settings automatically on boot execution
+  useEffect(() => {
+    const loadStoredLanguage = async () => {
+      try {
+        const savedLang = await AsyncStorage.getItem(STORAGE_KEY);
+        if (savedLang === 'en' || savedLang === 'ml') {
+          setLanguageState(savedLang);
+        }
+      } catch (error) {
+        console.error('Failed to load language from async storage:', error);
+      }
+    };
+    loadStoredLanguage();
+  }, []);
+
+  // Save changes securely inside local storage layer
+  const setLanguage = async (lang: Language) => {
+    try {
+      setLanguageState(lang);
+      await AsyncStorage.setItem(STORAGE_KEY, lang);
+    } catch (error) {
+      console.error('Failed to save language to async storage:', error);
+    }
+  };
 
   const value = {
     language,
