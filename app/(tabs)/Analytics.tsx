@@ -121,6 +121,7 @@ export default function AnalyticsScreen() {
     primary: '#DAA520',
   };
 
+  // ─── Global Chart Template Settings ───────────────────────────────────────
   const chartConfig = {
     backgroundGradientFrom: theme.card,
     backgroundGradientTo: theme.card,
@@ -128,16 +129,17 @@ export default function AnalyticsScreen() {
     color: (opacity = 1) => `rgba(218, 165, 32, ${opacity})`, 
     labelColor: (opacity = 1) => `rgba(${isDark ? '255, 255, 255' : '26, 26, 26'}, ${opacity})`,
     style: { borderRadius: 16 },
+    // Placed inner margin controls to stop labels from rendering outside the container grid boundaries
+    propsForLabels: {
+      fontSize: 10,
+    },
   };
 
-  // Helper localizer mapping for categories (handles bidirectional space/language variations)
+  // Helper localizer mapping for categories 
   const getLocalizedCategory = (category: string) => {
     if (!category) return '';
-    
-    // Normalize casing and trim leading/trailing white space
     const normalized = category.trim().toLowerCase();
     
-    // Fallback lookups for explicit Malayalam strings from DB
     if (normalized === 'ഭക്ഷണം') return t.food;
     if (normalized === 'പാനീയങ്ങൾ') return t.beverages;
     if (normalized === 'സേവനം') return t.service;
@@ -146,7 +148,6 @@ export default function AnalyticsScreen() {
     if (normalized === 'ഫാസ്റ്റ്ഫുഡ്' || normalized === 'ഫാസ്റ്റ് ഫുഡ്') return t['fast food'];
     if (normalized === 'സ്നാക്ക്സ്') return t.snacks;
     
-    // Standard contextual dictionary lookup mapping via lowercase dictionary structures
     return (t as any)[normalized] || category;
   };
 
@@ -251,7 +252,7 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* ─── FIXED CONTAINER: Keeps the toggle fixed at the top layout level ─── */}
+      {/* Toggle View Controller Component Header */}
       <View style={[styles.toggleContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <TouchableOpacity
           style={[styles.toggleButton, chartView === 'daily' && { backgroundColor: theme.primary }]}
@@ -273,7 +274,7 @@ export default function AnalyticsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ─── SCROLLABLE DATA MATRIX CONTAINER ─── */}
+      {/* Main Data Layout Stream Area */}
       <ScrollView 
         style={[styles.container, { backgroundColor: theme.background }]} 
         contentContainerStyle={styles.scrollContent}
@@ -288,10 +289,9 @@ export default function AnalyticsScreen() {
           />
         }
        >
-        {/* ─── RENDER ENGINE A: STOCK VIEW ──────────────────────────────────────── */}
+        {/* ─── STOCK VIEW ─── */}
         {chartView === 'Stock' && stockAnalytics && (
           <>
-            {/* Inventory Grid Matrix */}
             <View style={styles.gridRow}>
               <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
                 <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.uniqueProducts}</Text>
@@ -312,9 +312,9 @@ export default function AnalyticsScreen() {
               </View>
             </View>
 
-            {/* Category Distribution Chart */}
+            {/* Category Stock BarChart */}
             {stockAnalytics.categoryLabels.length > 0 && (
-              <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+              <View style={[styles.sectionCard, { backgroundColor: theme.card, paddingRight: 20 }]}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.topStockCategories}</Text>
                 <BarChart
                   data={{
@@ -322,20 +322,22 @@ export default function AnalyticsScreen() {
                     datasets: [{ data: stockAnalytics.categoryVolumes }],
                   }}
                   width={SCREEN_WIDTH - 64}
-                  height={200}
+                  height={220}
                   yAxisLabel=""
                   yAxisSuffix=""
                   chartConfig={{
                     ...chartConfig,
                     color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, 
                   }}
-                  style={styles.chartCanvas}
+                  style={{
+                    ...styles.chartCanvas,
+                    paddingLeft: 12, // Clears label alignment shifts
+                  }}
                   verticalLabelRotation={15} 
                 />
               </View>
             )}
 
-            {/* Tabular Detailed Inventory Logs */}
             <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
               <Text style={[styles.sectionTitle, { color: theme.subText }]}>
                 {t.categoryBreakdownTitle}
@@ -352,10 +354,9 @@ export default function AnalyticsScreen() {
           </>
         )}
 
-        {/* ─── RENDER ENGINE B: ORDERS VIEW (Daily / Monthly) ───────────────────── */}
+        {/* ─── ORDERS VIEW (Daily / Monthly) ─── */}
         {chartView !== 'Stock' && orderAnalytics && (
           <>
-            {/* Metrics Grid Matrix */}
             <View style={styles.gridRow}>
               <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
                 <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.totalRevenue}</Text>
@@ -384,49 +385,54 @@ export default function AnalyticsScreen() {
               </View>
             </View>
 
-            {/* Revenue Chart Layout */}
+            {/* Total Revenue Timeline Chart Layout */}
             {orderAnalytics.chartLabels.length > 0 && (
-              <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+              <View style={[styles.sectionCard, { backgroundColor: theme.card, paddingRight: 24 }]}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.revenueTimelineTitle}</Text>
                 <LineChart
                   data={{
                     labels: orderAnalytics.chartLabels,
                     datasets: [{ data: orderAnalytics.chartRevenues }],
                   }}
-                  width={SCREEN_WIDTH - 64} 
-                  height={180}
+                  width={SCREEN_WIDTH - 50} 
+                  height={190}
                   yAxisLabel="₹"
                   yAxisSuffix=""
                   chartConfig={chartConfig}
                   bezier
-                  style={styles.chartCanvas}
+                  style={{
+                    ...styles.chartCanvas,
+                    paddingLeft: 12, // Pushes the text away from the container edge
+                  }}
                 />
               </View>
             )}
 
-            {/* Orders Count Tracker Bar Graph */}
+            {/* Total Orders Tracker Graph Layout */}
             {orderAnalytics.chartLabels.length > 0 && (
-              <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+              <View style={[styles.sectionCard, { backgroundColor: theme.card, paddingRight: 24 }]}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.ordersTrackerTitle}</Text>
                 <BarChart
                   data={{
                     labels: orderAnalytics.chartLabels,
                     datasets: [{ data: orderAnalytics.chartOrdersCount }],
                   }}
-                  width={SCREEN_WIDTH - 64}
-                  height={180}
+                  width={SCREEN_WIDTH - 50}
+                  height={190}
                   yAxisLabel=""
                   yAxisSuffix=""
                   chartConfig={{
                     ...chartConfig,
                     color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
                   }}
-                  style={styles.chartCanvas}
+                  style={{
+                    ...styles.chartCanvas,
+                    paddingLeft: 12, // Fixes cutoff numbers on the left axis
+                  }}
                 />
               </View>
             )}
 
-            {/* Table Breakdown Logging */}
             <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
               <Text style={[styles.sectionTitle, { color: theme.subText }]}>
                 {t.revenueTimelineBreakdown}
@@ -440,7 +446,6 @@ export default function AnalyticsScreen() {
               ))}
             </View>
 
-            {/* Order Status Allocation Progress Tracks */}
             <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
               <Text style={[styles.sectionTitle, { color: theme.subText }]}>{t.orderStatusAllocation}</Text>
               {Object.entries(orderAnalytics.statusMap).map(([statusName, count], idx) => {
@@ -468,7 +473,7 @@ export default function AnalyticsScreen() {
           </>
         )}
 
-        {/* Empty State Layout Layer Exception Case */}
+        {/* Empty State Tracker Wrapper */}
         {((chartView === 'Stock' && !stockAnalytics) || (chartView !== 'Stock' && !orderAnalytics)) && (
           <View style={styles.centerContainer}>
             <Text style={{ color: theme.subText, marginTop: 40, textAlign: 'center' }}>
