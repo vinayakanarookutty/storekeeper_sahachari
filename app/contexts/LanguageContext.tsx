@@ -48,7 +48,7 @@ const translations = {
     reject: 'REJECT',
     cancel: 'Cancel',
     cancelRequestedLabel: 'Cancel Requested',
-    cancelRequestedShort: 'Cancel Req.',
+    cancelRequestedShort: 'CANCEL Req.',
 
     // Orders (New keys required by three.tsx conversion)
     statusPlaced: 'Order Placed',
@@ -56,8 +56,8 @@ const translations = {
     statusAccepted: 'Accepted',
     statusPickedUp: 'Picked Up',
     statusCompleted: 'Completed',
-    statusRejected: 'Rejected',
-    statusCancelled: 'Cancelled',
+    statusRejected: 'REJECTED',
+    statusCancelled: 'CANCELED',
     successTitle: 'Success',
     statusUpdatedSuccess: 'Order status updated',
     failedTitle: 'Action Failed',
@@ -85,7 +85,7 @@ const translations = {
     stock: 'Stock',
     totalRevenue: 'Total Revenue',
     totalOrders: 'Total Orders',
-    statusFailed: 'Failed',
+    statusFailed: 'FAILED',
     failed: 'Failed',
 
     // Analytics Additions (Fixes Mix-up)

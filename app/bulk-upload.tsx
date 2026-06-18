@@ -18,8 +18,11 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const showAlert = (title: string, message: string, onConfirm?: () => void) => {
   if (Platform.OS === 'web') {
-    alert(`${title}: ${message}`);
-    if (onConfirm) onConfirm();
+    // Wrap inside a micro-timeout to let the main browser thread breathe
+    setTimeout(() => {
+      alert(`${title}: ${message}`);
+      if (onConfirm) onConfirm();
+    }, 100);
   } else {
     Alert.alert(title, message, onConfirm ? [{ text: 'OK', onPress: onConfirm }] : undefined);
   }
@@ -98,21 +101,24 @@ export default function BulkUploadScreen() {
       }
 
       // Send the request
-      const response = await axios.post(
-        `${API_URL}/storekeeper/bulk-upload`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
+const response = await axios.post(
+  `${API_URL}/storekeeper/bulk-upload`,
+  formData,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+  }
+);
 
-      showAlert(
-        t.successTitle || 'Success',
-        `${response.data.count || 0} products imported successfully`
-      );
+showAlert(
+  t.successTitle || 'Success',
+  `${response.data.count || 0} products imported successfully`,
+  () => {
+    setSelectedFile(null);
+  }
+);
 
       setSelectedFile(null);
     } catch (error: any) {
@@ -129,18 +135,18 @@ export default function BulkUploadScreen() {
   return (
     <View style={styles.container}>
       {/* =========================
-           LOCALIZED HEADER
+           HEADER
       ========================= */}
       <Text style={styles.title}>
         {t.bulkUpload || 'Bulk Upload Products'}
       </Text>
 
       <Text style={styles.subtitle}>
-        {t.bulkUploadSubtitle || 'Upload Excel or CSV files to import products quickly'}
+        Upload Excel or CSV files to import products quickly
       </Text>
 
       {/* =========================
-           LOCALIZED FILE PICKER AREA
+           FILE PICKER
       ========================= */}
       <TouchableOpacity
         style={styles.uploadBox}
@@ -154,11 +160,11 @@ export default function BulkUploadScreen() {
         />
 
         <Text style={styles.uploadText}>
-          {t.tapToChooseFile || 'Tap to choose file'}
+          Tap to choose file
         </Text>
 
         <Text style={styles.supportText}>
-          {t.supportsExtensions || 'Supports .xlsx and .csv'}
+          Supports .xlsx and .csv
         </Text>
 
         {selectedFile && (
@@ -179,7 +185,7 @@ export default function BulkUploadScreen() {
       </TouchableOpacity>
 
       {/* =========================
-           LOCALIZED IMPORT BUTTON
+           IMPORT BUTTON
       ========================= */}
       <TouchableOpacity
         style={[
@@ -199,7 +205,7 @@ export default function BulkUploadScreen() {
               color="#fff"
             />
             <Text style={styles.importButtonText}>
-              {t.importProductsBtn || 'Import Products'}
+              Import Products
             </Text>
           </>
         )}

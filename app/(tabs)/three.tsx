@@ -343,7 +343,7 @@ export default function OrdersScreen() {
       {/* Scrollable Horizontal Filter View Capsule */}
       <View style={screenStyles.filterBarContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15 }}>
-          {['ALL', 'PLACED', 'READY', 'ACCEPTED', 'DELIVERED', 'CANCEL_PENDING', 'CANCELLED', 'REJECTED'].map((filter) => {
+          {['ALL', 'PLACED', 'READY', 'ACCEPTED', 'DELIVERED','FAILED', 'CANCEL_PENDING', 'CANCELLED', 'REJECTED'].map((filter) => {
              // Handle local filter button translations safely
              let displayLabel = filter;
              if (filter === 'ALL') displayLabel = t.all || 'ALL';
@@ -352,6 +352,7 @@ export default function OrdersScreen() {
              else if (filter === 'ACCEPTED') displayLabel = t.accepted || 'ACCEPTED';
              else if (filter === 'DELIVERED') displayLabel = t.delivered || 'DELIVERED';
              else if (filter === 'REJECTED') displayLabel = t.rejected || 'REJECTED';
+             else if (filter === 'FAILED') displayLabel = t.statusFailed || 'FAILED';
              else if (filter === 'CANCEL_PENDING') displayLabel = t.cancelRequestedShort || 'CANCEL REQ.';
              else if (filter === 'CANCELLED') displayLabel = t.statusCancelled || 'CANCELLED';
 
