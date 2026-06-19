@@ -57,7 +57,8 @@ const translations = {
     statusPickedUp: 'Picked Up',
     statusCompleted: 'Completed',
     statusRejected: 'REJECTED',
-    statusCancelled: 'CANCELED',
+    statusCancelled: 'CANCELLED',
+    statusCancelPending: 'Cancel Pending',
     successTitle: 'Success',
     statusUpdatedSuccess: 'Order status updated',
     failedTitle: 'Action Failed',
@@ -96,6 +97,7 @@ const translations = {
     topStockCategories: 'Top Stock Categories',
     categoryBreakdownTitle: 'SAHACHARI CATEGORY BREAKDOWN',
     unitsLabel: 'Units',
+    unitLabelSingular: 'Unit',
     avgOrderValue: 'Avg Order Value',
     peakPerformance: 'Peak Performance',
     revenueTimelineTitle: 'Total Revenue Timeline (₹)',
@@ -103,6 +105,7 @@ const translations = {
     revenueTimelineBreakdown: 'TOTAL REVENUE TIMELINE BREAKDOWN',
     orderStatusAllocation: 'ORDER STATUS ALLOCATION',
     ordersLabel: 'Orders',
+    orderLabelSingular: 'Order', // Added singular variant
 
     // Navigation Tabs
     homeTab: 'Home',
@@ -217,7 +220,7 @@ const translations = {
     logInLabel: 'ലോഗിൻ ചെയ്യുക',
     forgotPasswordLabel: 'പാസ്‌വേഡ് മറന്നുപോയോ?',
     fillFieldsMsg: 'ദയവായി എല്ലാ ഫീൽഡുകളും പൂരിപ്പിക്കുക',
-    errorTitle: 'പിശക്',
+    errorTitle: 'എറർ',
 
     // Home
     sahachari: 'സഹചാരി',
@@ -244,7 +247,7 @@ const translations = {
     noOrdersFound: 'ഓർഡറുകൾ ഒന്നും കണ്ടെത്തിയില്ല',
     grandTotal: 'ആകെ തുക',
     accept: 'സ്വീകരിക്കുക',
-    markReady: 'തയ്യാറായി എന്ന് അടയാളപ്പെടുത്തുക',
+    markReady: 'ഓർഡർ തയ്യാർ',
     completeDeliver: 'പൂർത്തിയാക്കുക / ഡെലിവർ ചെയ്യുക',
     reject: 'നിരസിക്കുക',
     cancel: 'റദ്ദാക്കുക',
@@ -259,6 +262,7 @@ const translations = {
     statusCompleted: 'പൂർത്തിയായി',
     statusRejected: 'നിരസിച്ചു',
     statusCancelled: 'റദ്ദാക്കി',
+    statusCancelPending: 'റദ്ദാക്കാൻ അഭ്യർത്ഥിച്ചവ',
     successTitle: 'വിജയം',
     statusUpdatedSuccess: 'ഓർഡർ സ്റ്റാറ്റസ് പുതുക്കിയിരിക്കുന്നു',
     failedTitle: 'നടപടി പരാജയപ്പെട്ടു',
@@ -297,6 +301,7 @@ const translations = {
     topStockCategories: 'കൂടുതൽ സ്റ്റോക്കുള്ള വിഭാഗങ്ങൾ',
     categoryBreakdownTitle: 'സഹചാരി കാറ്റഗറി തിരിച്ചുള്ള വിവരങ്ങൾ',
     unitsLabel: 'യൂണിറ്റുകൾ',
+    unitLabelSingular: 'യൂണിറ്റ്',
     avgOrderValue: 'ശരാശരി ഓർഡർ മൂല്യം',
     peakPerformance: 'മികച്ച പ്രകടനം',
     revenueTimelineTitle: 'ആകെ വരുമാന സമയരേഖ (₹)',
@@ -304,6 +309,7 @@ const translations = {
     revenueTimelineBreakdown: 'ആകെ വരുമാനത്തിന്റെ സമയരേഖാ വിവരണം',
     orderStatusAllocation: 'ഓർഡർ സ്റ്റാറ്റസ് വിഭജനം',
     ordersLabel: 'ഓർഡറുകൾ',
+    orderLabelSingular: 'ഓർഡർ', // Added singular variant
 
     // Navigation Tabs
     homeTab: 'ഹോം',
@@ -339,7 +345,7 @@ const translations = {
     beverages: 'പാനീയങ്ങൾ',
     service: 'സേവനം',
     'home made': 'ഹോം മെയ്ഡ്',
-    'vegetables and fruits': 'പച്ചക്കറികളും പഴങ്ങളും',
+    'vegetables and fruits': 'പച്ചക്കക്കറികളും പഴങ്ങളും',
     'fast food': 'ഫാസ്റ്റ് ഫുഡ്',
     snacks: 'സ്നാക്ക്സ്',
     groceries: 'ഗ്രോസറി',

@@ -29,6 +29,7 @@ const STATUS_COLORS: Record<string, string> = {
   DELIVERED: '#10b981',
   FAILED: '#ef4444',
   CANCELLED: '#6b7280',
+  CANCEL_PENDING: '#f43f5e', // Added rose-red accent color for the cancellation request bar
   REJECTED: '#f97316',
 };
 
@@ -129,7 +130,6 @@ export default function AnalyticsScreen() {
     color: (opacity = 1) => `rgba(218, 165, 32, ${opacity})`, 
     labelColor: (opacity = 1) => `rgba(${isDark ? '255, 255, 255' : '26, 26, 26'}, ${opacity})`,
     style: { borderRadius: 16 },
-    // Placed inner margin controls to stop labels from rendering outside the container grid boundaries
     propsForLabels: {
       fontSize: 10,
     },
@@ -160,6 +160,7 @@ export default function AnalyticsScreen() {
       case 'PICKED_UP': return t.statusPickedUp;
       case 'DELIVERED': return t.statusCompleted;
       case 'CANCELLED': return t.statusCancelled;
+      case 'CANCEL_PENDING': return (t as any).statusCancelPending || 'CANCEL_PENDING'; // Intercepts fallback stream leak
       case 'REJECTED': return t.statusRejected;
       case 'FAILED': return t.statusFailed;
       default: return (t as any)[status.toLowerCase()] || status;
@@ -331,7 +332,7 @@ export default function AnalyticsScreen() {
                   }}
                   style={{
                     ...styles.chartCanvas,
-                    paddingLeft: 12, // Clears label alignment shifts
+                    paddingLeft: 12, 
                   }}
                   verticalLabelRotation={15} 
                 />
@@ -347,7 +348,9 @@ export default function AnalyticsScreen() {
                   <Text style={{ color: theme.text, fontWeight: '600', flex: 2 }}>
                     {getLocalizedCategory(catName)}
                   </Text>
-                  <Text style={{ color: theme.primary, fontWeight: '700', flex: 1, textAlign: 'right' }}>{qty} {t.unitsLabel}</Text>
+                  <Text style={{ color: theme.primary, fontWeight: '700', flex: 1, textAlign: 'right' }}>
+                    {qty} {qty === 1 ? ((t as any).unitLabelSingular || 'Unit') : t.unitsLabel}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -402,7 +405,7 @@ export default function AnalyticsScreen() {
                   bezier
                   style={{
                     ...styles.chartCanvas,
-                    paddingLeft: 12, // Pushes the text away from the container edge
+                    paddingLeft: 12, 
                   }}
                 />
               </View>
@@ -427,7 +430,7 @@ export default function AnalyticsScreen() {
                   }}
                   style={{
                     ...styles.chartCanvas,
-                    paddingLeft: 12, // Fixes cutoff numbers on the left axis
+                    paddingLeft: 12, 
                   }}
                 />
               </View>
@@ -440,7 +443,9 @@ export default function AnalyticsScreen() {
               {orderAnalytics.sortedTimeline.map((item, idx) => (
                 <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
                   <Text style={{ color: theme.text, fontWeight: '600' }}>{item.label}</Text>
-                  <Text style={{ color: theme.subText }}>{item.counts} {t.ordersLabel}</Text>
+                  <Text style={{ color: theme.subText }}>
+                    {item.counts} {item.counts === 1 ? ((t as any).orderLabelSingular || 'Order') : t.ordersLabel}
+                  </Text>
                   <Text style={{ color: theme.primary, fontWeight: '700' }}>₹{item.revenue}</Text>
                 </View>
               ))}
