@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // Added useMutation and useQueryClient
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef } from 'react';
@@ -18,6 +18,8 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  Platform,
+  Alert,
 } from 'react-native';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -45,9 +47,10 @@ interface Product {
 export default function TabOneScreen() {
   const { token } = useAuth();
   const router = useRouter();
-  const { language, setLanguage, t } = useLanguage();
-  const slideAnim = useRef(new Animated.Value(language === 'en' ? 0 : 1)).current;
-
+  const queryClient = useQueryClient();
+  const { language, t } = useLanguage();
+  
+  // Current user query includes the backend's user status property
   const { data: userData } = useQuery<any>({
     queryKey: ['currentUser'],
     queryFn: async () => {
@@ -61,12 +64,55 @@ export default function TabOneScreen() {
     enabled: !!token, 
   });
 
+const showStatusConfirm = (title: string, message: string, onConfirm: () => void) => {
+  if (Platform.OS === 'web') {
+    const confirmed = window.confirm(`${title}\n\n${message}`);
+    if (confirmed) onConfirm();
+  } else {
+    Alert.alert(
+      title,
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Confirm', style: 'destructive', onPress: onConfirm }
+      ]
+    );
+  }
+};
+  // Derived user store status value (defaults to 'ACTIVE' if undefined)
+  const currentStatus = userData?.status || 'ACTIVE';
+
+  // Toggle animation setups mapped against current status
+  const slideAnim = useRef(new Animated.Value(currentStatus === 'ACTIVE' ? 0 : 1)).current;
+
+  // React Query Mutation to safely update status inside backend MongoDB
+  const toggleStatusMutation = useMutation({
+    mutationFn: async (newStatus: 'ACTIVE' | 'CLOSED') => {
+      const authToken = await getToken();
+      const res = await fetch(`${API_BASE_URL}/storekeeper/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) throw new Error('Failed to update shop status');
+      return res.json();
+    },
+    onSuccess: () => {
+      // Instantly forces components to refresh cache context with the new backend state
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    },
+  });
+
+  // Track state changes to fire off animated slider changes smoothly
   useEffect(() => {
     Animated.spring(slideAnim, {
-      toValue: language === 'en' ? 0 : 1,
+      toValue: currentStatus === 'ACTIVE' ? 0 : 1,
       useNativeDriver: true,
     }).start();
-  }, [language]);
+  }, [currentStatus]);
 
   const { width } = useWindowDimensions();
 
@@ -104,6 +150,9 @@ export default function TabOneScreen() {
   };
 
   const renderHeader = () => {
+    // Determine dynamic store status text value
+    const statusText = currentStatus === 'ACTIVE' ? 'Active' : 'Closed';
+    
     return (
       <View style={{ backgroundColor: '#FDFCF7' }}>
         <LinearGradient 
@@ -119,11 +168,13 @@ export default function TabOneScreen() {
               </Text>
               <View style={styles.subtitleContainer}>
                 <View style={styles.headerLineAccent} />
+                {/* Dynamically displaying text based on your current status */}
                 <Text style={styles.subtitleText} numberOfLines={1}>
-                   {t.myStore}
+                   {`${t.myStore} (${statusText})`}
                 </Text>
               </View>
               
+              {/* Refactored Toggle Container from Language into Status Controller */}
               <View style={styles.languageToggleContainer}>
                 <View style={styles.languageToggle}>
                   <Animated.View
@@ -142,13 +193,33 @@ export default function TabOneScreen() {
                     ]}
                   />
 
-                  <TouchableOpacity style={styles.langButton} onPress={() => setLanguage('en')}>
-                    <Text style={language === 'en' ? styles.langTextActive : styles.langText}>EN</Text>
-                  </TouchableOpacity>
+                  {/* ON Button */}
+<TouchableOpacity 
+  style={styles.langButton} 
+  onPress={() => {
+    showStatusConfirm(
+      'Open Shop?', 
+      'Are you sure you want to change status to ACTIVE and accept new orders?', 
+      () => toggleStatusMutation.mutate('ACTIVE')
+    );
+  }}
+>
+  <Text style={currentStatus === 'ACTIVE' ? styles.langTextActive : styles.langText}>ON</Text>
+</TouchableOpacity>
 
-                  <TouchableOpacity style={styles.langButton} onPress={() => setLanguage('ml')}>
-                    <Text style={language === 'ml' ? styles.langTextActive : styles.langText}>മ</Text>
-                  </TouchableOpacity>
+{/* OFF Button */}
+<TouchableOpacity 
+  style={styles.langButton} 
+  onPress={() => {
+    showStatusConfirm(
+      'Close Shop?', 
+      'Are you sure you want to change status to CLOSED? Customers will not be able to order.', 
+      () => toggleStatusMutation.mutate('CLOSED')
+    );
+  }}
+>
+  <Text style={currentStatus === 'CLOSED' ? styles.langTextActive : styles.langText}>OFF</Text>
+</TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -157,7 +228,6 @@ export default function TabOneScreen() {
               <TouchableOpacity 
                 activeOpacity={0.8}
                 onPress={() => router.push('/two')} 
-                // style={styles.avatarContainer}
               >
                 <Image 
                   source={{ 
@@ -211,7 +281,6 @@ export default function TabOneScreen() {
 
     const priceString = String(item.price);
     
-    // ─── DYNAMIC EXPLICIT UNIT LOCALIZER ───
     const getTranslatedUnit = (rawPriceStr: string) => {
       if (!rawPriceStr.includes('/')) return '';
       
@@ -229,17 +298,14 @@ export default function TabOneScreen() {
         if (rawUnit === 'box' || rawUnit === 'പെട്ടി') return '/പെട്ടി';
       }
       
-      // Fallback to original English unit string if language is 'en' or untranslated
       return '/' + rawPriceStr.split('/')[1].trim();
     };
 
     const priceUnit = getTranslatedUnit(priceString);
-
     const discountedPrice = activeOffer
       ? Math.round(numericPrice - (numericPrice * activeOffer.value / 100))
       : null;
 
-    // ─── BULLETPROOF EXPLICIT DYNAMIC LOCALIZER ───
     const getTranslatedCategory = (category: string) => {
       if (!category) return '';
       
@@ -274,7 +340,6 @@ export default function TabOneScreen() {
 
     const translatedCategory = getTranslatedCategory(item.category);
 
-    // Dynamic localization fallback strategy for single base values without slash structures
     const renderBasePriceText = () => {
       if (!priceString.includes('/')) {
         return `₹${item.price}`;
@@ -288,22 +353,22 @@ export default function TabOneScreen() {
         onPress={() => handleProductPress(item)}
         activeOpacity={0.8}
       >
-       <View style={[styles.imageWrapper, { height: cardWidth }]}>
-  {item.images && item.images.length > 0 ? (
-    <Image
-      source={{
-        uri: item.images[0].startsWith('http') 
-          ? item.images[0] 
-          : `${S3_BASE_URL}/${item.images[0]}`
-      }}
-      style={styles.productImage}
-      resizeMode="cover"
-    />
-  ) : (
-    <View style={styles.noImagePlaceholder}>
-      <FontAwesome name="image" size={30} color="#E0D6C3" />
-    </View>
-  )}
+        <View style={[styles.imageWrapper, { height: cardWidth }]}>
+          {item.images && item.images.length > 0 ? (
+            <Image
+              source={{
+                uri: item.images[0].startsWith('http') 
+                  ? item.images[0] 
+                  : `${S3_BASE_URL}/${item.images[0]}`
+              }}
+              style={styles.productImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.noImagePlaceholder}>
+              <FontAwesome name="image" size={30} color="#E0D6C3" />
+            </View>
+          )}
 
           {activeOffer && (
             <View style={styles.offerBadge}>

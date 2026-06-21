@@ -100,7 +100,6 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
     }
   };
 
-  // ─── GRAMMATICALLY CORRECT TITLE STRATEGY FOR MALAYALAM SOV ORDER ───
   const getModalTitle = () => {
     if (language === 'ml') {
       switch (field) {
@@ -111,7 +110,6 @@ function EditModal({ visible, field, value, onClose, onSave, isLoading }: EditMo
         default: return t.confirmTitle || 'ഉറപ്പാക്കുക';
       }
     }
-    // Fallback default structure for English compilation environments
     return `${t.confirmTitle || 'Edit'} ${getFieldLabel()}`;
   };
 
@@ -159,7 +157,7 @@ export default function TabTwoScreen() {
   const { token, clearAuthToken } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { language, t } = useLanguage();
+  const { language, setLanguage, t } = useLanguage(); // Added setLanguage back here
   
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -294,7 +292,6 @@ export default function TabTwoScreen() {
     setEditModalVisible(true);
   };
 
-  // ─── LOCAL VALUE INLINE TRANSLATION MATRIX ───
   const getPlaceholderValue = (field: string, label: string) => {
     if (language === 'ml') {
       if (field === 'mobileNumber') return 'മൊബൈൽ നമ്പർ ചേർക്കുക';
@@ -320,6 +317,7 @@ export default function TabTwoScreen() {
       }
       contentContainerStyle={styles.scrollContent}
     >
+      {/* Profile Header */}
       <View style={styles.header}>
         <View style={styles.avatarWrapper}>
           {uploadAvatarMutation.isPending ? (
@@ -337,6 +335,52 @@ export default function TabTwoScreen() {
         <Text style={styles.userEmail}>{userData?.email}</Text>
       </View>
 
+      {/* 🌐 NEW SECTION: Language Selector Options Component */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          {language === 'ml' ? 'ഭാഷ തിരഞ്ഞെടുക്കുക' : 'Application Language'}
+        </Text>
+        
+        <View style={[styles.infoCard, { justifyContent: 'space-between', alignItems: 'center' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={styles.infoIconBg}>
+              <FontAwesome name="language" size={16} color={COLORS.primary} />
+            </View>
+            <Text style={styles.infoLabel}>
+              {language === 'ml' ? 'നിലവിലെ ഭാഷ' : 'Active Language'}
+            </Text>
+          </View>
+          
+          {/* Side-by-side Selectors wrapped directly inside a layout container row */}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity 
+              onPress={() => setLanguage('en')}
+              style={{
+                backgroundColor: language === 'en' ? COLORS.primary : '#F4F4F4',
+                paddingHorizontal: 14,
+                paddingVertical: 6,
+                borderRadius: 6,
+              }}
+            >
+              <Text style={{ color: language === 'en' ? '#FFF' : COLORS.textDark, fontWeight: 'bold' }}>EN</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => setLanguage('ml')}
+              style={{
+                backgroundColor: language === 'ml' ? COLORS.primary : '#F4F4F4',
+                paddingHorizontal: 14,
+                paddingVertical: 6,
+                borderRadius: 6,
+              }}
+            >
+              <Text style={{ color: language === 'ml' ? '#FFF' : COLORS.textDark, fontWeight: 'bold' }}>മലയാളം</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* Contact Information Cards Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
           {t.contactInformation}
@@ -362,6 +406,7 @@ export default function TabTwoScreen() {
         ))}
       </View>
 
+      {/* Actions Section */}
       <TouchableOpacity 
         style={styles.logoutBtn} 
         onPress={() => {
