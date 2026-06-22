@@ -1,5 +1,3 @@
-// D:\storekeeper_sahachari\app\(tabs)\Analytics.tsx
-
 import React, { useState, useMemo } from 'react';
 import {
   Text,
@@ -29,7 +27,7 @@ const STATUS_COLORS: Record<string, string> = {
   DELIVERED: '#10b981',
   FAILED: '#ef4444',
   CANCELLED: '#6b7280',
-  CANCEL_PENDING: '#f43f5e', // Added rose-red accent color for the cancellation request bar
+  CANCEL_PENDING: '#f43f5e',
   REJECTED: '#f97316',
 };
 
@@ -57,12 +55,48 @@ interface Product {
   updatedAt: MongoDate;
 }
 
+// 🪙 Interface definition for active commission rules payload
+interface CommissionRule {
+  storekeeperId: string;
+  percentage: number;
+}
+
+interface UserProfile {
+  _id: string;
+  name: string;
+  email: string;
+}
+
 export default function AnalyticsScreen() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
   
   const [chartView, setChartView] = useState<'daily' | 'monthly' | 'Stock'>('daily');
+
+  // ─── Query 0A: Profile Context Resolution ──────────────────────────────────
+  const { data: userData } = useQuery<UserProfile>({
+    queryKey: ['currentUserProfileAnalyticsContext'],
+    queryFn: async () => {
+      const authToken = await getToken();
+      const res = await fetch(`${API_BASE_URL}/users/me`, { headers: { Authorization: `Bearer ${authToken}` } });
+      return res.json();
+    },
+  });
+
+  // ─── Query 0B: Commission Fetching Engine ──────────────────────────────────
+  const { data: commission = { storekeeperId: '', percentage: 0 }, isLoading: isCommissionLoading } = useQuery<CommissionRule>({
+    queryKey: ['storekeeperCommissionAnalytics', userData?._id],
+    queryFn: async () => {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/commission/store/${userData?._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 404) return { storekeeperId: userData?._id || '', percentage: 0 };
+      return res.json();
+    },
+    enabled: !!userData?._id,
+  });
 
   // ─── Query 1: Orders Fetching Engine ───────────────────────────────────────
   const { 
@@ -160,7 +194,7 @@ export default function AnalyticsScreen() {
       case 'PICKED_UP': return t.statusPickedUp;
       case 'DELIVERED': return t.statusCompleted;
       case 'CANCELLED': return t.statusCancelled;
-      case 'CANCEL_PENDING': return (t as any).statusCancelPending || 'CANCEL_PENDING'; // Intercepts fallback stream leak
+      case 'CANCEL_PENDING': return (t as any).statusCancelPending || 'CANCEL_PENDING'; 
       case 'REJECTED': return t.statusRejected;
       case 'FAILED': return t.statusFailed;
       default: return (t as any)[status.toLowerCase()] || status;
@@ -172,36 +206,65 @@ export default function AnalyticsScreen() {
     if (!orders.length || chartView === 'Stock') return null;
 
     let totalRevenue = 0;
+    let completedRevenue = 0; 
+    let activePeriodOrderCount = 0;
     const statusMap: Record<string, number> = {};
     const timelineMap: Record<string, { revenue: number; counts: number }> = {};
 
-    for (const o of orders) {
-      const orderAmt = o.totalAmount || 0;
-      totalRevenue += orderAmt;
-      statusMap[o.status] = (statusMap[o.status] ?? 0) + 1;
+    // Get current time strings to filter active metrics window
+    const now = new Date();
+    const currentDayStr = now.toISOString().slice(5, 10); // e.g., "06-22"
+    const currentMonthStr = now.toISOString().slice(0, 7); // e.g., "2026-06"
 
+    for (const o of orders) {
       const rawDateStr = o.createdAt?.$date || o.createdAt;
       if (typeof rawDateStr !== 'string') continue;
 
       const dateObj = new Date(rawDateStr);
       if (isNaN(dateObj.getTime())) continue;
 
-      const key = chartView === 'daily' 
-        ? dateObj.toISOString().slice(5, 10) 
-        : dateObj.toISOString().slice(0, 7);
+      // Extract comparison keys
+      const dayKey = dateObj.toISOString().slice(5, 10);
+      const monthKey = dateObj.toISOString().slice(0, 7);
+      const activeTimelineKey = chartView === 'daily' ? dayKey : monthKey;
 
-      if (!timelineMap[key]) timelineMap[key] = { revenue: 0, counts: 0 };
-      timelineMap[key].revenue += orderAmt;
-      timelineMap[key].counts += 1;
+      // 1. Build the overall chart timeline arrays
+      if (!timelineMap[activeTimelineKey]) timelineMap[activeTimelineKey] = { revenue: 0, counts: 0 };
+      timelineMap[activeTimelineKey].revenue += o.totalAmount || 0;
+      timelineMap[activeTimelineKey].counts += 1;
+
+      // 2. 🎯 CRITICAL FIX: Filter top card metrics based on active toggle view
+      const isMatch = chartView === 'daily' 
+        ? dayKey === currentDayStr 
+        : monthKey === currentMonthStr;
+
+      if (isMatch) {
+        const orderAmt = o.totalAmount || 0;
+        totalRevenue += orderAmt;
+        activePeriodOrderCount++;
+        statusMap[o.status] = (statusMap[o.status] ?? 0) + 1;
+
+        if (o.status === 'DELIVERED') {
+          completedRevenue += orderAmt;
+        }
+      }
     }
 
     const sortedTimeline = Object.keys(timelineMap).sort().map(key => ({ label: key, ...timelineMap[key] }));
     const limitedTimeline = sortedTimeline.slice(-6);
     const peakWindow = sortedTimeline.reduce((max, curr) => (curr.revenue > max.revenue ? curr : max), sortedTimeline[0] || { label: 'N/A', revenue: 0 });
 
+    const rate = commission?.percentage || 0;
+    const netStoreKeeperEarnings = (completedRevenue * rate) / 100; 
+    const adminShare = completedRevenue - netStoreKeeperEarnings;
+
     return {
-      totalRevenue,
-      avgOrderValue: totalRevenue / orders.length,
+      totalRevenue, // Now changes based on toggle!
+      completedRevenue,
+      adminShare,
+      netStoreKeeperEarnings,
+      activePeriodOrderCount,
+      avgOrderValue: activePeriodOrderCount > 0 ? totalRevenue / activePeriodOrderCount : 0,
       statusMap,
       sortedTimeline,
       peakWindow,
@@ -209,7 +272,7 @@ export default function AnalyticsScreen() {
       chartRevenues: limitedTimeline.map(i => i.revenue),
       chartOrdersCount: limitedTimeline.map(i => i.counts)
     };
-  }, [orders, chartView]);
+  }, [orders, chartView, commission]);
 
   // ─── Memoized Computations for Stock / Inventory Analytics ───────────────────
   const stockAnalytics = useMemo(() => {
@@ -242,7 +305,7 @@ export default function AnalyticsScreen() {
     };
   }, [products, chartView, t]);
 
-  const isDataLoading = chartView === 'Stock' ? isProductsLoading : isOrdersLoading;
+  const isDataLoading = chartView === 'Stock' ? isProductsLoading : (isOrdersLoading || isCommissionLoading);
   if (isDataLoading) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: theme.background }]}>
@@ -290,82 +353,41 @@ export default function AnalyticsScreen() {
           />
         }
        >
-        {/* ─── STOCK VIEW ─── */}
-        {chartView === 'Stock' && stockAnalytics && (
-          <>
-            <View style={styles.gridRow}>
-              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.uniqueProducts}</Text>
-                <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalUniqueProducts}</Text>
-              </View>
-              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.totalStock}</Text>
-                <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalItemsStocked}</Text>
-              </View>
-            </View>
-
-            <View style={styles.gridRow}>
-              <View style={[styles.metricCard, { backgroundColor: theme.card, borderColor: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.border, borderWidth: stockAnalytics.lowStockCount > 0 ? 1 : 0 }]}>
-                <Text style={[styles.metricLabel, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.subText }]}>{t.lowStockAlerts}</Text>
-                <Text style={[styles.metricValue, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.text }]}>
-                  {stockAnalytics.lowStockCount} {t.itemsLabel}
-                </Text>
-              </View>
-            </View>
-
-            {/* Category Stock BarChart */}
-            {stockAnalytics.categoryLabels.length > 0 && (
-              <View style={[styles.sectionCard, { backgroundColor: theme.card, paddingRight: 20 }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.topStockCategories}</Text>
-                <BarChart
-                  data={{
-                    labels: stockAnalytics.categoryLabels,
-                    datasets: [{ data: stockAnalytics.categoryVolumes }],
-                  }}
-                  width={SCREEN_WIDTH - 64}
-                  height={220}
-                  yAxisLabel=""
-                  yAxisSuffix=""
-                  chartConfig={{
-                    ...chartConfig,
-                    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, 
-                  }}
-                  style={{
-                    ...styles.chartCanvas,
-                    paddingLeft: 12, 
-                  }}
-                  verticalLabelRotation={15} 
-                />
-              </View>
-            )}
-
-            <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.sectionTitle, { color: theme.subText }]}>
-                {t.categoryBreakdownTitle}
-              </Text>
-              {stockAnalytics.allCategoriesBreakdown.map(([catName, qty], idx) => (
-                <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                  <Text style={{ color: theme.text, fontWeight: '600', flex: 2 }}>
-                    {getLocalizedCategory(catName)}
-                  </Text>
-                  <Text style={{ color: theme.primary, fontWeight: '700', flex: 1, textAlign: 'right' }}>
-                    {qty} {qty === 1 ? ((t as any).unitLabelSingular || 'Unit') : t.unitsLabel}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
         {/* ─── ORDERS VIEW (Daily / Monthly) ─── */}
         {chartView !== 'Stock' && orderAnalytics && (
           <>
+            {/* 🪙 STOREKEEPER REWARD EARNINGS PANEL */}
+<View style={[styles.sectionCard, { backgroundColor: theme.card, borderLeftWidth: 5, borderLeftColor: '#10b981' }]}>
+  <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 12, fontSize: 16 }]}>
+    {language === 'ml' ? 'കമ്മീഷൻ വരുമാന വിവരങ്ങൾ' : 'Your Commission Earnings'}
+  </Text>
+  
+  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+    <Text style={{ color: theme.subText }}>{language === 'ml' ? 'നിങ്ങളുടെ കമ്മീഷൻ നിരക്ക്' : 'Your Commission Rate'}</Text>
+    <Text style={{ color: theme.text, fontWeight: '700' }}>{commission?.percentage || 0}%</Text>
+  </View>
+
+  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+    <Text style={{ color: theme.subText }}>{language === 'ml' ? 'ആകെ വിൽപന' : 'Total Sales Volume'}</Text>
+    <Text style={{ color: theme.text, fontWeight: '600' }}>₹{orderAnalytics.completedRevenue.toLocaleString('en-IN')}</Text>
+  </View>
+
+  <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 8 }} />
+
+  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{language === 'ml' ? 'നിങ്ങൾ നേടിയ കമ്മീഷൻ' : 'Total Rupees Earned'}</Text>
+    <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 20 }}>
+      ₹{Math.round(orderAnalytics.netStoreKeeperEarnings).toLocaleString('en-IN')}
+    </Text>
+  </View>
+</View>
+
             <View style={styles.gridRow}>
               <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
                 <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.totalRevenue}</Text>
                 <Text style={[styles.metricValue, { color: theme.text }]}>
-                  ₹{orderAnalytics.totalRevenue.toLocaleString('en-IN')}
-                </Text>
+  {orderAnalytics.activePeriodOrderCount}
+</Text>
               </View>
               <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
                 <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.avgOrderValue}</Text>
@@ -474,6 +496,73 @@ export default function AnalyticsScreen() {
                   </View>
                 );
               })}
+            </View>
+          </>
+        )}
+
+        {/* ─── STOCK VIEW ─── */}
+        {chartView === 'Stock' && stockAnalytics && (
+          <>
+            <View style={styles.gridRow}>
+              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.uniqueProducts}</Text>
+                <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalUniqueProducts}</Text>
+              </View>
+              <View style={[styles.metricCard, { backgroundColor: theme.card }]}>
+                <Text style={[styles.metricLabel, { color: theme.subText }]}>{t.totalStock}</Text>
+                <Text style={[styles.metricValue, { color: theme.text }]}>{stockAnalytics.totalItemsStocked}</Text>
+              </View>
+            </View>
+
+            <View style={styles.gridRow}>
+              <View style={[styles.metricCard, { backgroundColor: theme.card, borderColor: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.border, borderWidth: stockAnalytics.lowStockCount > 0 ? 1 : 0 }]}>
+                <Text style={[styles.metricLabel, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.subText }]}>{t.lowStockAlerts}</Text>
+                <Text style={[styles.metricValue, { color: stockAnalytics.lowStockCount > 0 ? '#ef4444' : theme.text }]}>
+                  {stockAnalytics.lowStockCount} {t.itemsLabel}
+                </Text>
+              </View>
+            </View>
+
+            {/* Category Stock BarChart */}
+            {stockAnalytics.categoryLabels.length > 0 && (
+              <View style={[styles.sectionCard, { backgroundColor: theme.card, paddingRight: 20 }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.topStockCategories}</Text>
+                <BarChart
+                  data={{
+                    labels: stockAnalytics.categoryLabels,
+                    datasets: [{ data: stockAnalytics.categoryVolumes }],
+                  }}
+                  width={SCREEN_WIDTH - 64}
+                  height={220}
+                  yAxisLabel=""
+                  yAxisSuffix=""
+                  chartConfig={{
+                    ...chartConfig,
+                    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, 
+                  }}
+                  style={{
+                    ...styles.chartCanvas,
+                    paddingLeft: 12, 
+                  }}
+                  verticalLabelRotation={15} 
+                />
+              </View>
+            )}
+
+            <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+              <Text style={[styles.sectionTitle, { color: theme.subText }]}>
+                {t.categoryBreakdownTitle}
+              </Text>
+              {stockAnalytics.allCategoriesBreakdown.map(([catName, qty], idx) => (
+                <View key={idx} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                  <Text style={{ color: theme.text, fontWeight: '600', flex: 2 }}>
+                    {getLocalizedCategory(catName)}
+                  </Text>
+                  <Text style={{ color: theme.primary, fontWeight: '700', flex: 1, textAlign: 'right' }}>
+                    {qty} {qty === 1 ? ((t as any).unitLabelSingular || 'Unit') : t.unitsLabel}
+                  </Text>
+                </View>
+              ))}
             </View>
           </>
         )}

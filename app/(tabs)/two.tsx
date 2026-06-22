@@ -47,6 +47,12 @@ interface UserProfile {
   image?: string;
 }
 
+// 🪙 Added Interface definition for the commission response payload
+interface CommissionData {
+  storekeeperId: string;
+  percentage: number;
+}
+
 interface EditModalProps {
   visible: boolean;
   field: string | null;
@@ -157,14 +163,15 @@ export default function TabTwoScreen() {
   const { token, clearAuthToken } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { language, setLanguage, t } = useLanguage(); // Added setLanguage back here
+  const { language, setLanguage, t } = useLanguage();
   
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editInitialValue, setEditInitialValue] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: userData, refetch } = useQuery<UserProfile>({
+  // 1. Existing Query: Get Storekeeper Profile
+  const { data: userData, refetch: refetchUser } = useQuery<UserProfile>({
     queryKey: ['currentUser'],
     queryFn: async () => {
       const authToken = await getToken();
@@ -175,11 +182,29 @@ export default function TabTwoScreen() {
     enabled: !!token,
   });
 
+  // 2. 🚀 NEW Query: Fetch commission rate matching current storekeeper ID
+  const { data: commissionData, refetch: refetchCommission, isLoading: isCommissionLoading } = useQuery<CommissionData>({
+    queryKey: ['storekeeperCommission', userData?._id],
+    queryFn: async () => {
+      const authToken = await getToken();
+      const res = await fetch(`${API_BASE_URL}/commission/store/${userData?._id}`, { 
+        headers: { 'Authorization': `Bearer ${authToken}` } 
+      });
+      if (res.status === 404) {
+        return { storekeeperId: userData?._id || '', percentage: 0 }; // Return zero fallback if no setup configuration has been initialized yet
+      }
+      if (!res.ok) throw new Error('Failed to fetch commission data');
+      return res.json();
+    },
+    enabled: !!token && !!userData?._id, // Executes network call only after valid profile is loaded
+  });
+
+  // Pull both values on refresh layout triggering
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetchUser(), refetchCommission()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetchUser, refetchCommission]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async ({ field, value }: { field: string; value: string }) => {
@@ -335,7 +360,37 @@ export default function TabTwoScreen() {
         <Text style={styles.userEmail}>{userData?.email}</Text>
       </View>
 
-      {/* 🌐 NEW SECTION: Language Selector Options Component */}
+      {/* 🚀 NEW SECTION: Store Settings / Commission Breakdown */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          {language === 'ml' ? 'ബിസിനസ് വിവരങ്ങൾ' : 'Business Rates'}
+        </Text>
+        
+        <View style={[styles.infoCard, { backgroundColor: '#FFFDF6', borderColor: '#F5E6C4', borderStyle: 'solid', borderWidth: 1 }]}>
+          <View style={styles.infoIconBg}>
+            <FontAwesome name="percent" size={14} color={COLORS.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.infoLabel}>
+              {language === 'ml' ? 'അഡ്മിൻ കമ്മീഷൻ നിരക്ക്' : 'Platform Commission Rate'}
+            </Text>
+            {isCommissionLoading ? (
+              <ActivityIndicator size="small" color={COLORS.primary} style={{ alignSelf: 'flex-start', marginTop: 4 }} />
+            ) : (
+              <Text style={[styles.infoValue, { color: COLORS.textDark, fontWeight: '700', fontSize: 16, marginTop: 2 }]}>
+                {commissionData?.percentage !== undefined ? `${commissionData.percentage}%` : '0%'}
+              </Text>
+            )}
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              {language === 'ml' 
+                ? '* ഈ ശതമാനം നിങ്ങളുടെ വിൽപന തുകയിൽ നിന്ന് ഈടാക്കുന്നതാണ്.' 
+                : '* This percentage is automatically charged from your items total sales.'}
+            </p>
+          </View>
+        </View>
+      </View>
+
+      {/* Language Selector Options Component */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
           {language === 'ml' ? 'ഭാഷ തിരഞ്ഞെടുക്കുക' : 'Application Language'}
@@ -351,7 +406,6 @@ export default function TabTwoScreen() {
             </Text>
           </View>
           
-          {/* Side-by-side Selectors wrapped directly inside a layout container row */}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity 
               onPress={() => setLanguage('en')}
