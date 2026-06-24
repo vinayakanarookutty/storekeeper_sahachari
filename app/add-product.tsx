@@ -51,14 +51,11 @@ const PRODUCT_CATEGORIES = [
   'Vegetables and Fruits',
   'Groceries',
   'Home Made',
-  'Service',
   'Fish & Meat',
-  'Rent'
+  
 ];
 
 const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
-const RENT_UNITS = ['Hour', 'Day', 'Week', 'Month'];
-const SERVICE_UNITS = ['Hour', 'Day', 'Service'];
 
 export default function AddProductScreen() {
   const queryClient = useQueryClient();
@@ -81,9 +78,6 @@ export default function AddProductScreen() {
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [showServiceUnitModal, setShowServiceUnitModal] = useState(false);
 
-  const isService = category === 'Service';
-  const isRent = category === 'Rent';
-  const needsTimeUnit = isService || isRent;
 
   // DYNAMIC LOOKUP HELPER FOR TRANSLATED LABELS
   const getLocalizedUnitLabel = (unitValue: string): string => {
@@ -124,18 +118,6 @@ export default function AddProductScreen() {
   const handleSelectCategory = (selectedCategory: string) => {
     setCategory(selectedCategory);
     setShowCategoryModal(false);
-    
-    if (selectedCategory === 'Service') {
-      setQuantity('1');
-      setServiceUnit('Hour');
-    } else if (selectedCategory === 'Rent') {
-      setUnit('unit');
-      setQuantity('');
-      setServiceUnit('Day');
-    } else {
-      setUnit('kg');
-      setQuantity('');
-    }
   };
 
   const pickImages = async () => {
@@ -235,21 +217,18 @@ export default function AddProductScreen() {
       showAlert(t.failedTitle || 'Error', 'Please fill in all required fields');
       return;
     }
-    if (!isService && !quantity) {
-      showAlert(t.failedTitle || 'Error', 'Please enter the quantity');
-      return;
-    }
+    
     if (uploadedImageKeys.length === 0) {
       showAlert(t.failedTitle || 'Error', 'Please upload your picked images first');
       return;
     }
 
-    const finalPrice = needsTimeUnit ? `${price}/${serviceUnit}` : `${price}/${unit}`;
+    const finalPrice =  `${price}/${unit}`;
     const productData: ProductData = {
       name,
       description,
       price: finalPrice,
-      quantity: isService ? 1 : parseInt(quantity),
+      quantity: parseInt(quantity),
       category,
       images: uploadedImageKeys,
     };
@@ -293,7 +272,7 @@ export default function AddProductScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {isService ? (t.addNewService || 'Add New Service') : (t.addNewProduct || 'Add New Product')}
+          {    (t.addNewProduct || 'Add New Product')}
         </Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <FontAwesome name="times" size={24} color="#2D2416" />
@@ -324,7 +303,7 @@ export default function AddProductScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder={isService ? (t.serviceName || "Service Name *") : (t.productName || "Product Name *")}
+          placeholder={ (t.productName || "Product Name *")}
           placeholderTextColor="#A89378"
           value={name}
           onChangeText={setName}
@@ -351,55 +330,8 @@ export default function AddProductScreen() {
               keyboardType="numeric"
             />
           </View>
-          {needsTimeUnit && (
-            <View style={{ flex: 1.5, marginLeft: 10 }}>
-              <TouchableOpacity 
-                style={styles.unitSelector} 
-                onPress={() => setShowServiceUnitModal(true)}
-              >
-                <Text style={styles.unitText}>/ {getLocalizedUnitLabel(serviceUnit)}</Text>
-                <FontAwesome name="caret-down" size={16} color="#DAA520" />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
-        {/* STOCK/QUANTITY FIELD */}
-        {!isService && (
-          <View style={styles.section}>
-            <View style={styles.parallelContainer}>
-              <View style={{ flex: 1.5 }}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={isRent ? `${t.stockQty || 'Stock'} (Unit) *` : `${t.stockQty || 'Stock'} *`}
-                  placeholderTextColor="#A89378"
-                  value={quantity}
-                  onChangeText={setQuantity}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              {!isRent && (
-                <View style={{ flex: 1.3, marginLeft: 10, minWidth: 115 }}>
-                  <TouchableOpacity 
-                    style={styles.unitSelector} 
-                    onPress={() => setShowUnitModal(true)}
-                  >
-                    <Text 
-                      style={[styles.unitText, { flex: 1, marginRight: 4 }]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit={true}
-                      minimumFontScale={0.7}
-                    >
-                      {getLocalizedUnitLabel(unit)}
-                    </Text>
-                    <FontAwesome name="caret-down" size={16} color="#DAA520" />
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
 
         {/* IMAGES SECTION */}
         <View style={styles.section}>
@@ -432,9 +364,6 @@ export default function AddProductScreen() {
           onPress={handleCreateProduct}
           disabled={createProductMutation.isPending || uploadedImageKeys.length === 0}
         >
-          <Text style={styles.createButtonText}>
-            {isService ? (t.createServiceBtn || 'Create Service') : (t.createProductBtn || 'Create Product')}
-          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -459,17 +388,7 @@ export default function AddProductScreen() {
         onClose={() => setShowUnitModal(false)}
       />
 
-      <SelectionModal 
-        visible={showServiceUnitModal}
-        data={isService ? SERVICE_UNITS : RENT_UNITS}
-        title={isService ? "Select Service Unit" : "Select Rental Unit"}
-        isUnitModal={true}
-        onSelect={(item: string) => {
-          setServiceUnit(item);
-          setShowServiceUnitModal(false);
-        }}
-        onClose={() => setShowServiceUnitModal(false)}
-      />
+      
     </View>
   );
 }

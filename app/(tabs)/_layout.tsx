@@ -114,6 +114,20 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* BOOKINGS TAB */}
+      <Tabs.Screen
+        name="bookings"
+        options={{
+          title: 'Bookings', 
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon
+              name="calendar"
+              color={color}
+              focused={focused}
+            />
+          ),
+        }}
+      />
 
       {/* ANALYTICS TAB */}
       <Tabs.Screen

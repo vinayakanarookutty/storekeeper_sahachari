@@ -372,7 +372,7 @@ export default function TabTwoScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>
-              {language === 'ml' ? 'അഡ്മിൻ കമ്മീഷൻ നിരക്ക്' : 'Platform Commission Rate'}
+              {language === 'ml' ? 'വിൽപന ലാഭം' : 'Platform Fee Percentage'}
             </Text>
             {isCommissionLoading ? (
               <ActivityIndicator size="small" color={COLORS.primary} style={{ alignSelf: 'flex-start', marginTop: 4 }} />

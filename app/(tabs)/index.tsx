@@ -1,13 +1,14 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // Added useMutation and useQueryClient
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getToken } from '../services/auth';
 import { styles } from '../tab_style/index.style';
+import { fetchItems, fetchMyRentals, fetchMyServices } from '../services/productApi';
 
 import {
   ActivityIndicator,
@@ -15,10 +16,12 @@ import {
   Image,
   RefreshControl,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
   Platform,
+  Modal,
   Alert,
 } from 'react-native';
 
@@ -33,15 +36,18 @@ interface Offer {
   endDate: string;
 }
 
-interface Product {
+interface DisplayItem {
   _id: string;
   name: string;
   description: string;
-  price: string | number;
+  price?: string | number;
+  rentalPrice?: number;
   quantity: number;
   category: string;
   images: string[];
   offers?: Offer[];
+  unit?: string;
+  itemType: 'product' | 'rent' | 'service';
 }
 
 export default function TabOneScreen() {
@@ -49,8 +55,22 @@ export default function TabOneScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { language, t } = useLanguage();
+
+  const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
   
-  // Current user query includes the backend's user status property
+  // High-frequency state for immediate character updates in the input box
+  const [searchQuery, setSearchQuery] = useState('');
+  // Low-frequency debounced state to drive smooth item list filtering
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  // Debounce handler to make filtering buttery smooth
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 150); // 150ms delays heavy processing until user rests typing
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+  
   const { data: userData } = useQuery<any>({
     queryKey: ['currentUser'],
     queryFn: async () => {
@@ -64,28 +84,21 @@ export default function TabOneScreen() {
     enabled: !!token, 
   });
 
-const showStatusConfirm = (title: string, message: string, onConfirm: () => void) => {
-  if (Platform.OS === 'web') {
-    const confirmed = window.confirm(`${title}\n\n${message}`);
-    if (confirmed) onConfirm();
-  } else {
-    Alert.alert(
-      title,
-      message,
-      [
+  const showStatusConfirm = (title: string, message: string, onConfirm: () => void) => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`${title}\n\n${message}`);
+      if (confirmed) onConfirm();
+    } else {
+      Alert.alert(title, message, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Confirm', style: 'destructive', onPress: onConfirm }
-      ]
-    );
-  }
-};
-  // Derived user store status value (defaults to 'ACTIVE' if undefined)
-  const currentStatus = userData?.status || 'ACTIVE';
+      ]);
+    }
+  };
 
-  // Toggle animation setups mapped against current status
+  const currentStatus = userData?.status || 'ACTIVE';
   const slideAnim = useRef(new Animated.Value(currentStatus === 'ACTIVE' ? 0 : 1)).current;
 
-  // React Query Mutation to safely update status inside backend MongoDB
   const toggleStatusMutation = useMutation({
     mutationFn: async (newStatus: 'ACTIVE' | 'CLOSED') => {
       const authToken = await getToken();
@@ -101,12 +114,10 @@ const showStatusConfirm = (title: string, message: string, onConfirm: () => void
       return res.json();
     },
     onSuccess: () => {
-      // Instantly forces components to refresh cache context with the new backend state
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
     },
   });
 
-  // Track state changes to fire off animated slider changes smoothly
   useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: currentStatus === 'ACTIVE' ? 0 : 1,
@@ -129,112 +140,116 @@ const showStatusConfirm = (title: string, message: string, onConfirm: () => void
     return availableWidth / numColumns;
   }, [width, numColumns]);
 
-  const { data: products, isLoading, refetch } = useQuery({
-    queryKey: ['products'],
+  const { data: combinedItems, isLoading, refetch } = useQuery({
+    queryKey: ['homeDashboardItems'],
     queryFn: async () => {
-      const authToken = await getToken();
-      const response = await fetch(`${API_BASE_URL}/storekeeper/products`, {
-        headers: { 'Authorization': `Bearer ${authToken}` },
-      });
-      if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json() as Promise<Product[]>;
+      const [products, rentals, services] = await Promise.all([
+        fetchItems().catch(() => []),
+        fetchMyRentals().catch(() => []),
+        fetchMyServices().catch(() => []),
+      ]);
+
+      const taggedProducts = products.map((p: any) => ({ ...p, itemType: 'product' }));
+      const taggedRentals = rentals.map((r: any) => ({ ...r, itemType: 'rent', category: 'Rent' }));
+      const taggedServices = services.map((s: any) => ({ ...s, itemType: 'service', category: 'Service' }));
+
+      return [...taggedProducts, ...taggedRentals, ...taggedServices] as DisplayItem[];
     },
     enabled: !!token,
   });
 
-  const handleProductPress = (product: Product) => {
-    router.push({
-      pathname: '/product-detail',
-      params: { product: JSON.stringify(product) },
+  // Fast Memoized filtering running on decoupled debounced text
+  const filteredItems = useMemo(() => {
+    if (!combinedItems) return [];
+    
+    let items = [...combinedItems];
+    
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
+      items = items.filter(item => 
+        item.name?.toLowerCase().includes(query) || 
+        item.description?.toLowerCase().includes(query) ||
+        item.category?.toLowerCase().includes(query)
+      );
+    }
+
+    // STRICT PRIORITY SORT: Products (1) -> Rentals (2) -> Services (3)
+    return items.sort((a, b) => {
+      const priority = { product: 1, rent: 2, service: 3 };
+      return priority[a.itemType] - priority[b.itemType];
     });
+  }, [combinedItems, debouncedSearchQuery]);
+
+  // FIXED: Redirects correctly back into your detail routes matching object types
+  const handleItemPress = (item: DisplayItem) => {
+    if (item.itemType === 'product') {
+      router.push({
+        pathname: '/product-detail',
+        params: { product: JSON.stringify(item) }, // Kept "product" parameter legacy key signature intact
+      });
+    } else if (item.itemType === 'rent') {
+      router.push({
+        pathname: '/rental-detail',
+        params: { id:item._id },
+      });
+    } else {
+      router.push({
+        pathname: '/service-detail',
+        params: { id: item._id },
+      });
+    }
   };
 
   const renderHeader = () => {
-    // Determine dynamic store status text value
     const statusText = currentStatus === 'ACTIVE' ? 'Active' : 'Closed';
     
     return (
       <View style={{ backgroundColor: '#FDFCF7' }}>
         <LinearGradient 
           colors={['#DAA520', '#F4C430']} 
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={styles.headerGradient}
         >
           <View style={styles.headerTopRow}>
             <View style={styles.headerLeft}>
-              <Text style={styles.title} numberOfLines={1}>
-                {t.sahachari}
-              </Text>
+              <Text style={styles.title} numberOfLines={1}>{t.sahachari}</Text>
               <View style={styles.subtitleContainer}>
                 <View style={styles.headerLineAccent} />
-                {/* Dynamically displaying text based on your current status */}
                 <Text style={styles.subtitleText} numberOfLines={1}>
                    {`${t.myStore} (${statusText})`}
                 </Text>
               </View>
               
-              {/* Refactored Toggle Container from Language into Status Controller */}
               <View style={styles.languageToggleContainer}>
                 <View style={styles.languageToggle}>
                   <Animated.View
-                    style={[
-                      styles.toggleSlider,
-                      {
-                        transform: [
-                          {
-                            translateX: slideAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [0, 42],
-                            }),
-                          },
-                        ],
-                      },
-                    ]}
+                    style={[styles.toggleSlider, {
+                      transform: [{
+                        translateX: slideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 42],
+                        }),
+                      }],
+                    }]}
                   />
-
-                  {/* ON Button */}
-<TouchableOpacity 
-  style={styles.langButton} 
-  onPress={() => {
-    showStatusConfirm(
-      'Open Shop?', 
-      'Are you sure you want to change status to ACTIVE and accept new orders?', 
-      () => toggleStatusMutation.mutate('ACTIVE')
-    );
-  }}
->
-  <Text style={currentStatus === 'ACTIVE' ? styles.langTextActive : styles.langText}>ON</Text>
-</TouchableOpacity>
-
-{/* OFF Button */}
-<TouchableOpacity 
-  style={styles.langButton} 
-  onPress={() => {
-    showStatusConfirm(
-      'Close Shop?', 
-      'Are you sure you want to change status to CLOSED? Customers will not be able to order.', 
-      () => toggleStatusMutation.mutate('CLOSED')
-    );
-  }}
->
-  <Text style={currentStatus === 'CLOSED' ? styles.langTextActive : styles.langText}>OFF</Text>
-</TouchableOpacity>
+                  <TouchableOpacity style={styles.langButton} onPress={() => {
+                    showStatusConfirm('Open Shop?', 'Are you sure you want to open?', () => toggleStatusMutation.mutate('ACTIVE'));
+                  }}>
+                    <Text style={currentStatus === 'ACTIVE' ? styles.langTextActive : styles.langText}>ON</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.langButton} onPress={() => {
+                    showStatusConfirm('Close Shop?', 'Are you sure you want to close?', () => toggleStatusMutation.mutate('CLOSED'));
+                  }}>
+                    <Text style={currentStatus === 'CLOSED' ? styles.langTextActive : styles.langText}>OFF</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
 
             <View style={styles.headerRightActions}>
-              <TouchableOpacity 
-                activeOpacity={0.8}
-                onPress={() => router.push('/two')} 
-              >
+              <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/two')}>
                 <Image 
-                  source={{ 
-                    uri: userData?.image 
-                      ? `${S3_BASE_URL}/${userData.image}` 
-                      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb' 
-                  }} 
+                  source={{ uri: userData?.image ? `${S3_BASE_URL}/${userData.image}` : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb' }} 
                   style={styles.avatarImage} 
                 />
               </TouchableOpacity>
@@ -242,20 +257,40 @@ const showStatusConfirm = (title: string, message: string, onConfirm: () => void
           </View>
         </LinearGradient>
 
+        {/* SMOOTH SEARCH BAR CONTAINER */}
+        <View style={{ paddingHorizontal: 20, marginTop: 15 }}>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#FFF',
+            borderWidth: 1,
+            borderColor: '#E6DCB8',
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            height: 45,
+          }}>
+            <FontAwesome name="search" size={16} color="#A89378" style={{ marginRight: 8 }} />
+            <TextInput
+              style={{ flex: 1, color: '#2D2416', fontSize: 15 }}
+              placeholder="Search products, services, rentals..."
+              placeholderTextColor="#A89378"
+              value={searchQuery}
+              onChangeText={setSearchQuery} // Runs instantly for typing fluidness
+              clearButtonMode="while-editing"
+            />
+          </View>
+        </View>
+
         <View style={styles.actionButtonsContainer}>
           <View style={styles.actionButtons}>
             <TouchableOpacity style={styles.bulkButton} onPress={() => router.push('/bulk-upload')}>
               <FontAwesome name="upload" size={14} color="#fff" />
-              <Text style={styles.buttonText} numberOfLines={1}>
-                {t.bulkUpload}
-              </Text>
+              <Text style={styles.buttonText} numberOfLines={1}>{t.bulkUpload}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.addButton} onPress={() => router.push('/add-product')}>
+            <TouchableOpacity style={styles.addButton} onPress={() => setBottomSheetOpen(true)}>
               <FontAwesome name="plus" size={14} color="#fff" />
-              <Text style={styles.buttonText} numberOfLines={1}>
-                {t.addProduct}
-              </Text>
+              <Text style={styles.buttonText} numberOfLines={1}>{t.addItem || 'Add Item'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -263,7 +298,7 @@ const showStatusConfirm = (title: string, message: string, onConfirm: () => void
     );
   };
 
-  const renderProduct = ({ item }: { item: Product }) => {
+  const renderItemCard = ({ item }: { item: DisplayItem }) => {
     const getActiveOffer = () => {
       if (!item.offers || item.offers.length === 0) return null;
       const now = new Date();
@@ -275,101 +310,72 @@ const showStatusConfirm = (title: string, message: string, onConfirm: () => void
     };
 
     const activeOffer = getActiveOffer();
-    const numericPrice = typeof item.price === 'string'
-      ? parseFloat(item.price.replace(/[^0-9.]/g, ''))
-      : item.price;
+    const baseRawPrice = item.itemType === 'rent' ? item.rentalPrice : item.price;
+    const numericPrice = typeof baseRawPrice === 'string'
+      ? parseFloat(baseRawPrice.replace(/[^0-9.]/g, ''))
+      : baseRawPrice || 0;
 
-    const priceString = String(item.price);
+    const priceString = String(baseRawPrice || '');
     
-    const getTranslatedUnit = (rawPriceStr: string) => {
+    const getTranslatedUnit = (rawPriceStr: string, specifiedUnit?: string) => {
+      if (specifiedUnit) {
+        const cleanUnit = specifiedUnit.toLowerCase();
+        if (language === 'ml') {
+          if (cleanUnit === 'hour') return '/മണിക്കൂർ';
+          if (cleanUnit === 'day') return '/ദിവസം';
+          if (cleanUnit === 'week') return '/ആഴ്ച';
+          if (cleanUnit === 'month') return '/മാസം';
+        }
+        return `/${specifiedUnit.toLowerCase()}`;
+      }
+
       if (!rawPriceStr.includes('/')) return '';
-      
       const rawUnit = rawPriceStr.split('/')[1].trim().toLowerCase();
       
       if (language === 'ml') {
-        if (rawUnit === 'kg' || rawUnit === 'kilogram' || rawUnit === 'കിലോലോഗ്രാം') return '/കിലോഗ്രാം';
-        if (rawUnit === 'grams' || rawUnit === 'gram' || rawUnit === 'ഗ്രാം') return '/ഗ്രാം';
-        if (rawUnit === 'liters' || rawUnit === 'liter' || rawUnit === 'ലിറ്റർ') return '/ലിറ്റർ';
-        if (rawUnit === 'ml' || rawUnit === 'milliliter' || rawUnit === 'മില്ലിലിറ്റർ') return '/മില്ലിലിറ്റർ';
-        if (rawUnit === 'pcs' || rawUnit === 'piece' || rawUnit === 'എണ്ണം') return '/എണ്ണം';
-        if (rawUnit === 'packet' || rawUnit === 'pkt' || rawUnit === 'പാക്കറ്റ്') return '/പാക്കറ്റ്';
-        if (rawUnit === 'bottle' || rawUnit === 'കുപ്പി') return '/കുപ്പി';
-        if (rawUnit === 'hour' || rawUnit === 'മണിക്കൂർ') return '/മണിക്കൂർ';
-        if (rawUnit === 'box' || rawUnit === 'പെട്ടി') return '/പെട്ടി';
+        if (['kg', 'kilogram'].includes(rawUnit)) return '/കിലോഗ്രാം';
+        if (['grams', 'gram'].includes(rawUnit)) return '/ഗ്രാം';
+        if (['liters', 'liter'].includes(rawUnit)) return '/ലിറ്റർ';
+        if (['pcs', 'piece'].includes(rawUnit)) return '/എണ്ണം';
       }
-      
       return '/' + rawPriceStr.split('/')[1].trim();
     };
 
-    const priceUnit = getTranslatedUnit(priceString);
+    const priceUnit = getTranslatedUnit(priceString, item.unit);
     const discountedPrice = activeOffer
       ? Math.round(numericPrice - (numericPrice * activeOffer.value / 100))
       : null;
 
-    const getTranslatedCategory = (category: string) => {
-      if (!category) return '';
-      
-      const normalized = category.toLowerCase().trim().replace(/\s+/g, '');
-
+    const getTranslatedCategory = (cat: string) => {
+      if (!cat) return '';
+      const normalized = cat.toLowerCase().trim().replace(/\s+/g, '');
       if (language === 'ml') {
-        if (normalized === 'fastfood' || normalized === 'ഫാസ്റ്റ്ഫുഡ്') return 'ഫാസ്റ്റ് ഫുഡ്';
-        if (normalized === 'snacks' || normalized === 'സ്നാക്ക്സ്' || normalized === 'സ്നാക്സ്') return 'സ്നാക്ക്സ്';
-        if (normalized === 'food' || normalized === 'ഭക്ഷണം') return 'ഭക്ഷണം';
-        if (normalized === 'service' || normalized === 'സേവനം') return 'സേവനം';
-        if (normalized === 'drinks' || normalized === 'പാനീയങ്ങൾ') return 'പാനീയങ്ങൾ';
-        if (normalized === 'homemade' || normalized === 'ഹോംമേഡ്') return 'ഹോം മെയ്ഡ്';
-        
-        if (normalized.includes('vegetable') || normalized.includes('fruit') || normalized === 'പച്ചക്കറികളുംപഴങ്ങളും') {
-          return 'പച്ചക്കറികളും പഴങ്ങളും';
-        }
+        if (normalized === 'service') return 'സേവനം';
+        if (normalized === 'rent') return 'വാടകയ്ക്ക്';
       } else {
-        if (normalized === 'fastfood' || normalized === 'ഫാസ്റ്റ്ഫുഡ്') return 'Fast Food';
-        if (normalized === 'snacks' || normalized === 'സ്നാക്ക്സ്' || normalized === 'സ്നാക്സ്') return 'Snacks';
-        if (normalized === 'food' || normalized === 'ഭക്ഷണം') return 'Food';
-        if (normalized === 'service' || normalized === 'സേവനം') return 'Service';
-        if (normalized === 'drinks' || normalized === 'പാനീയങ്ങൾ') return 'Drinks';
-        if (normalized === 'homemade' || normalized === 'ഹോംമേഡ്') return 'Home Made';
-        
-        if (normalized.includes('vegetable') || normalized.includes('fruit') || normalized === 'പച്ചക്കറികളുംപഴങ്ങളും') {
-          return 'Vegetables and Fruits';
-        }
+        if (normalized === 'service') return 'Service';
+        if (normalized === 'rent') return 'Rent Item';
       }
-
-      return (t as any)[normalized] || category;
-    };
-
-    const translatedCategory = getTranslatedCategory(item.category);
-
-    const renderBasePriceText = () => {
-      if (!priceString.includes('/')) {
-        return `₹${item.price}`;
-      }
-      return `₹${numericPrice}${priceUnit}`;
+      return (t as any)[normalized] || cat;
     };
 
     return (
       <TouchableOpacity
         style={[styles.productCard, { width: cardWidth }]}
-        onPress={() => handleProductPress(item)}
+        onPress={() => handleItemPress(item)}
         activeOpacity={0.8}
       >
         <View style={[styles.imageWrapper, { height: cardWidth }]}>
           {item.images && item.images.length > 0 ? (
             <Image
-              source={{
-                uri: item.images[0].startsWith('http') 
-                  ? item.images[0] 
-                  : `${S3_BASE_URL}/${item.images[0]}`
-              }}
-              style={styles.productImage}
-              resizeMode="cover"
+              source={{ uri: item.images[0].startsWith('http') ? item.images[0] : `${S3_BASE_URL}/${item.images[0]}` }}
+              style={styles.productImage} resizeMode="cover"
             />
           ) : (
             <View style={styles.noImagePlaceholder}>
               <FontAwesome name="image" size={30} color="#E0D6C3" />
             </View>
           )}
-
           {activeOffer && (
             <View style={styles.offerBadge}>
               <Text style={styles.offerBadgeText}>{activeOffer.value}% OFF</Text>
@@ -379,7 +385,7 @@ const showStatusConfirm = (title: string, message: string, onConfirm: () => void
 
         <View style={styles.productInfo}>
           <Text style={styles.categoryText} numberOfLines={1}>
-            {translatedCategory}
+            {getTranslatedCategory(item.category)}
           </Text>
           
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
@@ -387,24 +393,22 @@ const showStatusConfirm = (title: string, message: string, onConfirm: () => void
           <View style={styles.priceRow}>
             {activeOffer ? (
               <View style={styles.priceContainer}>
-                <Text style={styles.discountedPrice}>
-                  ₹{discountedPrice}{priceUnit}
-                </Text>
-                <Text style={styles.originalPriceText}>
-                  ₹{numericPrice}{priceUnit}
-                </Text>
+                <Text style={styles.discountedPrice}>₹{discountedPrice}{priceUnit}</Text>
+                <Text style={styles.originalPriceText}>₹{numericPrice}{priceUnit}</Text>
               </View>
             ) : (
-              <Text style={styles.priceText}>{renderBasePriceText()}</Text>
+              <Text style={styles.priceText}>
+                ₹{numericPrice}{priceUnit}
+              </Text>
             )}
           </View>
 
-          {item.category !== 'Service' && (
+          {item.itemType !== 'service' && (
             <View style={styles.cardFooter}>
               <View style={styles.stockInfo}>
                 <FontAwesome name="cube" size={10} color="#D97706" />
                 <Text style={styles.stockText}>
-                  {item.quantity} {t.inStock}
+                  {item.quantity} {item.itemType === 'rent' ? 'Available' : t.inStock}
                 </Text>
               </View>
             </View>
@@ -421,22 +425,17 @@ const showStatusConfirm = (title: string, message: string, onConfirm: () => void
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color="#2563EB" />
           </View>
-        ) : products && products.length > 0 ? (
+        ) : filteredItems.length > 0 ? (
           <FlatList
             key={numColumns}
-            data={products}
-            renderItem={renderProduct}
-            keyExtractor={(item) => item._id}
+            data={filteredItems}
+            renderItem={renderItemCard}
+            keyExtractor={(item) => `${item.itemType}_${item._id}`}
             numColumns={numColumns}
             columnWrapperStyle={styles.columnWrapper}
             contentContainerStyle={styles.list}
             refreshControl={
-              <RefreshControl
-                refreshing={isLoading}
-                onRefresh={refetch}
-                tintColor="#2563EB"
-                colors={["#2563EB"]}
-              />
+              <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor="#2563EB" colors={["#2563EB"]} />
             }
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={renderHeader}
@@ -446,14 +445,35 @@ const showStatusConfirm = (title: string, message: string, onConfirm: () => void
             {renderHeader()}
             <View style={[styles.centerContainer, { marginTop: 40 }]}>
               <FontAwesome name="folder-open-o" size={60} color="#E0D6C3" />
-              <Text style={styles.emptyText}>{t.noProducts}</Text>
-              <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/add-product')}>
-                <Text style={styles.emptyButtonText}>{t.createFirstProduct}</Text>
-              </TouchableOpacity>
+              <Text style={styles.emptyText}>No matches found</Text>
             </View>
           </View>
         )}
       </View>
+
+      <Modal animationType="slide" transparent={true} visible={bottomSheetOpen} onRequestClose={() => setBottomSheetOpen(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setBottomSheetOpen(false)}>
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '50%', width: '100%' }} onStartShouldSetResponder={() => true} onTouchEnd={(e) => e.stopPropagation()}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#EFEFEF' }}>
+              <Text style={{ fontSize: 18, fontWeight: '600', color: '#111' }}>Select Category</Text>
+              <TouchableOpacity onPress={() => setBottomSheetOpen(false)} style={{ padding: 4 }}>
+                <FontAwesome name="times" size={18} color="#000" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ paddingBottom: Platform.OS === 'ios' ? 30 : 15 }}>
+              <TouchableOpacity style={{ paddingVertical: 18, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' }} onPress={() => { setBottomSheetOpen(false); router.push('/add-product'); }}>
+                <Text style={{ color: '#111', fontSize: 16, fontWeight: '400' }}>{t.addProduct || 'Add Product'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ paddingVertical: 18, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' }} onPress={() => { setBottomSheetOpen(false); router.push({ pathname: '/add-service', params: { initialCategory: 'Service' } }); }}>
+                <Text style={{ color: '#111', fontSize: 16, fontWeight: '400' }}>Add Service</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ paddingVertical: 18, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' }} onPress={() => { setBottomSheetOpen(false); router.push({ pathname: '/add-rent', params: { initialCategory: 'Rent' } }); }}>
+                <Text style={{ color: '#111', fontSize: 16, fontWeight: '400' }}>Add Rent</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
