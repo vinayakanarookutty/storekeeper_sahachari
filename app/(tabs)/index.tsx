@@ -1,3 +1,5 @@
+// D:\storekeeper_sahachari\app\tabs\index.tsx
+
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,8 +34,9 @@ interface Offer {
   _id?: string;
   type: string;
   value: number;
-  startDate: string;
-  endDate: string;
+  startDate?: string;
+  endDate?: string;
+  isActive?: boolean;
 }
 
 interface DisplayItem {
@@ -57,17 +60,13 @@ export default function TabOneScreen() {
   const { language, t } = useLanguage();
 
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
-  
-  // High-frequency state for immediate character updates in the input box
   const [searchQuery, setSearchQuery] = useState('');
-  // Low-frequency debounced state to drive smooth item list filtering
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
-  // Debounce handler to make filtering buttery smooth
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
-    }, 150); // 150ms delays heavy processing until user rests typing
+    }, 150);
     return () => clearTimeout(handler);
   }, [searchQuery]);
   
@@ -158,7 +157,6 @@ export default function TabOneScreen() {
     enabled: !!token,
   });
 
-  // Fast Memoized filtering running on decoupled debounced text
   const filteredItems = useMemo(() => {
     if (!combinedItems) return [];
     
@@ -173,24 +171,22 @@ export default function TabOneScreen() {
       );
     }
 
-    // STRICT PRIORITY SORT: Products (1) -> Rentals (2) -> Services (3)
     return items.sort((a, b) => {
       const priority = { product: 1, rent: 2, service: 3 };
       return priority[a.itemType] - priority[b.itemType];
     });
   }, [combinedItems, debouncedSearchQuery]);
 
-  // FIXED: Redirects correctly back into your detail routes matching object types
   const handleItemPress = (item: DisplayItem) => {
     if (item.itemType === 'product') {
       router.push({
         pathname: '/product-detail',
-        params: { product: JSON.stringify(item) }, // Kept "product" parameter legacy key signature intact
+        params: { product: JSON.stringify(item) },
       });
     } else if (item.itemType === 'rent') {
       router.push({
         pathname: '/rental-detail',
-        params: { id:item._id },
+        params: { id: item._id },
       });
     } else {
       router.push({
@@ -257,7 +253,6 @@ export default function TabOneScreen() {
           </View>
         </LinearGradient>
 
-        {/* SMOOTH SEARCH BAR CONTAINER */}
         <View style={{ paddingHorizontal: 20, marginTop: 15 }}>
           <View style={{
             flexDirection: 'row',
@@ -275,7 +270,7 @@ export default function TabOneScreen() {
               placeholder="Search products, services, rentals..."
               placeholderTextColor="#A89378"
               value={searchQuery}
-              onChangeText={setSearchQuery} // Runs instantly for typing fluidness
+              onChangeText={setSearchQuery}
               clearButtonMode="while-editing"
             />
           </View>
@@ -299,12 +294,22 @@ export default function TabOneScreen() {
   };
 
   const renderItemCard = ({ item }: { item: DisplayItem }) => {
+    // UPDATED: Combined logic supporting both Date boundaries (Products) and absolute flags (Services)
     const getActiveOffer = () => {
       if (!item.offers || item.offers.length === 0) return null;
+      
       const now = new Date();
       return item.offers.find(offer => {
+        // If it's a Service without date fields, verify using the isActive flag directly
+        if (!offer.startDate || !offer.endDate) {
+          return offer.isActive !== false;
+        }
+
         const start = new Date(offer.startDate);
         const end = new Date(offer.endDate);
+        
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+        
         return now >= start && now <= end;
       });
     };
@@ -342,8 +347,12 @@ export default function TabOneScreen() {
     };
 
     const priceUnit = getTranslatedUnit(priceString, item.unit);
+    
+    // Support calculation for flat discounts or percentage tags
     const discountedPrice = activeOffer
-      ? Math.round(numericPrice - (numericPrice * activeOffer.value / 100))
+      ? activeOffer.type === 'FLAT' 
+        ? Math.round(numericPrice - activeOffer.value)
+        : Math.round(numericPrice - (numericPrice * activeOffer.value / 100))
       : null;
 
     const getTranslatedCategory = (cat: string) => {
@@ -369,16 +378,20 @@ export default function TabOneScreen() {
           {item.images && item.images.length > 0 ? (
             <Image
               source={{ uri: item.images[0].startsWith('http') ? item.images[0] : `${S3_BASE_URL}/${item.images[0]}` }}
-              style={styles.productImage} resizeMode="cover"
+              style={styles.productImage} 
+              resizeMode="cover"
             />
           ) : (
             <View style={styles.noImagePlaceholder}>
               <FontAwesome name="image" size={30} color="#E0D6C3" />
             </View>
           )}
+          
           {activeOffer && (
-            <View style={styles.offerBadge}>
-              <Text style={styles.offerBadgeText}>{activeOffer.value}% OFF</Text>
+            <View style={[styles.offerBadge, { position: 'absolute', top: 10, left: 10, zIndex: 999 }]}>
+              <Text style={styles.offerBadgeText}>
+                {activeOffer.type === 'FLAT' ? `₹${activeOffer.value}` : `${activeOffer.value}%`} OFF
+              </Text>
             </View>
           )}
         </View>

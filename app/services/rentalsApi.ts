@@ -2,6 +2,14 @@ import { getToken } from './auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
+export interface RentalOffer {
+  type: 'PERCENTAGE' | 'FLAT';
+  value: number;
+  startDate?: string;
+  endDate?: string;
+  isActive: boolean;
+}
+
 export interface RentalData {
   name: string;
   description?: string;
@@ -9,6 +17,8 @@ export interface RentalData {
   quantity: number;
   rentalPrice: number;
   unit: 'HOUR' | 'DAY' | 'WEEK' | 'MONTH';
+
+  offers?: RentalOffer[]; // add this
 }
 
 export const rentalsApi = {

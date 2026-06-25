@@ -263,21 +263,21 @@ export const styles = StyleSheet.create({
   },
 
   offerBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    backgroundColor: '#E74C3C', // Eye-catching sale red
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    zIndex: 10,
-  },
+  position: 'absolute',
+  top: 10,
+  left: 10,
+  backgroundColor: '#E74C3C', // Eye-catching sale red
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 8,
+  zIndex: 10,
+},
 
-  offerBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-  },
+offerBadgeText: {
+  color: '#FFFFFF',
+  fontSize: 10,
+  fontWeight: '900',
+},
 
   productInfo: {
     padding: 14,
