@@ -381,11 +381,11 @@ export default function TabTwoScreen() {
                 {commissionData?.percentage !== undefined ? `${commissionData.percentage}%` : '0%'}
               </Text>
             )}
-            <p className="text-[11px] text-zinc-500 mt-0.5">
+            <Text className="text-[11px] text-zinc-500 mt-0.5">
               {language === 'ml' 
                 ? '* ഈ ശതമാനം നിങ്ങളുടെ വിൽപന തുകയിൽ നിന്ന് ഈടാക്കുന്നതാണ്.' 
                 : '* This percentage is automatically charged from your items total sales.'}
-            </p>
+            </Text>
           </View>
         </View>
       </View>

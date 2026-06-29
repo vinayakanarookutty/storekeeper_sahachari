@@ -259,7 +259,7 @@ export default function AnalyticsScreen() {
     const adminShare = completedRevenue - netStoreKeeperEarnings;
 
     return {
-      totalRevenue, // Now changes based on toggle!
+      totalRevenue,
       completedRevenue,
       adminShare,
       netStoreKeeperEarnings,

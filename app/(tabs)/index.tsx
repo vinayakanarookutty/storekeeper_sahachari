@@ -63,24 +63,25 @@ export default function TabOneScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
+  // Debounce search query to keep the UI smooth during typing fast
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
     }, 150);
     return () => clearTimeout(handler);
   }, [searchQuery]);
-  
+
   const { data: userData } = useQuery<any>({
     queryKey: ['currentUser'],
     queryFn: async () => {
       const authToken = await getToken();
-      const res = await fetch(`${API_BASE_URL}/users/me`, { 
-        headers: { 'Authorization': `Bearer ${authToken}` } 
+      const res = await fetch(`${API_BASE_URL}/users/me`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
       if (!res.ok) throw new Error('Failed to fetch user');
       return res.json();
     },
-    enabled: !!token, 
+    enabled: !!token,
   });
 
   const showStatusConfirm = (title: string, message: string, onConfirm: () => void) => {
@@ -139,6 +140,7 @@ export default function TabOneScreen() {
     return availableWidth / numColumns;
   }, [width, numColumns]);
 
+  // Unified background fetching layer mapping MongoDB APIs
   const { data: combinedItems, isLoading, refetch } = useQuery({
     queryKey: ['homeDashboardItems'],
     queryFn: async () => {
@@ -157,15 +159,16 @@ export default function TabOneScreen() {
     enabled: !!token,
   });
 
+  // Processes filtering logic via reactive computed useMemo tracking debounced query strings
   const filteredItems = useMemo(() => {
     if (!combinedItems) return [];
-    
+
     let items = [...combinedItems];
-    
+
     if (debouncedSearchQuery.trim()) {
       const query = debouncedSearchQuery.toLowerCase();
-      items = items.filter(item => 
-        item.name?.toLowerCase().includes(query) || 
+      items = items.filter(item =>
+        item.name?.toLowerCase().includes(query) ||
         item.description?.toLowerCase().includes(query) ||
         item.category?.toLowerCase().includes(query)
       );
@@ -196,120 +199,18 @@ export default function TabOneScreen() {
     }
   };
 
-  const renderHeader = () => {
-    const statusText = currentStatus === 'ACTIVE' ? 'Active' : 'Closed';
-    
-    return (
-      <View style={{ backgroundColor: '#FDFCF7' }}>
-        <LinearGradient 
-          colors={['#DAA520', '#F4C430']} 
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
-          <View style={styles.headerTopRow}>
-            <View style={styles.headerLeft}>
-              <Text style={styles.title} numberOfLines={1}>{t.sahachari}</Text>
-              <View style={styles.subtitleContainer}>
-                <View style={styles.headerLineAccent} />
-                <Text style={styles.subtitleText} numberOfLines={1}>
-                   {`${t.myStore} (${statusText})`}
-                </Text>
-              </View>
-              
-              <View style={styles.languageToggleContainer}>
-                <View style={styles.languageToggle}>
-                  <Animated.View
-                    style={[styles.toggleSlider, {
-                      transform: [{
-                        translateX: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, 42],
-                        }),
-                      }],
-                    }]}
-                  />
-                  <TouchableOpacity style={styles.langButton} onPress={() => {
-                    showStatusConfirm('Open Shop?', 'Are you sure you want to open?', () => toggleStatusMutation.mutate('ACTIVE'));
-                  }}>
-                    <Text style={currentStatus === 'ACTIVE' ? styles.langTextActive : styles.langText}>ON</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.langButton} onPress={() => {
-                    showStatusConfirm('Close Shop?', 'Are you sure you want to close?', () => toggleStatusMutation.mutate('CLOSED'));
-                  }}>
-                    <Text style={currentStatus === 'CLOSED' ? styles.langTextActive : styles.langText}>OFF</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.headerRightActions}>
-              <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/two')}>
-                <Image 
-                  source={{ uri: userData?.image ? `${S3_BASE_URL}/${userData.image}` : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb' }} 
-                  style={styles.avatarImage} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </LinearGradient>
-
-        <View style={{ paddingHorizontal: 20, marginTop: 15 }}>
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: '#FFF',
-            borderWidth: 1,
-            borderColor: '#E6DCB8',
-            borderRadius: 10,
-            paddingHorizontal: 12,
-            height: 45,
-          }}>
-            <FontAwesome name="search" size={16} color="#A89378" style={{ marginRight: 8 }} />
-            <TextInput
-              style={{ flex: 1, color: '#2D2416', fontSize: 15 }}
-              placeholder="Search products, services, rentals..."
-              placeholderTextColor="#A89378"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              clearButtonMode="while-editing"
-            />
-          </View>
-        </View>
-
-        <View style={styles.actionButtonsContainer}>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.bulkButton} onPress={() => router.push('/bulk-upload')}>
-              <FontAwesome name="upload" size={14} color="#fff" />
-              <Text style={styles.buttonText} numberOfLines={1}>{t.bulkUpload}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.addButton} onPress={() => setBottomSheetOpen(true)}>
-              <FontAwesome name="plus" size={14} color="#fff" />
-              <Text style={styles.buttonText} numberOfLines={1}>{t.addItem || 'Add Item'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
   const renderItemCard = ({ item }: { item: DisplayItem }) => {
-    // UPDATED: Combined logic supporting both Date boundaries (Products) and absolute flags (Services)
     const getActiveOffer = () => {
       if (!item.offers || item.offers.length === 0) return null;
-      
+
       const now = new Date();
       return item.offers.find(offer => {
-        // If it's a Service without date fields, verify using the isActive flag directly
         if (!offer.startDate || !offer.endDate) {
           return offer.isActive !== false;
         }
-
         const start = new Date(offer.startDate);
         const end = new Date(offer.endDate);
-        
         if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
-        
         return now >= start && now <= end;
       });
     };
@@ -321,7 +222,7 @@ export default function TabOneScreen() {
       : baseRawPrice || 0;
 
     const priceString = String(baseRawPrice || '');
-    
+
     const getTranslatedUnit = (rawPriceStr: string, specifiedUnit?: string) => {
       if (specifiedUnit) {
         const cleanUnit = specifiedUnit.toLowerCase();
@@ -336,7 +237,7 @@ export default function TabOneScreen() {
 
       if (!rawPriceStr.includes('/')) return '';
       const rawUnit = rawPriceStr.split('/')[1].trim().toLowerCase();
-      
+
       if (language === 'ml') {
         if (['kg', 'kilogram'].includes(rawUnit)) return '/കിലോഗ്രാം';
         if (['grams', 'gram'].includes(rawUnit)) return '/ഗ്രാം';
@@ -347,10 +248,9 @@ export default function TabOneScreen() {
     };
 
     const priceUnit = getTranslatedUnit(priceString, item.unit);
-    
-    // Support calculation for flat discounts or percentage tags
+
     const discountedPrice = activeOffer
-      ? activeOffer.type === 'FLAT' 
+      ? activeOffer.type === 'FLAT'
         ? Math.round(numericPrice - activeOffer.value)
         : Math.round(numericPrice - (numericPrice * activeOffer.value / 100))
       : null;
@@ -378,7 +278,7 @@ export default function TabOneScreen() {
           {item.images && item.images.length > 0 ? (
             <Image
               source={{ uri: item.images[0].startsWith('http') ? item.images[0] : `${S3_BASE_URL}/${item.images[0]}` }}
-              style={styles.productImage} 
+              style={styles.productImage}
               resizeMode="cover"
             />
           ) : (
@@ -386,7 +286,7 @@ export default function TabOneScreen() {
               <FontAwesome name="image" size={30} color="#E0D6C3" />
             </View>
           )}
-          
+
           {activeOffer && (
             <View style={[styles.offerBadge, { position: 'absolute', top: 10, left: 10, zIndex: 999 }]}>
               <Text style={styles.offerBadgeText}>
@@ -400,7 +300,7 @@ export default function TabOneScreen() {
           <Text style={styles.categoryText} numberOfLines={1}>
             {getTranslatedCategory(item.category)}
           </Text>
-          
+
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
 
           <View style={styles.priceRow}>
@@ -431,6 +331,8 @@ export default function TabOneScreen() {
     );
   };
 
+  const statusText = currentStatus === 'ACTIVE' ? 'Active' : 'Closed';
+
   return (
     <View style={styles.container}>
       <View style={styles.maxWidthWrapper}>
@@ -438,7 +340,7 @@ export default function TabOneScreen() {
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color="#2563EB" />
           </View>
-        ) : filteredItems.length > 0 ? (
+        ) : (
           <FlatList
             key={numColumns}
             data={filteredItems}
@@ -447,20 +349,134 @@ export default function TabOneScreen() {
             numColumns={numColumns}
             columnWrapperStyle={styles.columnWrapper}
             contentContainerStyle={styles.list}
+
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+
             refreshControl={
-              <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor="#2563EB" colors={["#2563EB"]} />
+              <RefreshControl
+                refreshing={isLoading}
+                onRefresh={refetch}
+                tintColor="#2563EB"
+                colors={["#2563EB"]}
+              />
             }
+
             showsVerticalScrollIndicator={false}
-            ListHeaderComponent={renderHeader}
+
+            // FIX: Rendered inline directly to prevent unmounting/keyboard dismissal issues
+            ListHeaderComponent={
+              <View style={{ backgroundColor: '#FDFCF7' }}>
+                <LinearGradient
+                  colors={['#DAA520', '#F4C430']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={styles.headerGradient}
+                >
+                  <View style={styles.headerTopRow}>
+                    <View style={styles.headerLeft}>
+                      <Text style={styles.title} numberOfLines={1}>{t.sahachari}</Text>
+                      <View style={styles.subtitleContainer}>
+                        <View style={styles.headerLineAccent} />
+                        <Text style={styles.subtitleText} numberOfLines={1}>
+                          {`${t.myStore} (${statusText})`}
+                        </Text>
+                      </View>
+
+                      <View style={styles.languageToggleContainer}>
+                        <View style={styles.languageToggle}>
+                          <Animated.View
+                            style={[styles.toggleSlider, {
+                              transform: [{
+                                translateX: slideAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0, 42],
+                                }),
+                              }],
+                            }]}
+                          />
+                          <TouchableOpacity style={styles.langButton} onPress={() => {
+                            showStatusConfirm('Open Shop?', 'Are you sure you want to open?', () => toggleStatusMutation.mutate('ACTIVE'));
+                          }}>
+                            <Text style={currentStatus === 'ACTIVE' ? styles.langTextActive : styles.langText}>ON</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.langButton} onPress={() => {
+                            showStatusConfirm('Close Shop?', 'Are you sure you want to close?', () => toggleStatusMutation.mutate('CLOSED'));
+                          }}>
+                            <Text style={currentStatus === 'CLOSED' ? styles.langTextActive : styles.langText}>OFF</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.headerRightActions}>
+                      <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/two')}>
+                        <Image
+                          source={{ uri: userData?.image ? `${S3_BASE_URL}/${userData.image}` : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb' }}
+                          style={styles.avatarImage}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </LinearGradient>
+
+                <View style={{ paddingHorizontal: 2, marginTop: 10 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#FFF',
+                      borderWidth: 1,
+                      borderColor: '#E6DCB8',
+                      borderRadius: 20,
+                      paddingHorizontal: 12,
+                      minHeight: 48,
+                      zIndex: 999,
+                      elevation: 5,
+                    }}
+                  >
+                    <FontAwesome name="search" size={16} color="#A89378" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        color: '#2D2416',
+                        fontSize: 15,
+                        paddingVertical: 8,
+                      }}
+                      placeholder="Search products, services, rentals..."
+                      placeholderTextColor="#A89378"
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      clearButtonMode="while-editing"
+
+                      autoCorrect={false}
+                      autoCapitalize="none"
+                      blurOnSubmit={false}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.actionButtonsContainer}>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity style={styles.bulkButton} onPress={() => router.push('/bulk-upload')}>
+                      <FontAwesome name="upload" size={14} color="#fff" />
+                      <Text style={styles.buttonText} numberOfLines={1}>{t.bulkUpload}</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.addButton} onPress={() => setBottomSheetOpen(true)}>
+                      <FontAwesome name="plus" size={14} color="#fff" />
+                      <Text style={styles.buttonText} numberOfLines={1}>{t.addItem || 'Add Item'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            }
+            ListEmptyComponent={
+              <View style={[styles.centerContainer, { marginTop: 40 }]}>
+                <FontAwesome name="folder-open-o" size={60} color="#E0D6C3" />
+                <Text style={styles.emptyText}>No matches found</Text>
+              </View>
+            }
           />
-        ) : (
-          <View style={{ flex: 1 }}>
-            {renderHeader()}
-            <View style={[styles.centerContainer, { marginTop: 40 }]}>
-              <FontAwesome name="folder-open-o" size={60} color="#E0D6C3" />
-              <Text style={styles.emptyText}>No matches found</Text>
-            </View>
-          </View>
         )}
       </View>
 
