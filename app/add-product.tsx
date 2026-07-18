@@ -2,25 +2,35 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  Keyboard,
+  Platform,
+  Modal,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
-  Modal, // Added Modal
 } from 'react-native';
+import { styles } from './styles/add-edit-common.style';
 import { getToken } from './services/auth';
+import { useLanguage } from './contexts/LanguageContext';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
+const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+  if (Platform.OS === 'web') {
+    alert(`${title}: ${message}`);
+    if (onConfirm) onConfirm();
+  } else {
+    Alert.alert(title, message, onConfirm ? [{ text: 'OK', onPress: onConfirm }] : undefined);
+  }
+};
 
 interface PresignedUrlResponse {
   url: string;
@@ -42,19 +52,24 @@ const PRODUCT_CATEGORIES = [
   'Groceries',
   'Home Made',
   'Service',
-  'Fish & Meat'
+  'Fish & Meat',
+  'Rent'
 ];
 
 const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
+const RENT_UNITS = ['Hour', 'Day', 'Week', 'Month'];
+const SERVICE_UNITS = ['Hour', 'Day', 'Service'];
 
 export default function AddProductScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { t } = useLanguage();
   
   const [category, setCategory] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [serviceUnit, setServiceUnit] = useState('Hour');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('kg');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -64,8 +79,18 @@ export default function AddProductScreen() {
   // MODAL STATES
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
+  const [showServiceUnitModal, setShowServiceUnitModal] = useState(false);
 
   const isService = category === 'Service';
+  const isRent = category === 'Rent';
+  const needsTimeUnit = isService || isRent;
+
+  // DYNAMIC LOOKUP HELPER FOR TRANSLATED LABELS
+  const getLocalizedUnitLabel = (unitValue: string): string => {
+    if (!t || !t.units) return unitValue;
+    const localized = (t.units as Record<string, string>)[unitValue];
+    return typeof localized === 'string' ? localized : unitValue;
+  };
 
   const createProductMutation = useMutation({
     mutationFn: async (productData: ProductData) => {
@@ -86,27 +111,29 @@ export default function AddProductScreen() {
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', isService ? 'Service created successfully!' : 'Product created successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            router.back();
-          },
-        },
-      ]);
+      showAlert(t.successTitle || 'Success', 'Created successfully!', () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        router.back();
+      });
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || `Failed to create ${isService ? 'service' : 'product'}`);
+      showAlert(t.failedTitle || 'Error', error.message || 'Failed to create item');
     },
   });
 
   const handleSelectCategory = (selectedCategory: string) => {
     setCategory(selectedCategory);
     setShowCategoryModal(false);
+    
     if (selectedCategory === 'Service') {
-      setQuantity('100');
-    } else if (category === 'Service') {
+      setQuantity('1');
+      setServiceUnit('Hour');
+    } else if (selectedCategory === 'Rent') {
+      setUnit('unit');
+      setQuantity('');
+      setServiceUnit('Day');
+    } else {
+      setUnit('kg');
       setQuantity('');
     }
   };
@@ -115,7 +142,7 @@ export default function AddProductScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant permission to access photos');
+        showAlert(t.failedTitle || 'Permission needed', 'Please grant permission to access photos');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -129,7 +156,7 @@ export default function AddProductScreen() {
         setSelectedImages(prev => [...prev, ...newImages]);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick images');
+      showAlert(t.failedTitle || 'Error', 'Failed to pick images');
     }
   };
 
@@ -140,19 +167,34 @@ export default function AddProductScreen() {
 
   const uploadImages = async () => {
     if (selectedImages.length === 0) {
-      Alert.alert('Error', 'Please select at least one image');
+      showAlert(t.failedTitle || 'Error', 'Please select at least one image');
       return;
     }
     setIsUploading(true);
     const imageKeys: string[] = [];
+    
     try {
       const token = await getToken();
       for (const imageUri of selectedImages) {
-        let cleanPath = imageUri.split(':http')[0].replace('blob:', '');
-        const extensionMatch = cleanPath.match(/\.([a-zA-Z0-9]+)$/);
-        const fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg';
+        let fileExtension = 'jpg';
+        let fileType = 'image/jpeg';
+
+        if (Platform.OS === 'web') {
+          if (imageUri.includes('image/png') || imageUri.endsWith('.png')) {
+            fileExtension = 'png';
+            fileType = 'image/png';
+          }
+        } else {
+          // Native clean path strategy for file extension parsing
+          const uriParts = imageUri.split('.');
+          const ext = uriParts[uriParts.length - 1].toLowerCase();
+          if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+            fileExtension = ext;
+            fileType = ext === 'png' ? 'image/png' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+          }
+        }
+
         const fileName = `product_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
-        const fileType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
 
         const presignedResponse = await fetch(`${API_BASE_URL}/s3/presigned-url`, {
           method: 'POST',
@@ -165,6 +207,7 @@ export default function AddProductScreen() {
 
         if (!presignedResponse.ok) throw new Error('Failed to get presigned URL');
         const { url: presignedUrl, key }: PresignedUrlResponse = await presignedResponse.json();
+        
         const imageResponse = await fetch(imageUri);
         const blob = await imageResponse.blob();
 
@@ -177,10 +220,11 @@ export default function AddProductScreen() {
         if (!uploadResponse.ok) throw new Error('Failed to upload image to S3');
         imageKeys.push(key);
       }
+      
       setUploadedImageKeys(imageKeys);
-      Alert.alert('Success', `${imageKeys.length} image(s) uploaded successfully!`);
+      showAlert(t.successTitle || 'Success', `${imageKeys.length} image(s) uploaded successfully!`);
     } catch (error: any) {
-      Alert.alert('Upload Failed', error.message);
+      showAlert(t.failedTitle || 'Upload Failed', error.message);
     } finally {
       setIsUploading(false);
     }
@@ -188,23 +232,24 @@ export default function AddProductScreen() {
 
   const handleCreateProduct = () => {
     if (!category.trim() || !name.trim() || !description.trim() || !price) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      showAlert(t.failedTitle || 'Error', 'Please fill in all required fields');
       return;
     }
     if (!isService && !quantity) {
-      Alert.alert('Error', 'Please enter the quantity');
+      showAlert(t.failedTitle || 'Error', 'Please enter the quantity');
       return;
     }
     if (uploadedImageKeys.length === 0) {
-      Alert.alert('Error', 'Please upload at least one image');
+      showAlert(t.failedTitle || 'Error', 'Please upload your picked images first');
       return;
     }
 
+    const finalPrice = needsTimeUnit ? `${price}/${serviceUnit}` : `${price}/${unit}`;
     const productData: ProductData = {
       name,
       description,
-      price: price,
-      quantity: isService ? 100 : parseInt(quantity),
+      price: finalPrice,
+      quantity: isService ? 1 : parseInt(quantity),
       category,
       images: uploadedImageKeys,
     };
@@ -212,8 +257,8 @@ export default function AddProductScreen() {
     createProductMutation.mutate(productData);
   };
 
-  // Selection Modal Component for reusability
-  const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
+  // LOCALIZED SELECTION MODAL
+  const SelectionModal = ({ visible, data, title, onSelect, onClose, isUnitModal = false }: any) => (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.modalOverlay}>
@@ -232,7 +277,9 @@ export default function AddProductScreen() {
                   style={styles.modalItem} 
                   onPress={() => onSelect(item)}
                 >
-                  <Text style={styles.modalItemText}>{item}</Text>
+                  <Text style={styles.modalItemText}>
+                    {isUnitModal ? getLocalizedUnitLabel(item) : item}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
@@ -245,7 +292,9 @@ export default function AddProductScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{isService ? 'Add New Service' : 'Add New Product'}</Text>
+        <Text style={styles.headerTitle}>
+          {isService ? (t.addNewService || 'Add New Service') : (t.addNewProduct || 'Add New Product')}
+        </Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <FontAwesome name="times" size={24} color="#2D2416" />
         </TouchableOpacity>
@@ -256,7 +305,7 @@ export default function AddProductScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        {/* CATEGORY FIELD */}
+        {/* CATEGORY INPUT */}
         <TouchableOpacity 
           style={styles.inputWrapper} 
           onPress={() => setShowCategoryModal(true)}
@@ -264,7 +313,7 @@ export default function AddProductScreen() {
           <View pointerEvents="none">
             <TextInput
               style={[styles.input, { marginBottom: 0 }]}
-              placeholder="Select Category *"
+              placeholder={t.selectCategory ? `${t.selectCategory} *` : "Select Category *"}
               placeholderTextColor="#A89378"
               value={category}
               editable={false}
@@ -275,7 +324,7 @@ export default function AddProductScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder={isService ? "Service Name *" : "Product Name *"}
+          placeholder={isService ? (t.serviceName || "Service Name *") : (t.productName || "Product Name *")}
           placeholderTextColor="#A89378"
           value={name}
           onChangeText={setName}
@@ -283,29 +332,46 @@ export default function AddProductScreen() {
 
         <TextInput
           style={[styles.input, styles.textArea]}
-          placeholder="Description *"
+          placeholder={t.description ? `${t.description} *` : "Description *"}
           placeholderTextColor="#A89378"
           value={description}
           onChangeText={setDescription}
           multiline
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Price *"
-          placeholderTextColor="#A89378"
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="numeric"
-        />
+        {/* PRICE FIELD */}
+        <View style={styles.parallelContainer}>
+          <View style={{ flex: 2 }}>
+            <TextInput
+              style={styles.input}
+              placeholder={t.price ? `${t.price} *` : "Price *"}
+              placeholderTextColor="#A89378"
+              value={price}
+              onChangeText={setPrice}
+              keyboardType="numeric"
+            />
+          </View>
+          {needsTimeUnit && (
+            <View style={{ flex: 1.5, marginLeft: 10 }}>
+              <TouchableOpacity 
+                style={styles.unitSelector} 
+                onPress={() => setShowServiceUnitModal(true)}
+              >
+                <Text style={styles.unitText}>/ {getLocalizedUnitLabel(serviceUnit)}</Text>
+                <FontAwesome name="caret-down" size={16} color="#DAA520" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
+        {/* STOCK/QUANTITY FIELD */}
         {!isService && (
           <View style={styles.section}>
             <View style={styles.parallelContainer}>
-              <View style={{ flex: 2 }}>
+              <View style={{ flex: 1.5 }}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Stock *"
+                  placeholder={isRent ? `${t.stockQty || 'Stock'} (Unit) *` : `${t.stockQty || 'Stock'} *`}
                   placeholderTextColor="#A89378"
                   value={quantity}
                   onChangeText={setQuantity}
@@ -313,28 +379,34 @@ export default function AddProductScreen() {
                 />
               </View>
 
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <TouchableOpacity 
-                  style={styles.unitSelector} 
-                  onPress={() => setShowUnitModal(true)}
-                >
-                  <Text style={styles.unitText}>{unit}</Text>
-                  <FontAwesome name="caret-down" size={16} color="#DAA520" />
-                </TouchableOpacity>
-              </View>
+              {!isRent && (
+                <View style={{ flex: 1.3, marginLeft: 10, minWidth: 115 }}>
+                  <TouchableOpacity 
+                    style={styles.unitSelector} 
+                    onPress={() => setShowUnitModal(true)}
+                  >
+                    <Text 
+                      style={[styles.unitText, { flex: 1, marginRight: 4 }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit={true}
+                      minimumFontScale={0.7}
+                    >
+                      {getLocalizedUnitLabel(unit)}
+                    </Text>
+                    <FontAwesome name="caret-down" size={16} color="#DAA520" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-            <Text style={styles.fieldHint}>
-              Total Stock: {quantity || '0'} {unit}
-            </Text>
           </View>
         )}
 
         {/* IMAGES SECTION */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Images</Text>
+          <Text style={styles.sectionTitle}>{t.images || 'Images'}</Text>
           <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
             <FontAwesome name="image" size={24} color="#DAA520" />
-            <Text style={styles.pickButtonText}>Pick Images</Text>
+            <Text style={styles.pickButtonText}>{t.pickImages || 'Pick Images'}</Text>
           </TouchableOpacity>
 
           <View style={styles.imagesContainer}>
@@ -350,7 +422,7 @@ export default function AddProductScreen() {
 
           {selectedImages.length > 0 && uploadedImageKeys.length === 0 && (
             <TouchableOpacity style={styles.uploadButton} onPress={uploadImages} disabled={isUploading}>
-              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>Upload</Text>}
+              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>{t.upload || 'Upload'}</Text>}
             </TouchableOpacity>
           )}
         </View>
@@ -360,7 +432,9 @@ export default function AddProductScreen() {
           onPress={handleCreateProduct}
           disabled={createProductMutation.isPending || uploadedImageKeys.length === 0}
         >
-          <Text style={styles.createButtonText}>Create {isService ? 'Service' : 'Product'}</Text>
+          <Text style={styles.createButtonText}>
+            {isService ? (t.createServiceBtn || 'Create Service') : (t.createProductBtn || 'Create Product')}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -368,70 +442,34 @@ export default function AddProductScreen() {
       <SelectionModal 
         visible={showCategoryModal}
         data={PRODUCT_CATEGORIES}
-        title="Select Category"
+        title={t.selectCategory || "Select Category"}
         onSelect={handleSelectCategory}
-        onClose={() => setShowCategoryModal(false)}
+        close={(() => setShowCategoryModal(false))}
       />
 
       <SelectionModal 
         visible={showUnitModal}
         data={UNITS}
-        title="Select Unit"
+        title={t.selectUnit || "Select Unit"}
+        isUnitModal={true}
         onSelect={(item: string) => {
           setUnit(item);
           setShowUnitModal(false);
         }}
         onClose={() => setShowUnitModal(false)}
       />
+
+      <SelectionModal 
+        visible={showServiceUnitModal}
+        data={isService ? SERVICE_UNITS : RENT_UNITS}
+        title={isService ? "Select Service Unit" : "Select Rental Unit"}
+        isUnitModal={true}
+        onSelect={(item: string) => {
+          setServiceUnit(item);
+          setShowServiceUnitModal(false);
+        }}
+        onClose={() => setShowServiceUnitModal(false)}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF9E6' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, borderBottomWidth: 1, borderBottomColor: '#E0D6C3' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#2D2416' },
-  closeButton: { padding: 8 },
-  scrollView: { flex: 1 },
-  content: { padding: 20 },
-  inputWrapper: { position: 'relative', marginBottom: 16 },
-  inputIcon: { position: 'absolute', right: 16, top: 20 },
-  input: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E0D6C3', color: '#2D2416' },
-  textArea: { minHeight: 100, textAlignVertical: 'top' },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#2D2416', marginBottom: 12 },
-  parallelContainer: { flexDirection: 'row', alignItems: 'flex-start' },
-  unitSelector: { 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 8, 
-    padding: 16, 
-    borderWidth: 1, 
-    borderColor: '#E0D6C3', 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    height: 58 
-  },
-  unitText: { fontSize: 16, color: '#2D2416', fontWeight: '600' },
-  fieldHint: { fontSize: 12, color: '#856404', marginTop: -6, marginBottom: 8 },
-  pickButton: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 20, alignItems: 'center', borderWidth: 2, borderColor: '#DAA520', borderStyle: 'dashed', flexDirection: 'row', justifyContent: 'center', gap: 12 },
-  pickButtonText: { color: '#DAA520', fontSize: 16, fontWeight: '600' },
-  imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 12 },
-  imageWrapper: { position: 'relative' },
-  imagePreview: { width: 100, height: 100, borderRadius: 8 },
-  removeButton: { position: 'absolute', top: -8, right: -8, backgroundColor: '#ff3b30', width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  removeButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  uploadButton: { backgroundColor: '#4A90E2', borderRadius: 8, padding: 16, alignItems: 'center', marginTop: 16 },
-  uploadButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  createButton: { backgroundColor: '#DAA520', borderRadius: 8, padding: 16, alignItems: 'center', marginBottom: 40 },
-  createButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  buttonDisabled: { opacity: 0.6 },
-  
-  // MODAL STYLES
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '50%', paddingBottom: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#2D2416' },
-  modalItem: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  modalItemText: { fontSize: 16, color: '#2D2416' }
-});

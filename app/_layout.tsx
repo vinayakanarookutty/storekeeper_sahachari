@@ -6,8 +6,10 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { Image, Platform, StyleSheet, View } from 'react-native';
+import { Image, Platform, View } from 'react-native';
 import { AuthProvider } from './contexts/AuthContext';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { styles } from './styles/_layout.style';
 
 // Prevent auto-hide so we control the timing
 SplashScreen.preventAutoHideAsync();
@@ -71,12 +73,14 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
+  <AuthProvider>
+    <LanguageProvider>
       <QueryClientProvider client={queryClient}>
         <RootLayoutNav />
       </QueryClientProvider>
-    </AuthProvider>
-  );
+    </LanguageProvider>
+  </AuthProvider>
+);
 }
 
 function RootLayoutNav() {
@@ -89,7 +93,6 @@ function RootLayoutNav() {
         <Stack.Screen name="index" />
         
         {/* Auth screens */}
-        <Stack.Screen name="signup" />
         <Stack.Screen name="login" />
         
         {/* Main app */}
@@ -103,6 +106,13 @@ function RootLayoutNav() {
             presentation: 'modal',
           }} 
         />
+
+<Stack.Screen 
+  name="bulk-upload" 
+  options={{ 
+    presentation: 'modal',
+    title: 'Bulk Upload',
+  }} />
         <Stack.Screen 
           name="edit-product" 
           options={{ 
@@ -114,18 +124,3 @@ function RootLayoutNav() {
     </ThemeProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  splashContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FDB515',
-  },
-  splashImage: {
-    width: '40%',
-    height: '40%',
-    maxWidth: 500,
-    maxHeight: 500,
-  },
-});

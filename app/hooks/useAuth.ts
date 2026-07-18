@@ -81,8 +81,8 @@ export function useLogout() {
       // Clear all cached data
       queryClient.clear();
 
-      // Navigate to signup
-      router.replace("/signup");
+      // Navigate to login
+      router.replace("/login");
     },
   });
 }

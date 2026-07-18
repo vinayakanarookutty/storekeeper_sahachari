@@ -1,0 +1,50 @@
+import { StyleSheet } from 'react-native';
+
+export const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#FFF9E6' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, borderBottomWidth: 1, borderBottomColor: '#E0D6C3' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#2D2416' },
+  closeButton: { padding: 8 },
+  scrollView: { flex: 1 },
+  content: { padding: 20 },
+  inputWrapper: { position: 'relative', marginBottom: 16 },
+  inputIcon: { position: 'absolute', right: 16, top: 20 },
+  input: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E0D6C3', color: '#2D2416' },
+  textArea: { minHeight: 100, textAlignVertical: 'top' },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#2D2416', marginBottom: 12 },
+  parallelContainer: { flexDirection: 'row', alignItems: 'flex-start' },
+  unitSelector: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 8, 
+    padding: 16, 
+    borderWidth: 1, 
+    borderColor: '#E0D6C3', 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    height: 58 
+  },
+  unitText: { fontSize: 16, color: '#2D2416', fontWeight: '600' },
+  fieldHint: { fontSize: 12, color: '#856404', marginTop: -6, marginBottom: 8 },
+  pickButton: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 20, alignItems: 'center', borderWidth: 2, borderColor: '#DAA520', borderStyle: 'dashed', flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  pickButtonText: { color: '#DAA520', fontSize: 16, fontWeight: '600' },
+  imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 12 },
+  imageWrapper: { position: 'relative' },
+  imagePreview: { width: 100, height: 100, borderRadius: 8 },
+  removeButton: { position: 'absolute', top: -8, right: -8, backgroundColor: '#ff3b30', width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  removeButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  uploadButton: { backgroundColor: '#4A90E2', borderRadius: 8, padding: 16, alignItems: 'center', marginTop: 16 },
+  uploadButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  createButton: { backgroundColor: '#DAA520', borderRadius: 8, padding: 16, alignItems: 'center', marginBottom: 40 },
+  createButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  buttonDisabled: { opacity: 0.6 },
+  
+  // MODAL STYLES
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '50%', paddingBottom: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#2D2416' },
+  modalItem: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
+  modalItemText: { fontSize: 16, color: '#2D2416' }
+});

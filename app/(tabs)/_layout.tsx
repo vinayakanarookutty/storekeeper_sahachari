@@ -1,98 +1,155 @@
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs, useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
-import { Alert, Pressable } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Platform,
+} from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
-// Icon component for the tab bar
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
+  focused?: boolean;
 }) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
+  return (
+    <View
+      style={[
+        styles.iconContainer,
+        props.focused && styles.activeIconContainer,
+      ]}>
+      <FontAwesome
+        size={22}
+        {...props}
+        style={{
+          opacity: props.focused ? 1 : 0.8,
+        }}
+      />
+    </View>
+  );
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme() ?? 'light'; // Default to light if null
-  const { token, clearAuthToken } = useAuth();
+  const colorScheme = useColorScheme() ?? 'light';
+  const { token } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
-  // Protect tabs - redirect if no token
+  const theme = {
+    background: colorScheme === 'dark' ? '#121212' : '#FDFCF7',
+    card: colorScheme === 'dark' ? '#1E1E1E' : '#FFFFFF',
+    text: colorScheme === 'dark' ? '#FFFFFF' : '#1A140B',
+    inactive: colorScheme === 'dark' ? '#8E8E93' : '#A0AEC0',
+    primary: '#DAA520', 
+    border: colorScheme === 'dark' ? '#2C2C2E' : '#E5E7EB',
+  };
+
   useEffect(() => {
     if (!token) {
-      router.replace('/signup');
+      router.replace('./login');
     }
   }, [token]);
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await clearAuthToken();
-            router.replace('/signup');
-          },
-        },
-      ]
-    );
-  };
 
   return (
     <Tabs
       screenOptions={{
-        // Dynamic colors based on the theme
-        tabBarActiveTintColor: Colors[colorScheme].tint,
-        tabBarInactiveTintColor: Colors[colorScheme].tabIconDefault,
-        tabBarStyle: {
-          backgroundColor: Colors[colorScheme].background,
+        headerShown: false, 
+
+        tabBarStyle: { 
+          height: 72,
+          borderRadius: 24,
+          backgroundColor: theme.card,
+          borderTopWidth: 0,
+          paddingTop: 10,
+          paddingBottom: Platform.OS === 'ios' ? 14 : 10,
+          elevation: 8,
+          shadowColor: '#DAA520', 
+          shadowOpacity: 0.08,
+          shadowRadius: 16,
+          shadowOffset: {
+            width: 0,
+            height: 6,
+          },
         },
-        headerStyle: {
-          backgroundColor: Colors[colorScheme].background,
+
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+          marginTop: 2,
         },
-        headerTintColor: Colors[colorScheme].text,
-        headerShown: useClientOnlyValue(false, true),
+
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.inactive,
       }}>
+
+      {/* HOME TAB */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
-          headerRight: () => (
-            <Pressable onPress={handleLogout}>
-              {({ pressed }) => (
-                <FontAwesome
-                  name="sign-out"
-                  size={25}
-                  color={Colors[colorScheme].text}
-                  style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                />
-              )}
-            </Pressable>
+          title: t.homeTab,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon
+              name="home"
+              color={color}
+              focused={focused}
+            />
           ),
         }}
       />
+
+      {/* ORDERS TAB */}
       <Tabs.Screen
         name="three"
         options={{
-          title: 'Orders',
-          tabBarIcon: ({ color }) => <TabBarIcon name="book" color={color} />,
+          title: t.ordersTab,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon
+              name="shopping-bag"
+              color={color}
+              focused={focused}
+            />
+          ),
         }}
       />
+
+      {/* ANALYTICS TAB */}
+      <Tabs.Screen
+        name="Analytics"
+        options={{
+          title: t.analyticsTab,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon
+              name="bar-chart"
+              color={color}
+              focused={focused}
+            />
+          ),
+        }}
+      />
+
+      {/* PROFILE SCREEN (HIDDEN FROM BOTTOM TAB BAR) */}
       <Tabs.Screen
         name="two"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
+          href: null, 
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 14,
+  },
+  activeIconContainer: {
+    backgroundColor: 'rgba(218, 165, 32, 0.08)', 
+  },
+});
