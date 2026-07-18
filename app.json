@@ -58,6 +58,9 @@
     },
 
     "plugins": [
+      [
+      "expo-notifications"
+      ],
       "expo-router",
 
       [
