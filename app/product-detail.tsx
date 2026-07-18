@@ -1,3 +1,5 @@
+// D:\storekeeper_sahachari\app\product-detail.tsx
+
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,6 +23,8 @@ import {
 } from 'react-native';
 import { getToken } from './services/auth';
 import { styles } from './styles/product-detail.style';
+import { useLanguage } from './contexts/LanguageContext';
+
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const { width, height } = Dimensions.get('window');
@@ -42,12 +46,16 @@ interface Product {
   category: string;
   images: string[];
   offers?: Offer[];
+  unit?: string; 
 }
 
 export default function ProductDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const queryClient = useQueryClient();
+  
+  const { t } = useLanguage();
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [offerValue, setOfferValue] = useState('');
@@ -58,23 +66,78 @@ export default function ProductDetailScreen() {
   
   const product: Product = params.product ? JSON.parse(params.product as string) : null;
 
-  // Check if product is a service
   const isService = product?.category === 'Service';
 
-  // Extract numeric value from price string
   const extractNumericPrice = (price: number | string): number => {
     if (typeof price === 'number') return price;
-    
-    // Remove currency symbols, spaces, and non-numeric characters except decimal point
     const numericString = price.toString().replace(/[^0-9.]/g, '');
     const numericPrice = parseFloat(numericString);
-    
     return isNaN(numericPrice) ? 0 : numericPrice;
   };
 
   const numericPrice = extractNumericPrice(product?.price || 0);
 
-  // Calculate discounted price if active offer exists
+  // SAFE STRUCTURAL TRANSLATION FOR UNITS
+  const getLocalizedUnit = (): string => {
+    if (!product) return '';
+    
+    let unitKey = product.unit || '';
+    
+    // Fallback parser for combined structures like "130/pcs"
+    if (!unitKey && product.price) {
+      const parts = product.price.toString().split('/');
+      if (parts.length > 1) {
+        unitKey = parts[1].trim();
+      }
+    }
+
+    if (!unitKey) return '';
+    
+    const normalKey = unitKey.toLowerCase().trim();
+    const contextMap = t as any;
+
+    // 1. Explicitly check inner sub-object dictionary structure (t.units.pcs)
+    if (contextMap.units && typeof contextMap.units === 'object') {
+      if (normalKey in contextMap.units && typeof contextMap.units[normalKey] === 'string') {
+        return contextMap.units[normalKey];
+      }
+      // Alternate case-sensitive lookup safety check
+      if (unitKey in contextMap.units && typeof contextMap.units[unitKey] === 'string') {
+        return contextMap.units[unitKey];
+      }
+    }
+
+    // 2. Fallback check root-level object context mappings
+    if (normalKey in contextMap && typeof contextMap[normalKey] === 'string') {
+      return contextMap[normalKey];
+    }
+    if (unitKey in contextMap && typeof contextMap[unitKey] === 'string') {
+      return contextMap[unitKey];
+    }
+
+    return unitKey; 
+  };
+
+  const localizedUnitLabel = getLocalizedUnit();
+
+  // SAFE STRUCTURAL TRANSLATION FOR CATEGORIES
+  const getLocalizedCategory = (): string => {
+    if (!product?.category) return '';
+    
+    const catKey = product.category.trim();
+    const lowerCatKey = catKey.toLowerCase();
+    const contextMap = t as any;
+
+    if (lowerCatKey in contextMap && typeof contextMap[lowerCatKey] === 'string') {
+      return contextMap[lowerCatKey];
+    }
+    if (catKey in contextMap && typeof contextMap[catKey] === 'string') {
+      return contextMap[catKey];
+    }
+
+    return catKey;
+  };
+
   const getActiveOffer = () => {
     if (!product?.offers || product.offers.length === 0) return null;
     
@@ -91,7 +154,6 @@ export default function ProductDetailScreen() {
     ? numericPrice - (numericPrice * activeOffer.value / 100)
     : null;
 
-  // Add Offer Mutation
   const addOfferMutation = useMutation({
     mutationFn: async (offerData: Omit<Offer, '_id'>) => {
       const token = await getToken();
@@ -107,24 +169,23 @@ export default function ProductDetailScreen() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to add offer');
+        throw new Error(error.message || t.failedAddOffer);
       }
 
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', 'Offer added successfully!');
+      Alert.alert(t.successTitle, t.offerAddedSuccess);
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setShowOfferModal(false);
       resetOfferForm();
       router.back();
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to add offer');
+      Alert.alert(t.failedTitle, error.message || t.failedAddOffer);
     },
   });
 
-  // Delete Offer Mutation
   const deleteOfferMutation = useMutation({
     mutationFn: async () => {
       const token = await getToken();
@@ -137,18 +198,18 @@ export default function ProductDetailScreen() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete offer');
+        throw new Error(t.failedDeleteOffer);
       }
 
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', 'Offer deleted successfully!');
+      Alert.alert(t.successTitle, t.offerDeletedSuccess);
       queryClient.invalidateQueries({ queryKey: ['products'] });
       router.back();
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to delete offer');
+      Alert.alert(t.failedTitle, error.message || t.failedDeleteOffer);
     },
   });
 
@@ -164,15 +225,16 @@ export default function ProductDetailScreen() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete product');
+        throw new Error(isService ? t.failedDeleteService : t.failedDeleteProduct);
       }
 
       return response.json();
     },
     onSuccess: () => {
-      Alert.alert('Success', `${isService ? 'Service' : 'Product'} deleted successfully!`, [
+      const successMsg = isService ? t.serviceDeletedSuccess : t.productDeletedSuccess;
+      Alert.alert(t.successTitle, successMsg, [
         {
-          text: 'OK',
+          text: t.ok,
           onPress: () => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
             router.back();
@@ -181,7 +243,8 @@ export default function ProductDetailScreen() {
       ]);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || `Failed to delete ${isService ? 'service' : 'product'}`);
+      const fallbackError = isService ? t.failedDeleteService : t.failedDeleteProduct;
+      Alert.alert(t.failedTitle, error.message || fallbackError);
     },
   });
 
@@ -196,40 +259,38 @@ export default function ProductDetailScreen() {
   };
 
   const handleDelete = () => {
-  const title = `Delete ${isService ? 'Service' : 'Product'}`;
-  const message = `Are you sure you want to delete this ${isService ? 'service' : 'product'}? This action cannot be undone.`;
+    const title = isService ? t.deleteServiceTitle : t.deleteProductTitle;
+    const message = isService ? t.deleteServiceConfirm : t.deleteProductConfirm;
 
-  if (Platform.OS === 'web') {
-    // Standard web browser confirmation dialog
-    const confirmed = window.confirm(`${title}\n\n${message}`);
-    if (confirmed) {
-      deleteProductMutation.mutate(product._id);
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`${title}\n\n${message}`);
+      if (confirmed) {
+        deleteProductMutation.mutate(product._id);
+      }
+    } else {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: t.cancel, style: 'cancel' },
+          {
+            text: t.delete,
+            style: 'destructive',
+            onPress: () => deleteProductMutation.mutate(product._id),
+          },
+        ]
+      );
     }
-  } else {
-    // Native mobile alert behavior
-    Alert.alert(
-      title,
-      message,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteProductMutation.mutate(product._id),
-        },
-      ]
-    );
-  }
-};
+  };
 
   const handleDeleteOffer = () => {
     Alert.alert(
-      'Delete Offer',
-      'Are you sure you want to delete this offer?',
+      t.deleteOfferTitle,
+      t.deleteOfferConfirm,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.cancel, style: 'cancel' },
         {
-          text: 'Delete',
+          text: t.delete,
           style: 'destructive',
           onPress: () => deleteOfferMutation.mutate(),
         },
@@ -244,19 +305,18 @@ export default function ProductDetailScreen() {
   };
 
   const handleAddOffer = () => {
-    // Validation
     if (!offerValue || parseFloat(offerValue) <= 0) {
-      Alert.alert('Error', 'Please enter a valid offer value');
+      Alert.alert(t.failedTitle, t.invalidOfferValueError);
       return;
     }
 
     if (parseFloat(offerValue) > 100) {
-      Alert.alert('Error', 'Discount cannot exceed 100%');
+      Alert.alert(t.failedTitle, t.offerExceedLimitError);
       return;
     }
 
     if (endDate <= startDate) {
-      Alert.alert('Error', 'End date must be after start date');
+      Alert.alert(t.failedTitle, t.dateOrderError);
       return;
     }
 
@@ -311,7 +371,7 @@ export default function ProductDetailScreen() {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" />
-        <Text style={styles.errorText}>Product not found</Text>
+        <Text style={styles.errorText}>{String(t.productNotFound || 'Product Not Found')}</Text>
       </View>
     );
   }
@@ -345,11 +405,12 @@ export default function ProductDetailScreen() {
               product.images.map((imageKey, index) => (
                 <View key={index} style={styles.imageContainer}>
                   <Image
-                    source={{ uri: `${S3_BASE_URL}/${imageKey}` }}
+                    source={{ uri: imageKey.startsWith('http') ? imageKey 
+                      : `${S3_BASE_URL}/${imageKey}`
+                     }}
                     style={styles.productImage}
                     resizeMode="cover"
                   />
-                  {/* Gradient Overlay */}
                   <LinearGradient
                     colors={['rgba(0,0,0,0.5)', 'transparent', 'rgba(0,0,0,0.7)']}
                     style={styles.imageGradient}
@@ -359,12 +420,11 @@ export default function ProductDetailScreen() {
             ) : (
               <View style={styles.noImageContainer}>
                 <FontAwesome name="image" size={80} color="#DAA520" />
-                <Text style={styles.noImageText}>No images available</Text>
+                <Text style={styles.noImageText}>{String(t.noImages || 'No Images')}</Text>
               </View>
             )}
           </ScrollView>
 
-          {/* Active Offer Badge with Gradient */}
           {activeOffer && (
             <LinearGradient
               colors={['#FF6B6B', '#EE5A6F']}
@@ -373,11 +433,10 @@ export default function ProductDetailScreen() {
               style={styles.offerBadge}
             >
               <FontAwesome name="tag" size={16} color="#fff" />
-              <Text style={styles.offerBadgeText}>{activeOffer.value}% OFF</Text>
+              <Text style={styles.offerBadgeText}>{activeOffer.value}% {String(t.offLabel || 'OFF')}</Text>
             </LinearGradient>
           )}
 
-          {/* Image Dots Indicator */}
           {product.images && product.images.length > 1 && (
             <View style={styles.dotsContainer}>
               {product.images.map((_, index) => (
@@ -392,10 +451,9 @@ export default function ProductDetailScreen() {
             </View>
           )}
 
-          {/* Image Counter Badge */}
           {product.images && product.images.length > 1 && (
             <View style={styles.imageCountBadge}>
-            <FontAwesome name="image" size={14} color="#fff" />
+              <FontAwesome name="image" size={14} color="#fff" />
               <Text style={styles.imageCountText}>
                 {currentImageIndex + 1}/{product.images.length}
               </Text>
@@ -405,26 +463,25 @@ export default function ProductDetailScreen() {
 
         {/* Product Info Card */}
         <View style={styles.infoCard}>
-          {/* Category & Stock Row */}
           <View style={styles.badgesRow}>
             <View style={styles.categoryBadge}>
               <FontAwesome name="tag" size={12} color="#2E7D32" />
-              <Text style={styles.categoryText}>{product.category}</Text>
+              <Text style={styles.categoryText}>
+                {getLocalizedCategory()}
+              </Text>
             </View>
             {!isService && (
               <View style={[styles.stockBadge, product.quantity < 10 && styles.lowStockBadge]}>
                 <FontAwesome name="cube" size={12} color={product.quantity < 10 ? '#D32F2F' : '#666'} />
                 <Text style={[styles.stockText, product.quantity < 10 && styles.lowStockText]}>
-                  {product.quantity} in stock
+                  {product.quantity} {String(t.inStock || 'In Stock')}
                 </Text>
               </View>
             )}
           </View>
 
-          {/* Product Name */}
           <Text style={styles.productName}>{product.name}</Text>
           
-          {/* Price Card with Gradient */}
           <LinearGradient
             colors={['#FFF9E6', '#FFF4D6']}
             style={styles.priceContainer}
@@ -450,12 +507,14 @@ export default function ProductDetailScreen() {
               {activeOffer && (
                 <View style={styles.savingsChip}>
                   <Text style={styles.savingsText}>
-                    Save ₹{Math.round(numericPrice - discountedPrice!).toLocaleString('en-IN')}
+                    {String(t.saveLabel || 'Save')} ₹{Math.round(numericPrice - discountedPrice!).toLocaleString('en-IN')}
                   </Text>
                 </View>
               )}
             </View>
-            <Text style={styles.priceLabel}>per unit</Text>
+            <Text style={styles.priceLabel}>
+              {String(t.perUnit || 'Per Unit')} {localizedUnitLabel ? `(1 ${localizedUnitLabel})` : ''}
+            </Text>
           </LinearGradient>
 
           {/* Active Offers Section */}
@@ -464,7 +523,7 @@ export default function ProductDetailScreen() {
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionHeader}>
                   <FontAwesome name="percent" size={18} color="#FF6B6B" />
-                  <Text style={styles.sectionTitle}>Active Offers</Text>
+                  <Text style={styles.sectionTitle}>{String(t.activeOffers || 'Active Offers')}</Text>
                 </View>
               </View>
               {product.offers.map((offer, index) => {
@@ -488,12 +547,12 @@ export default function ProductDetailScreen() {
                           style={styles.offerBadgeSmall}
                         >
                           <FontAwesome name="percent" size={14} color="#fff" />
-                          <Text style={styles.offerValueText}>{offer.value}% OFF</Text>
+                          <Text style={styles.offerValueText}>{offer.value}% {String(t.offLabel || 'OFF')}</Text>
                         </LinearGradient>
                         {isOfferActive() && (
                           <View style={styles.activeIndicator}>
                             <View style={styles.activeDotIndicator} />
-                            <Text style={styles.activeText}>Active</Text>
+                            <Text style={styles.activeText}>{String(t.statusActive || 'Active')}</Text>
                           </View>
                         )}
                       </View>
@@ -521,16 +580,16 @@ export default function ProductDetailScreen() {
             </View>
           )}
 
-          {/* Description */}
+          {/* Description Section */}
           <View style={styles.descriptionSection}>
             <View style={styles.sectionHeader}>
               <FontAwesome name="align-left" size={18} color="#4A90E2" />
-              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.sectionTitle}>{String(t.description || 'Description')}</Text>
             </View>
             <Text style={styles.productDescription}>{product.description}</Text>
           </View>
 
-          {/* Product Stats with Gradient - Hide quantity for services */}
+          {/* Product Stats Container */}
           <LinearGradient
             colors={['#F8F9FA', '#FFFFFF']}
             style={styles.statsContainer}
@@ -550,7 +609,9 @@ export default function ProductDetailScreen() {
                   : numericPrice * (isService ? 1 : product.quantity)
                 ).toLocaleString('en-IN')}
               </Text>
-              <Text style={styles.statLabel}>{isService ? 'Service Price' : 'Total Value'}</Text>
+              <Text style={styles.statLabel}>
+                {isService ? String(t.servicePriceLabel || 'Service Price') : String(t.totalValueLabel || 'Total Value')}
+              </Text>
             </View>
             {!isService && (
               <>
@@ -564,19 +625,20 @@ export default function ProductDetailScreen() {
                       <FontAwesome name="cubes" size={20} color="#fff" />
                     </LinearGradient>
                   </View>
-                  <Text style={styles.statValue}>{product.quantity}</Text>
-                  <Text style={styles.statLabel}>Units Available</Text>
+                  <Text style={styles.statValue}>
+                    {product.quantity} {localizedUnitLabel ? localizedUnitLabel : ''}
+                  </Text>
+                  <Text style={styles.statLabel}>{String(t.unitsAvailable || 'Units Available')}</Text>
                 </View>
               </>
             )}
           </LinearGradient>
         </View>
 
-        {/* Bottom spacing for fixed buttons */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Fixed Action Buttons with Gradient */}
+      {/* Fixed Action Buttons */}
       <LinearGradient
         colors={['rgba(255,255,255,0.95)', '#FFFFFF']}
         style={styles.fixedButtonContainer}
@@ -593,7 +655,7 @@ export default function ProductDetailScreen() {
             style={styles.offerButton}
           >
             <FontAwesome name="percent" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Add Offer</Text>
+            <Text style={styles.buttonText}>{String(t.addOffer || 'Add Offer')}</Text>
           </LinearGradient>
         </TouchableOpacity>
 
@@ -642,7 +704,7 @@ export default function ProductDetailScreen() {
                 >
                   <FontAwesome name="percent" size={20} color="#fff" />
                 </LinearGradient>
-                <Text style={styles.modalTitle}>Add New Offer</Text>
+                <Text style={styles.modalTitle}>{String(t.addNewOfferTitle || 'Add New Offer')}</Text>
               </View>
               <TouchableOpacity onPress={() => setShowOfferModal(false)}>
                 <FontAwesome name="times-circle" size={28} color="#999" />
@@ -650,14 +712,13 @@ export default function ProductDetailScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Discount Value Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Discount Percentage</Text>
+                <Text style={styles.inputLabel}>{String(t.discountPercentageLabel || 'Discount Percentage')}</Text>
                 <View style={styles.inputWrapper}>
                   <FontAwesome name="percent" size={18} color="#4A90E2" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter discount (e.g., 10)"
+                    placeholder={String(t.discountPlaceholder || 'Enter percentage')}
                     value={offerValue}
                     onChangeText={setOfferValue}
                     keyboardType="numeric"
@@ -666,9 +727,8 @@ export default function ProductDetailScreen() {
                 </View>
               </View>
 
-              {/* Start Date Picker */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Start Date</Text>
+                <Text style={styles.inputLabel}>{String(t.startDateLabel || 'Start Date')}</Text>
                 <TouchableOpacity 
                   style={styles.datePickerButton}
                   onPress={() => setShowStartDatePicker(true)}
@@ -689,9 +749,8 @@ export default function ProductDetailScreen() {
                 />
               )}
 
-              {/* End Date Picker */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>End Date</Text>
+                <Text style={styles.inputLabel}>{String(t.endDateLabel || 'End Date')}</Text>
                 <TouchableOpacity 
                   style={styles.datePickerButton}
                   onPress={() => setShowEndDatePicker(true)}
@@ -712,29 +771,27 @@ export default function ProductDetailScreen() {
                 />
               )}
 
-              {/* Preview Card */}
               {offerValue && parseFloat(offerValue) > 0 && (
                 <View style={styles.previewSection}>
-                  <Text style={styles.previewLabel}>Preview</Text>
+                  <Text style={styles.previewLabel}>{String(t.previewLabel || 'Preview')}</Text>
                   <LinearGradient
                     colors={['#FFE5E5', '#FFF0F0']}
                     style={styles.previewCard}
                   >
                     <View style={styles.previewBadge}>
                       <FontAwesome name="percent" size={16} color="#fff" />
-                      <Text style={styles.previewBadgeText}>{offerValue}% OFF</Text>
+                      <Text style={styles.previewBadgeText}>{offerValue}% {String(t.offLabel || 'OFF')}</Text>
                     </View>
                     <Text style={styles.previewPrice}>
                       ₹{numericPrice.toLocaleString('en-IN')} → ₹{Math.round(numericPrice - (numericPrice * parseFloat(offerValue) / 100)).toLocaleString('en-IN')}
                     </Text>
                     <Text style={styles.previewSavings}>
-                      You save ₹{Math.round(numericPrice * parseFloat(offerValue) / 100).toLocaleString('en-IN')} per unit
+                      {String(t.previewSavingsPrefix || 'You save')} ₹{Math.round(numericPrice * parseFloat(offerValue) / 100).toLocaleString('en-IN')} {String(t.previewSavingsSuffix || '')}
                     </Text>
                   </LinearGradient>
                 </View>
               )}
 
-              {/* Action Buttons */}
               <View style={styles.modalActions}>
                 <TouchableOpacity 
                   style={styles.cancelButton}
@@ -743,7 +800,7 @@ export default function ProductDetailScreen() {
                     resetOfferForm();
                   }}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>{String(t.cancel || 'Cancel')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -758,7 +815,7 @@ export default function ProductDetailScreen() {
                   >
                     <FontAwesome name="check" size={18} color="#fff" />
                     <Text style={styles.saveButtonText}>
-                      {addOfferMutation.isPending ? 'Adding...' : 'Add Offer'}
+                      {addOfferMutation.isPending ? String(t.addingState || 'Adding...') : String(t.addOffer || 'Add Offer')}
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -770,4 +827,3 @@ export default function ProductDetailScreen() {
     </View>
   );
 }
-

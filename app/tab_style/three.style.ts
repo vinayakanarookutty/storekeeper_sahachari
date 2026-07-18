@@ -12,7 +12,7 @@ export const screenStyles = StyleSheet.create({
   },
   filterBarContainer: {
     backgroundColor: '#fff', 
-    paddingVertical: 12, 
+    paddingVertical: 18, 
     borderBottomWidth: 1, 
     borderBottomColor: '#eee',
   },
@@ -20,6 +20,7 @@ export const screenStyles = StyleSheet.create({
     paddingHorizontal: 14, 
     paddingVertical: 8, 
     borderRadius: 20, 
+    marginTop:40,
     marginRight: 8, 
     backgroundColor: '#f5f5f5',
   },
@@ -28,7 +29,7 @@ export const screenStyles = StyleSheet.create({
     fontSize: 11,
   },
   orderCard: {
-    marginBottom: 15,
+    marginBottom: 10,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#fff',

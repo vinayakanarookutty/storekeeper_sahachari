@@ -1,3 +1,4 @@
+// D:\storekeeper_sahachari\app\edit-product.tsx
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,6 +20,7 @@ import {
 } from 'react-native';
 import { getToken } from './services/auth';
 import { styles } from './styles/add-edit-common.style';
+import { useLanguage } from './contexts/LanguageContext';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
@@ -28,7 +30,6 @@ const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
 const RENT_UNITS = ['Hour', 'Day', 'Week', 'Month'];
 const SERVICE_UNITS = ['Hour', 'Day', 'Service'];
 
-// Add below your S3_BASE_URL constant definition
 const showAlert = (title: string, message: string, onConfirm?: () => void) => {
   if (Platform.OS === 'web') {
     alert(`${title}: ${message}`);
@@ -55,10 +56,10 @@ export default function EditProductScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { t } = useLanguage();
   
   const product = params.product ? JSON.parse(params.product as string) : null;
 
-  // FIX: Parse existing price AND units properly for all categories
   const parsePriceData = () => {
     if (!product?.price) return { val: '', unit: 'kg' };
     const parts = product.price.toString().split('/');
@@ -82,7 +83,7 @@ export default function EditProductScreen() {
   const [price, setPrice] = useState(initialPriceInfo.val);
   const [serviceUnit, setServiceUnit] = useState(initialPriceInfo.unit);
   const [quantity, setQuantity] = useState(product?.quantity?.toString() || '');
-  const [unit, setUnit] = useState(initialPriceInfo.unit); // FIX: Dynamic assignment, not hardcoded to 'kg'
+  const [unit, setUnit] = useState(initialPriceInfo.unit);
   
   const [existingImages, setExistingImages] = useState<string[]>(product?.images || []);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -96,6 +97,21 @@ export default function EditProductScreen() {
   const isService = category === 'Service';
   const isRent = category === 'Rent';
   const needsTimeUnit = isService || isRent;
+
+  // SAFE DICTIONARY RESOLVER FOR CATS & UNITS
+  const translateKey = (target: string, group: 'categories' | 'units' = 'categories'): string => {
+    if (!target) return '';
+    const lookupKey = target.toLowerCase().trim();
+    const contextMap = t as any;
+
+    if (group === 'units' && contextMap.units && typeof contextMap.units === 'object') {
+      if (lookupKey in contextMap.units) return contextMap.units[lookupKey];
+    }
+    if (lookupKey in contextMap) {
+      return contextMap[lookupKey];
+    }
+    return target; 
+  };
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ProductData }) => {
@@ -117,14 +133,13 @@ export default function EditProductScreen() {
       return response.json();
     },
     onSuccess: () => {
-      // Fix: Now uses web-safe alert mapping to ensure redirect executes
-      showAlert('Success', 'Updated successfully!', () => {
+      showAlert(t.successTitle || 'Success', 'Updated successfully!', () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         router.back();
       });
     },
     onError: (error: any) => {
-      showAlert('Error', error.message || 'Failed to update item');
+      showAlert(t.failedTitle || 'Error', error.message || 'Failed to update item');
     },
   });
 
@@ -148,11 +163,18 @@ export default function EditProductScreen() {
         let fileExtension = 'jpg';
         let fileType = 'image/jpeg';
 
-        // Web environment image metadata adjustment
         if (Platform.OS === 'web') {
           if (uri.includes('image/png') || uri.endsWith('.png')) {
             fileExtension = 'png';
             fileType = 'image/png';
+          }
+        } else {
+          // Robust physical device file extension parser
+          const uriParts = uri.split('.');
+          const ext = uriParts[uriParts.length - 1].toLowerCase();
+          if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+            fileExtension = ext;
+            fileType = ext === 'png' ? 'image/png' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
           }
         }
 
@@ -172,27 +194,27 @@ export default function EditProductScreen() {
       }
       setUploadedImageKeys(prev => [...prev, ...newKeys]);
       setSelectedImages([]);
-      showAlert('Success', 'New images uploaded!');
+      showAlert(t.successTitle || 'Success', 'New images uploaded!');
     } catch (e) {
-      showAlert('Error', 'Upload failed');
+      showAlert(t.failedTitle || 'Error', 'Upload failed');
     } finally {
       setIsUploading(false);
     }
   };
 
- const handleUpdateProduct = () => {
+  const handleUpdateProduct = () => {
     if (!category.trim() || !name.trim() || !description.trim() || !price) {
-      showAlert('Error', 'Please fill in all required fields');
+      showAlert(t.failedTitle || 'Error', 'Please fill in all required fields');
       return;
     }
     if (!isService && !quantity) {
-      showAlert('Error', 'Please enter the quantity');
+      showAlert(t.failedTitle || 'Error', 'Please enter the quantity');
       return;
     }
     
     const finalImages = [...existingImages, ...uploadedImageKeys];
     if (finalImages.length === 0) {
-      showAlert('Error', 'Please keep or upload at least one image');
+      showAlert(t.failedTitle || 'Error', 'Please keep or upload at least one image');
       return;
     }
 
@@ -210,7 +232,7 @@ export default function EditProductScreen() {
     const currentId = product?._id; 
 
     if (!currentId) {
-      return showAlert('Error', 'Could not locate an active Product ID to update');
+      return showAlert(t.failedTitle || 'Error', 'Could not locate an active Product ID to update');
     }
 
     updateProductMutation.mutate({
@@ -219,7 +241,7 @@ export default function EditProductScreen() {
     });
   };
 
-  const SelectionModal = ({ visible, data, title, onSelect, onClose }: any) => (
+  const SelectionModal = ({ visible, data, title, onSelect, onClose, isUnitMode = false }: any) => (
     <Modal visible={visible} transparent animationType="slide">
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.modalOverlay}>
@@ -233,7 +255,9 @@ export default function EditProductScreen() {
               keyExtractor={(item) => item}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.modalItem} onPress={() => onSelect(item)}>
-                  <Text style={styles.modalItemText}>{item}</Text>
+                  <Text style={styles.modalItemText}>
+                    {translateKey(item, isUnitMode ? 'units' : 'categories')}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
@@ -246,7 +270,9 @@ export default function EditProductScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Edit {isService ? 'Service' : 'Product'}</Text>
+        <Text style={styles.headerTitle}>
+          {isService ? (t.editService || 'Edit Service') : (t.editProduct || 'Edit Product')}
+        </Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <FontAwesome name="times" size={24} color="#2D2416" />
         </TouchableOpacity>
@@ -255,22 +281,48 @@ export default function EditProductScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* CATEGORY SELECTOR */}
         <TouchableOpacity style={styles.inputWrapper} onPress={() => setShowCategoryModal(true)}>
-          <TextInput style={[styles.input, { marginBottom: 0 }]} value={category} editable={false} placeholder="Category *" placeholderTextColor="#A89378" />
+          <TextInput 
+            style={[styles.input, { marginBottom: 0 }]} 
+            value={translateKey(category, 'categories')} 
+            editable={false} 
+            placeholder={t.selectCategory ? `${t.selectCategory} *` : "Category *"} 
+            placeholderTextColor="#A89378" 
+          />
           <FontAwesome name="chevron-down" size={14} color="#A89378" style={styles.inputIcon} />
         </TouchableOpacity>
 
-        <TextInput style={styles.input} placeholder="Name *" value={name} onChangeText={setName} placeholderTextColor="#A89378" />
-        <TextInput style={[styles.input, styles.textArea]} placeholder="Description *" value={description} onChangeText={setDescription} multiline placeholderTextColor="#A89378" />
+        <TextInput 
+          style={styles.input} 
+          placeholder={isService ? `${t.serviceName || 'Service Name'} *` : `${t.productName || 'Product Name'} *`} 
+          value={name} 
+          onChangeText={setName} 
+          placeholderTextColor="#A89378" 
+        />
+        <TextInput 
+          style={[styles.input, styles.textArea]} 
+          placeholder={t.description ? `${t.description} *` : "Description *"} 
+          value={description} 
+          onChangeText={setDescription} 
+          multiline 
+          placeholderTextColor="#A89378" 
+        />
 
         {/* PRICE & DYNAMIC UNIT */}
         <View style={styles.parallelContainer}>
           <View style={{ flex: 2 }}>
-            <TextInput style={styles.input} placeholder="Price *" value={price} onChangeText={setPrice} keyboardType="numeric" placeholderTextColor="#A89378" />
+            <TextInput 
+              style={styles.input} 
+              placeholder={t.price ? `${t.price} *` : "Price *"} 
+              value={price} 
+              onChangeText={setPrice} 
+              keyboardType="numeric" 
+              placeholderTextColor="#A89378" 
+            />
           </View>
           {needsTimeUnit && (
             <View style={{ flex: 1.5, marginLeft: 10 }}>
               <TouchableOpacity style={styles.unitSelector} onPress={() => setShowServiceUnitModal(true)}>
-                <Text style={styles.unitText}>/ {serviceUnit}</Text>
+                <Text style={styles.unitText}>/ {translateKey(serviceUnit, 'units')}</Text>
                 <FontAwesome name="caret-down" size={16} color="#DAA520" />
               </TouchableOpacity>
             </View>
@@ -280,13 +332,27 @@ export default function EditProductScreen() {
         {/* STOCK & UNIT */}
         {!isService && (
           <View style={styles.parallelContainer}>
-            <View style={{ flex: 2 }}>
-              <TextInput style={styles.input} placeholder={isRent ? "Stock (Unit) *" : "Stock *"} value={quantity} onChangeText={setQuantity} keyboardType="numeric" placeholderTextColor="#A89378" />
+            <View style={{ flex: 1.5 }}>
+              <TextInput 
+                style={styles.input} 
+                placeholder={isRent ? `${t.stockQty || 'Stock'} (Unit) *` : `${t.stockQty || 'Stock'} *`} 
+                value={quantity} 
+                onChangeText={setQuantity} 
+                keyboardType="numeric" 
+                placeholderTextColor="#A89378" 
+              />
             </View>
             {!isRent && (
-              <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={{ flex: 1.3, marginLeft: 10, minWidth: 115 }}>
                 <TouchableOpacity style={styles.unitSelector} onPress={() => setShowUnitModal(true)}>
-                  <Text style={styles.unitText}>{unit}</Text>
+                  <Text 
+                    style={[styles.unitText, { flex: 1, marginRight: 4 }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit={true}
+                    minimumFontScale={0.7}
+                  >
+                    {translateKey(unit, 'units')}
+                  </Text>
                   <FontAwesome name="caret-down" size={16} color="#DAA520" />
                 </TouchableOpacity>
               </View>
@@ -296,7 +362,7 @@ export default function EditProductScreen() {
 
         {/* IMAGE MANAGEMENT */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Manage Images</Text>
+          <Text style={styles.sectionTitle}>{t.manageImages || 'Manage Images'}</Text>
           
           <View style={styles.imagesContainer}>
             {existingImages.map((img, index) => (
@@ -319,12 +385,12 @@ export default function EditProductScreen() {
 
           <TouchableOpacity style={styles.pickButton} onPress={pickImages}>
             <FontAwesome name="plus" size={20} color="#DAA520" />
-            <Text style={styles.pickButtonText}>Add New Images</Text>
+            <Text style={styles.pickButtonText}>{t.addNewImages || 'Add New Images'}</Text>
           </TouchableOpacity>
 
           {selectedImages.length > 0 && (
             <TouchableOpacity style={styles.uploadButton} onPress={uploadImages} disabled={isUploading}>
-              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>Upload Selection</Text>}
+              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.uploadButtonText}>{t.uploadSelection || 'Upload Selection'}</Text>}
             </TouchableOpacity>
           )}
         </View>
@@ -334,7 +400,9 @@ export default function EditProductScreen() {
           onPress={handleUpdateProduct}
           disabled={updateProductMutation.isPending}
         >
-          <Text style={styles.createButtonText}>Save Changes</Text>
+          <Text style={styles.createButtonText}>
+            {t.saveLabel || 'Save Changes'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -342,10 +410,10 @@ export default function EditProductScreen() {
       <SelectionModal 
         visible={showCategoryModal} 
         data={PRODUCT_CATEGORIES} 
-        title="Select Category" 
+        title={t.selectCategory || "Select Category"} 
+        isUnitMode={false}
         onSelect={(item: string) => { 
           setCategory(item); 
-          // FIX: Automatically keep unit states contextually synchronized on live selection
           if (item === 'Service') {
             setServiceUnit('Hour');
           } else if (item === 'Rent') {
@@ -361,7 +429,8 @@ export default function EditProductScreen() {
       <SelectionModal 
         visible={showUnitModal} 
         data={UNITS} 
-        title="Select Unit" 
+        title={t.selectUnit || "Select Unit"} 
+        isUnitMode={true}
         onSelect={(item: string) => { 
           setUnit(item); 
           setShowUnitModal(false); 
@@ -372,7 +441,8 @@ export default function EditProductScreen() {
       <SelectionModal 
         visible={showServiceUnitModal} 
         data={isService ? SERVICE_UNITS : RENT_UNITS} 
-        title="Select Unit" 
+        title={t.selectUnit || "Select Unit"} 
+        isUnitMode={true}
         onSelect={(item: string) => { 
           setServiceUnit(item); 
           setShowServiceUnitModal(false); 

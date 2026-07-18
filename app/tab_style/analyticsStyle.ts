@@ -5,8 +5,9 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    paddingTop:10,
     padding: 16,
-    paddingBottom: 90, 
+    paddingBottom: 10, 
   },
   centerContainer: {
     flex: 1,
@@ -16,7 +17,7 @@ export const styles = StyleSheet.create({
   toggleContainer: {
     flexDirection: 'row',
     borderRadius: 12,
-    padding: 4,
+    padding: 34,
     borderWidth: 1,
     marginBottom: 16,
   },

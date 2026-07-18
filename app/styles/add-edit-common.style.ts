@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 export const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF9E6' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, borderBottomWidth: 1, borderBottomColor: '#E0D6C3' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#2D2416' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#2D2416' },
   closeButton: { padding: 8 },
   scrollView: { flex: 1 },
   content: { padding: 20 },

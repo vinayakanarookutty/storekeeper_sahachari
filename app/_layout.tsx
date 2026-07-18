@@ -7,7 +7,9 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { Image, Platform, View } from 'react-native';
-import { styles } from './styles/_layout.style';import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { styles } from './styles/_layout.style';
 
 // Prevent auto-hide so we control the timing
 SplashScreen.preventAutoHideAsync();
@@ -71,12 +73,14 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
+  <AuthProvider>
+    <LanguageProvider>
       <QueryClientProvider client={queryClient}>
         <RootLayoutNav />
       </QueryClientProvider>
-    </AuthProvider>
-  );
+    </LanguageProvider>
+  </AuthProvider>
+);
 }
 
 function RootLayoutNav() {

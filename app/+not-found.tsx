@@ -1,9 +1,11 @@
 import { Link, Stack } from 'expo-router';
 import { StyleSheet } from 'react-native';
-
 import { Text, View } from '@/components/Themed';
+import { useLanguage } from './contexts/LanguageContext';
 
 export default function NotFoundScreen() {
+  const { t } = useLanguage();
+
   return (
     <>
       <Stack.Screen options={{ title: 'Oops!' }} />
@@ -11,7 +13,10 @@ export default function NotFoundScreen() {
         <Text style={styles.title}>This screen doesn't exist.</Text>
 
         <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Go to home screen!</Text>
+          {/* Using 'all' or fallback to safely adhere to TS schemas */}
+          <Text style={styles.linkText}>
+            {t.all ? `Go back` : 'Go to home screen!'}
+          </Text>
         </Link>
       </View>
     </>

@@ -1,4 +1,5 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome'; // Added for the eye icon
+// D:\storekeeper_sahachari\app\login.tsx
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -14,10 +15,10 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from './contexts/AuthContext';
+import { useLanguage } from './contexts/LanguageContext'; // Imported context hook
 import { getCurrentUser, loginApi } from './services/api';
 import { styles } from './styles/login.style';
 
-// Add this below: import { styles } from './styles/login.style';
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web') {
     alert(`${title}: ${message}`);
@@ -30,12 +31,13 @@ export default function LoginScreen() {
   const router = useRouter();
   const { setAuthToken } = useAuth();
   const queryClient = useQueryClient();
+  const { language, setLanguage, t } = useLanguage(); // Extract language properties
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // State to toggle visibility
+  const [showPassword, setShowPassword] = useState(false);
 
- const loginMutation = useMutation({
+  const loginMutation = useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
       const loginResponse = await loginApi(credentials);
       return loginResponse;
@@ -48,20 +50,24 @@ export default function LoginScreen() {
       } catch (error) {
         console.log('Could not fetch user data:', error);
       }
-      // Fix: Routing to '/' is cleaner and universally parsed across native and web engines
       router.replace('/');
     },
     onError: (error: any) => {
-      showAlert('Login Failed', error.message || 'Invalid email or password');
+      showAlert(t.failedTitle || 'Login Failed', error.message || 'Invalid email or password');
     },
   });
 
   const handleLogin = () => {
     if (!email.trim() || !password.trim()) {
-      showAlert('Error', 'Please fill in all fields');
+      showAlert(t.errorTitle || 'Error', t.fillFieldsMsg || 'Please fill in all fields');
       return;
     }
     loginMutation.mutate({ email, password });
+  };
+
+  const toggleLanguage = () => {
+    const nextLang = language === 'en' ? 'ml' : 'en';
+    setLanguage(nextLang);
   };
 
   return (
@@ -69,18 +75,40 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
+      {/* Dynamic Language Selection Toggle Action Bar */}
+      <View style={{ width: '100%', alignItems: 'flex-end', paddingHorizontal: 24, paddingTop: 16 }}>
+        <TouchableOpacity 
+          onPress={toggleLanguage} 
+          style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            backgroundColor: '#F4EFE6', 
+            paddingVertical: 6, 
+            paddingHorizontal: 14, 
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: '#E6DCCD'
+          }}
+        >
+          <FontAwesome name="globe" size={15} color="#A89378" style={{ marginRight: 6 }} />
+          <Text style={{ color: '#2D2416', fontWeight: '600', fontSize: 13 }}>
+            {language === 'en' ? 'മലയാളം' : 'English'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Log in to your account</Text>
+          <Text style={styles.title}>{t.welcomeBack}</Text>
+          <Text style={styles.subtitle}>{t.loginSubtitle}</Text>
 
           <View style={styles.form}>
             <TextInput
               style={styles.input}
-              placeholder="Email"
+              placeholder={t.emailPlaceholder}
               placeholderTextColor="#A89378"
               value={email}
               onChangeText={setEmail}
@@ -93,11 +121,11 @@ export default function LoginScreen() {
             <View style={styles.passwordContainer}>
               <TextInput
                 style={styles.passwordInput}
-                placeholder="Password"
+                placeholder={t.passwordPlaceholder}
                 placeholderTextColor="#A89378"
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry={!showPassword} // Toggles secure entry
+                secureTextEntry={!showPassword}
                 editable={!loginMutation.isPending}
               />
               <TouchableOpacity 
@@ -120,18 +148,18 @@ export default function LoginScreen() {
               {loginMutation.isPending ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.buttonText}>Log In</Text>
+                <Text style={styles.buttonText}>{t.logInLabel}</Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
-  style={styles.forgotPassword}
-  onPress={() => router.push('/forgot-password' as any)}
->
-  <Text style={styles.forgotPasswordText}>
-    Forgot Password?
-  </Text>
-</TouchableOpacity>
+              style={styles.forgotPassword}
+              onPress={() => router.push('/forgot-password' as any)}
+            >
+              <Text style={styles.forgotPasswordText}>
+                {t.forgotPasswordLabel}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
