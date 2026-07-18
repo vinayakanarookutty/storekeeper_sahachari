@@ -5,6 +5,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FDFCF7', // Crisp off-white with a very subtle warm undertone
     alignItems: 'center',
+    marginBottom:50
   },
 
   maxWidthWrapper: {
@@ -155,12 +156,10 @@ export const styles = StyleSheet.create({
      FLOATING ACTION BUTTONS
   ========================= */
   actionButtonsContainer: {
-    width: '100%',
-    paddingTop:40,
-    paddingBottom:10,
-    marginTop: -25, // Pulls the buttons up to float cleanly over the gradient split line
-    zIndex: 10,
-  },
+  width: '100%',
+  paddingTop: 15,
+  paddingBottom: 10,
+},
 
   actionButtons: {
     flexDirection: 'row',
@@ -177,7 +176,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#DAA520', // Vibrant Golden Theme Accent Button
     borderRadius: 16,
     minHeight: 48,
-    gap: 6,
+    gap: 3,
     elevation: 4,
     shadowColor: '#DAA520',
     shadowOffset: { width: 0, height: 4 },
@@ -193,7 +192,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#1E293B', // Deep Charcoal Slate for contrast balance
     borderRadius: 16,
     minHeight: 48,
-    gap: 6,
+    gap: 3,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -211,8 +210,8 @@ export const styles = StyleSheet.create({
      PRODUCT GRID LIST
   ========================= */
   list: {
-    padding: 10,
-    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingTop: 16, // Smoother breathing room below the action buttons
   },
 
   columnWrapper: {
@@ -221,25 +220,24 @@ export const styles = StyleSheet.create({
 
   productCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    marginBottom: 18,
+    borderRadius: 16,
+    marginBottom: 16,
     overflow: 'hidden',
     
-    // Smooth modern low-opacity drop shadows instead of harsh thick borders
     ...Platform.select({
       ios: {
         shadowColor: '#2D2416',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.05,
-        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 3,
+        elevation: 2,
       },
       web: {
         cursor: 'pointer',
-        transition: 'all 0.25s ease-in-out',
-        boxShadow: '0px 8px 24px rgba(45, 36, 22, 0.05)',
+        transition: 'all 0.2s ease-in-out',
+        boxShadow: '0px 4px 12px rgba(45, 36, 22, 0.06)',
       },
     }),
   },
@@ -263,21 +261,21 @@ export const styles = StyleSheet.create({
   },
 
   offerBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    backgroundColor: '#E74C3C', // Eye-catching sale red
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    zIndex: 10,
-  },
+  position: 'absolute',
+  top: 10,
+  left: 10,
+  backgroundColor: '#E74C3C', // Eye-catching sale red
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 8,
+  zIndex: 10,
+},
 
-  offerBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-  },
+offerBadgeText: {
+  color: '#FFFFFF',
+  fontSize: 10,
+  fontWeight: '900',
+},
 
   productInfo: {
     padding: 14,

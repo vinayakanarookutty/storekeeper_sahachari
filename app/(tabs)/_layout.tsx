@@ -5,8 +5,9 @@ import React, { useEffect } from 'react';
 import {
   StyleSheet,
   View,
-  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // ADD THIS
+
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -20,7 +21,8 @@ function TabBarIcon(props: {
       style={[
         styles.iconContainer,
         props.focused && styles.activeIconContainer,
-      ]}>
+      ]}
+    >
       <FontAwesome
         size={22}
         {...props}
@@ -38,12 +40,14 @@ export default function TabLayout() {
   const { t } = useLanguage();
   const router = useRouter();
 
+  const insets = useSafeAreaInsets(); // ADD THIS
+
   const theme = {
     background: colorScheme === 'dark' ? '#121212' : '#FDFCF7',
     card: colorScheme === 'dark' ? '#1E1E1E' : '#FFFFFF',
     text: colorScheme === 'dark' ? '#FFFFFF' : '#1A140B',
     inactive: colorScheme === 'dark' ? '#8E8E93' : '#A0AEC0',
-    primary: '#DAA520', 
+    primary: '#DAA520',
     border: colorScheme === 'dark' ? '#2C2C2E' : '#E5E7EB',
   };
 
@@ -56,36 +60,44 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false, 
+        headerShown: false,
+        tabBarHideOnKeyboard: true,
 
-        tabBarStyle: { 
-          height: 72,
-          borderRadius: 24,
+        tabBarStyle: {
           backgroundColor: theme.card,
           borderTopWidth: 0,
-          paddingTop: 10,
-          paddingBottom: Platform.OS === 'ios' ? 14 : 10,
-          elevation: 8,
-          shadowColor: '#DAA520', 
+
+          // Dynamic height based on device safe area
+          height: 60 + insets.bottom,
+
+          paddingTop: 3,
+          paddingBottom: Math.max(insets.bottom, 10),
+
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+
+          elevation: 12,
+          shadowColor: '#DAA520',
           shadowOpacity: 0.08,
-          shadowRadius: 16,
+          shadowRadius: 9,
           shadowOffset: {
             width: 0,
-            height: 6,
+            height: -4,
           },
+
+          position: 'absolute', // important
         },
 
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
-          marginTop: 2,
+          marginTop: 1,
         },
 
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.inactive,
-      }}>
-
-      {/* HOME TAB */}
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
@@ -100,7 +112,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* ORDERS TAB */}
       <Tabs.Screen
         name="three"
         options={{
@@ -115,7 +126,20 @@ export default function TabLayout() {
         }}
       />
 
-      {/* ANALYTICS TAB */}
+      <Tabs.Screen
+        name="bookings"
+        options={{
+          title: 'Bookings',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon
+              name="calendar"
+              color={color}
+              focused={focused}
+            />
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="Analytics"
         options={{
@@ -130,11 +154,10 @@ export default function TabLayout() {
         }}
       />
 
-      {/* PROFILE SCREEN (HIDDEN FROM BOTTOM TAB BAR) */}
       <Tabs.Screen
         name="two"
         options={{
-          href: null, 
+          href: null,
         }}
       />
     </Tabs>
@@ -143,13 +166,15 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   iconContainer: {
-    width: 44,
-    height: 44,
+    width: 35,
+    height: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 80,
   },
+
   activeIconContainer: {
-    backgroundColor: 'rgba(218, 165, 32, 0.08)', 
+    backgroundColor: 'rgba(218,165,32,0.08)',
+    
   },
 });

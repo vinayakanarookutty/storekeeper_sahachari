@@ -5,10 +5,10 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop:10,
-    padding: 16,
-    paddingBottom: 10, 
-  },
+  paddingTop: 10,
+  paddingHorizontal: 16,
+  paddingBottom: Platform.OS === 'ios' ? 110 : 95,
+},
   centerContainer: {
     flex: 1,
     justifyContent: 'center',

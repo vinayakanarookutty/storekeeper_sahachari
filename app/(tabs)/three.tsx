@@ -164,12 +164,17 @@ export default function OrdersScreen() {
     );
     const isSelfPickup = order.paymentMethod === 'SELF_PICKUP';
 
+    const anyPending = updateStatusMutation.isPending;
+    const isThisOrderPending = anyPending && updateStatusMutation.variables?.orderId === order._id;
+    const pendingEndpoint = isThisOrderPending ? updateStatusMutation.variables?.endpoint : null;
+
     return (
       <View style={screenStyles.actionsContainer}>
         {order.status === 'PLACED' && (
           <>
             <TouchableOpacity 
               style={{ flex: 2 }} 
+              disabled={anyPending}
               onPress={() => handleAction(
                 order._id, 
                 'ready', 
@@ -177,18 +182,27 @@ export default function OrdersScreen() {
               )}
             >
               <LinearGradient colors={['#4CAF50', '#2E7D32']} style={screenStyles.actionButtonGradient}>
-                <Text style={screenStyles.actionButtonText}>
-                  {isServiceOrRent ? (t.accept || 'ACCEPT') : (t.markReady || 'MARK READY')}
-                </Text>
+                {pendingEndpoint === 'ready' ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={screenStyles.actionButtonText}>
+                    {isServiceOrRent ? (t.accept || 'ACCEPT') : (t.markReady || 'MARK READY')}
+                  </Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={{ flex: 1 }} 
+              disabled={anyPending}
               onPress={() => handleAction(order._id, 'reject', t.confirmRejectOrder || 'Do you want to Reject this Order?')}
             >
               <LinearGradient colors={['#F44336', '#D32F2F']} style={screenStyles.actionButtonGradient}>
-                <Text style={screenStyles.actionButtonText}>{t.reject || 'REJECT'}</Text>
+                {pendingEndpoint === 'reject' ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={screenStyles.actionButtonText}>{t.reject || 'REJECT'}</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </>
@@ -197,10 +211,15 @@ export default function OrdersScreen() {
         {(order.status === 'READY' || order.status === 'ACCEPTED') && (isServiceOrRent || isSelfPickup) && (
             <TouchableOpacity 
               style={{ flex: 1 }} 
+              disabled={anyPending}
               onPress={() => handleAction(order._id, 'deliver', t.confirmCompleteOrder || 'Do you want to Complete this Order?')}
             >
               <LinearGradient colors={['#2196F3', '#1976D2']} style={screenStyles.actionButtonGradient}>
-                <Text style={screenStyles.actionButtonText}>{t.completeDeliver || 'COMPLETE / DELIVER'}</Text>
+                {pendingEndpoint === 'deliver' ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={screenStyles.actionButtonText}>{t.completeDeliver || 'COMPLETE / DELIVER'}</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
         )}

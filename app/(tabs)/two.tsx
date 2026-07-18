@@ -372,7 +372,7 @@ export default function TabTwoScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>
-              {language === 'ml' ? 'അഡ്മിൻ കമ്മീഷൻ നിരക്ക്' : 'Platform Commission Rate'}
+              {language === 'ml' ? 'വിൽപന ലാഭം' : 'Platform Fee Percentage'}
             </Text>
             {isCommissionLoading ? (
               <ActivityIndicator size="small" color={COLORS.primary} style={{ alignSelf: 'flex-start', marginTop: 4 }} />
@@ -381,11 +381,11 @@ export default function TabTwoScreen() {
                 {commissionData?.percentage !== undefined ? `${commissionData.percentage}%` : '0%'}
               </Text>
             )}
-            <p className="text-[11px] text-zinc-500 mt-0.5">
+            <Text className="text-[11px] text-zinc-500 mt-0.5">
               {language === 'ml' 
                 ? '* ഈ ശതമാനം നിങ്ങളുടെ വിൽപന തുകയിൽ നിന്ന് ഈടാക്കുന്നതാണ്.' 
                 : '* This percentage is automatically charged from your items total sales.'}
-            </p>
+            </Text>
           </View>
         </View>
       </View>

@@ -259,7 +259,7 @@ export default function AnalyticsScreen() {
     const adminShare = completedRevenue - netStoreKeeperEarnings;
 
     return {
-      totalRevenue, // Now changes based on toggle!
+      totalRevenue,
       completedRevenue,
       adminShare,
       netStoreKeeperEarnings,
@@ -359,11 +359,11 @@ export default function AnalyticsScreen() {
             {/* 🪙 STOREKEEPER REWARD EARNINGS PANEL */}
 <View style={[styles.sectionCard, { backgroundColor: theme.card, borderLeftWidth: 5, borderLeftColor: '#10b981' }]}>
   <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 12, fontSize: 16 }]}>
-    {language === 'ml' ? 'കമ്മീഷൻ വരുമാന വിവരങ്ങൾ' : 'Your Commission Earnings'}
+    {language === 'ml' ? 'കമ്മീഷൻ വരുമാന വിവരങ്ങൾ' : 'App Commission Earnings'}
   </Text>
   
   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-    <Text style={{ color: theme.subText }}>{language === 'ml' ? 'നിങ്ങളുടെ കമ്മീഷൻ നിരക്ക്' : 'Your Commission Rate'}</Text>
+    <Text style={{ color: theme.subText }}>{language === 'ml' ? 'നിങ്ങളുടെ കമ്മീഷൻ നിരക്ക്' : 'App Commission Rate'}</Text>
     <Text style={{ color: theme.text, fontWeight: '700' }}>{commission?.percentage || 0}%</Text>
   </View>
 
@@ -375,7 +375,7 @@ export default function AnalyticsScreen() {
   <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 8 }} />
 
   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
-    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{language === 'ml' ? 'നിങ്ങൾ നേടിയ കമ്മീഷൻ' : 'Total Rupees Earned'}</Text>
+    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{language === 'ml' ? 'നിങ്ങൾ നേടിയ കമ്മീഷൻ' : 'Total Platform Fee'}</Text>
     <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 20 }}>
       ₹{Math.round(orderAnalytics.netStoreKeeperEarnings).toLocaleString('en-IN')}
     </Text>

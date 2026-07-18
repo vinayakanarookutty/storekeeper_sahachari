@@ -4,6 +4,7 @@ export const screenStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f9f9f9',
+    marginBottom:50
   },
   centered: {
     flex: 1, 
