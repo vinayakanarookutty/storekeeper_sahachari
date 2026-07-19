@@ -9,18 +9,27 @@ import { useAuth } from '@/app/contexts/AuthContext';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
 // Setup notification handler behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 async function registerForPushNotificationsAsync() {
-  if (Platform.OS === 'web') return;
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        await Notification.requestPermission();
+      }
+    }
+    return;
+  }
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -47,11 +56,20 @@ async function triggerOrderNotification(order: any) {
   const checkoutId = order.checkoutId?.toUpperCase() || order._id?.substring(0, 8).toUpperCase();
   const userName = order.userId?.name || 'Customer';
   const total = order.itemsSubtotal || order.totalAmount || '0';
+  const title = 'New Order Received! 🛒';
+  const body = `Order #${checkoutId} from ${userName} for ₹${total}`;
+
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body });
+    }
+    return;
+  }
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'New Order Received! 🛒',
-      body: `Order #${checkoutId} from ${userName} for ₹${total}`,
+      title,
+      body,
       data: { orderId: order._id, type: 'order' },
     },
     trigger: null, // immediate
@@ -63,11 +81,20 @@ async function triggerBookingNotification(booking: any) {
   const userName = booking.userId?.name || 'Customer';
   const itemName = booking.item?.itemName || 'Listing';
   const total = booking.totalAmount || '0';
+  const title = 'New Booking Received! 📅';
+  const body = `Booking #${bookingId} for "${itemName}" from ${userName} for ₹${total}`;
+
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body });
+    }
+    return;
+  }
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'New Booking Received! 📅',
-      body: `Booking #${bookingId} for "${itemName}" from ${userName} for ₹${total}`,
+      title,
+      body,
       data: { bookingId: booking._id, type: 'booking' },
     },
     trigger: null, // immediate
