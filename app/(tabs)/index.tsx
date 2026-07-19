@@ -417,6 +417,16 @@ export default function TabOneScreen() {
                     </View>
 
                     <View style={styles.headerRightActions}>
+                      <TouchableOpacity 
+                        style={styles.logoutIconButton}
+                        activeOpacity={0.8} 
+                        onPress={() => {
+                          refetch();
+                          queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+                        }}
+                      >
+                        <FontAwesome name="refresh" size={18} color="#FFFFFF" />
+                      </TouchableOpacity>
                       <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/two')}>
                         <Image
                           source={{ uri: userData?.image ? `${S3_BASE_URL}/${userData.image}` : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb' }}

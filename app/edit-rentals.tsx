@@ -69,10 +69,12 @@ export default function EditRentalScreen() {
     mutationFn: async ({ id, data }: { id: string; data: RentalData }) => {
       return rentalsApi.updateRental(id, data);
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       showAlert('Success', 'Rental listing updated successfully!', () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['rentals'] });
+        queryClient.invalidateQueries({ queryKey: ['rentalDetail', variables.id] });
+        queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
         router.back();
       });
     },

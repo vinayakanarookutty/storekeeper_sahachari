@@ -63,6 +63,7 @@ export default function AddRentScreen() {
         // Invalidates the store items cache list to force update screen feeds
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['rentals'] });
+        queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
         router.back();
       });
     },

@@ -67,6 +67,7 @@ export default function ServiceDetailScreen() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       Alert.alert(t.successTitle || 'Success', 'Professional service variant deleted safely.');
       router.back();
@@ -94,6 +95,8 @@ export default function ServiceDetailScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['serviceDetail', id] });
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       setShowOfferModal(false);
       setOfferValue('');
       Alert.alert(t.successTitle || 'Success', t.offerAddedSuccess || 'Operational deal successfully bound.');
@@ -114,6 +117,8 @@ export default function ServiceDetailScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['serviceDetail', id] });
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       Alert.alert(t.successTitle || 'Cleaned', t.offerDeletedSuccess || 'Service listings returned to default tariffs.');
     },
     onError: (err: any) => Alert.alert(t.failedTitle || 'Error', err.message),

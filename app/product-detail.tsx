@@ -2,12 +2,13 @@
 
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -64,7 +65,22 @@ export default function ProductDetailScreen() {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   
-  const product: Product = params.product ? JSON.parse(params.product as string) : null;
+  const initialProduct: Product = params.product ? JSON.parse(params.product as string) : null;
+  const productId = initialProduct?._id || params.id;
+
+  const { data: product, isLoading } = useQuery({
+    queryKey: ['productDetail', productId],
+    queryFn: async () => {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/storekeeper/products/${productId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch product information');
+      return res.json();
+    },
+    initialData: initialProduct,
+    enabled: !!productId,
+  });
 
   const isService = product?.category === 'Service';
 
@@ -177,6 +193,8 @@ export default function ProductDetailScreen() {
     onSuccess: () => {
       Alert.alert(t.successTitle, t.offerAddedSuccess);
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['productDetail', product?._id] });
+      queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       setShowOfferModal(false);
       resetOfferForm();
       router.back();
@@ -206,6 +224,8 @@ export default function ProductDetailScreen() {
     onSuccess: () => {
       Alert.alert(t.successTitle, t.offerDeletedSuccess);
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['productDetail', product?._id] });
+      queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       router.back();
     },
     onError: (error: any) => {
@@ -237,6 +257,7 @@ export default function ProductDetailScreen() {
           text: t.ok,
           onPress: () => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
             router.back();
           },
         },

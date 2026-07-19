@@ -10,6 +10,7 @@ import { Image, Platform, View } from 'react-native';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { styles } from './styles/_layout.style';
+import NotificationWatcher from '@/components/NotificationWatcher';
 
 // Prevent auto-hide so we control the timing
 SplashScreen.preventAutoHideAsync();
@@ -76,6 +77,7 @@ export default function RootLayout() {
   <AuthProvider>
     <LanguageProvider>
       <QueryClientProvider client={queryClient}>
+        <NotificationWatcher />
         <RootLayoutNav />
       </QueryClientProvider>
     </LanguageProvider>

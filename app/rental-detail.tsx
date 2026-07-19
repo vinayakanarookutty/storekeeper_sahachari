@@ -75,6 +75,7 @@ export default function RentalDetailScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rentals'] });
+      queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       Alert.alert(t.successTitle || 'Success', 'Rental item deleted safely.');
       router.back();
     },
@@ -102,6 +103,8 @@ export default function RentalDetailScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rentalDetail', id] });
+      queryClient.invalidateQueries({ queryKey: ['rentals'] });
+      queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       setShowOfferModal(false);
       resetOfferForm();
       Alert.alert(t.successTitle || 'Success', t.offerAddedSuccess || 'Offer attached successfully.');
@@ -122,6 +125,8 @@ export default function RentalDetailScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rentalDetail', id] });
+      queryClient.invalidateQueries({ queryKey: ['rentals'] });
+      queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       Alert.alert(t.successTitle || 'Cleared', t.offerDeletedSuccess || 'All promotion offers removed.');
     },
     onError: (err: any) => Alert.alert(t.failedTitle || 'Error', err.message),

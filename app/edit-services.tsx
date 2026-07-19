@@ -68,10 +68,12 @@ export default function EditServiceScreen() {
     mutationFn: async ({ id, data }: { id: string; data: ServiceData }) => {
       return servicesApi.updateService(id, data);
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       showAlert('Success', 'Service updated successfully!', () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['services'] });
+        queryClient.invalidateQueries({ queryKey: ['serviceDetail', variables.id] });
+        queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
         router.back();
       });
     },

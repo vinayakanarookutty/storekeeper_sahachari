@@ -107,6 +107,7 @@ export default function AddProductScreen() {
     onSuccess: () => {
       showAlert(t.successTitle || 'Success', 'Created successfully!', () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
         router.back();
       });
     },
@@ -213,7 +214,7 @@ export default function AddProductScreen() {
   };
 
   const handleCreateProduct = () => {
-    if (!category.trim() || !name.trim() || !description.trim() || !price) {
+    if (!category.trim() || !name.trim() || !description.trim() || !price || !quantity.trim()) {
       showAlert(t.failedTitle || 'Error', 'Please fill in all required fields');
       return;
     }
@@ -223,12 +224,18 @@ export default function AddProductScreen() {
       return;
     }
 
+    const parsedQty = parseInt(quantity, 10);
+    if (isNaN(parsedQty) || parsedQty < 0) {
+      showAlert(t.failedTitle || 'Error', 'Quantity must be a valid non-negative number');
+      return;
+    }
+
     const finalPrice =  `${price}/${unit}`;
     const productData: ProductData = {
       name,
       description,
       price: finalPrice,
-      quantity: parseInt(quantity),
+      quantity: parsedQty,
       category,
       images: uploadedImageKeys,
     };
@@ -332,6 +339,36 @@ export default function AddProductScreen() {
           </View>
         </View>
 
+        {/* STOCK QUANTITY AND UNIT */}
+        <View style={styles.parallelContainer}>
+          <View style={{ flex: 1.5 }}>
+            <TextInput
+              style={styles.input}
+              placeholder={t.stockQty ? `${t.stockQty} *` : "Stock *"}
+              placeholderTextColor="#A89378"
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={{ flex: 1.3, marginLeft: 10, minWidth: 115 }}>
+            <TouchableOpacity 
+              style={styles.unitSelector} 
+              onPress={() => setShowUnitModal(true)}
+            >
+              <Text 
+                style={[styles.unitText, { flex: 1, marginRight: 4 }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit={true}
+                minimumFontScale={0.7}
+              >
+                {getLocalizedUnitLabel(unit)}
+              </Text>
+              <FontAwesome name="caret-down" size={16} color="#DAA520" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
 
         {/* IMAGES SECTION */}
         <View style={styles.section}>
@@ -364,6 +401,9 @@ export default function AddProductScreen() {
           onPress={handleCreateProduct}
           disabled={createProductMutation.isPending || uploadedImageKeys.length === 0}
         >
+          <Text style={styles.createButtonText}>
+            {t.addProduct || 'Add Product'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -373,7 +413,7 @@ export default function AddProductScreen() {
         data={PRODUCT_CATEGORIES}
         title={t.selectCategory || "Select Category"}
         onSelect={handleSelectCategory}
-        close={(() => setShowCategoryModal(false))}
+        onClose={() => setShowCategoryModal(false)}
       />
 
       <SelectionModal 

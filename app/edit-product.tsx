@@ -41,12 +41,6 @@ const showAlert = (title: string, message: string, onConfirm?: () => void) => {
   }
 };
 
-interface Offer {
-  value: number;
-  startDate: string;
-  endDate: string;
-}
-
 interface ProductData {
   name: string;
   description: string;
@@ -54,7 +48,6 @@ interface ProductData {
   quantity: number;
   category: string;
   images: string[];
-  offers?: Offer[];
 }
 
 export default function EditProductScreen() {
@@ -83,10 +76,6 @@ export default function EditProductScreen() {
   const [price, setPrice] = useState(initialPriceInfo.val);
   const [quantity, setQuantity] = useState(product?.quantity?.toString() || '');
   const [unit, setUnit] = useState(initialPriceInfo.unit);
-  
-  // OFFER MANAGEMENT STATES
-  const [hasOffer, setHasOffer] = useState(!!(product?.offers && product.offers.length > 0));
-  const [offerValue, setOfferValue] = useState(product?.offers?.[0]?.value?.toString() || '');
 
   const [existingImages, setExistingImages] = useState<string[]>(product?.images || []);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -129,9 +118,11 @@ export default function EditProductScreen() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       showAlert(t.successTitle || 'Success', 'Updated successfully!', () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['productDetail', variables.id] });
+        queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
         router.back();
       });
     },
@@ -212,26 +203,6 @@ export default function EditProductScreen() {
 
     const finalPrice = `${price}/${unit}`;
 
-    // COMPUTE AUTOMATIC VALID DATES FOR OFFERS
-    let computedOffers: Offer[] = [];
-    if (hasOffer && offerValue.trim()) {
-      const numericValue = parseFloat(offerValue);
-      if (isNaN(numericValue) || numericValue <= 0 || numericValue > 100) {
-        showAlert(t.failedTitle || 'Error', 'Please enter a valid offer percentage between 1 and 100');
-        return;
-      }
-      
-      const today = new Date();
-      const nextYear = new Date();
-      nextYear.setFullYear(today.getFullYear() + 1);
-
-      computedOffers = [{
-        value: numericValue,
-        startDate: today.toISOString(),
-        endDate: nextYear.toISOString()
-      }];
-    }
-
     const productData: ProductData = {
       name,
       description,
@@ -239,7 +210,6 @@ export default function EditProductScreen() {
       quantity: parseInt(quantity, 10),
       category,
       images: finalImages,
-      offers: computedOffers,
     };
 
     const currentId = product?._id; 
@@ -356,28 +326,6 @@ export default function EditProductScreen() {
               <FontAwesome name="caret-down" size={16} color="#DAA520" />
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* INTEGRATED DYNAMIC OFFER CONFIGURATION SECTION */}
-        <View style={[styles.section, { borderTopWidth: 1, borderTopColor: '#F3EFE6', paddingTop: 15 }]}>
-          <TouchableOpacity 
-            style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}
-            onPress={() => setHasOffer(!hasOffer)}
-          >
-            <FontAwesome name={hasOffer ? "check-square" : "square-o"} size={20} color="#DAA520" />
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#2D2416' }}>Apply Promotional Discount Offer</Text>
-          </TouchableOpacity>
-          
-          {hasOffer && (
-            <TextInput 
-              style={styles.input} 
-              placeholder="Offer Discount Percentage (e.g. 10) *" 
-              value={offerValue} 
-              onChangeText={setOfferValue} 
-              keyboardType="numeric" 
-              placeholderTextColor="#A89378" 
-            />
-          )}
         </View>
 
         <View style={styles.section}>

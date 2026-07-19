@@ -62,6 +62,7 @@ export default function AddServiceScreen() {
         // Clear caches to refresh your views instantly
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['services'] });
+        queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
         router.back();
       });
     },
