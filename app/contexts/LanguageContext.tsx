@@ -17,6 +17,15 @@ const translations = {
     forgotPasswordLabel: 'Forgot Password?',
     fillFieldsMsg: 'Please fill in all fields',
     errorTitle: 'Error',
+    forgotPasswordTitle: 'Forgot Password',
+    enterEmailSubtitle: 'Enter your email to receive an OTP',
+    otpPlaceholder: 'OTP (6-digit)',
+    newPasswordPlaceholder: 'New Password',
+    resetPasswordBtn: 'Reset Password',
+    sendOtpBtn: 'Send OTP',
+    otpSentSuccess: 'OTP has been sent to your email successfully',
+    passwordResetSuccess: 'Password reset successfully!',
+    backToLogin: 'Back to Login',
 
     // Home
     sahachari: 'Sahachari',
@@ -222,6 +231,15 @@ const translations = {
     forgotPasswordLabel: 'പാസ്‌വേഡ് മറന്നുപോയോ?',
     fillFieldsMsg: 'ദയവായി എല്ലാ ഫീൽഡുകളും പൂരിപ്പിക്കുക',
     errorTitle: 'എറർ',
+    forgotPasswordTitle: 'പാസ്‌വേഡ് മറന്നുപോയോ?',
+    enterEmailSubtitle: 'OTP ലഭിക്കുന്നതിന് നിങ്ങളുടെ ഇമെയിൽ നൽകുക',
+    otpPlaceholder: 'OTP (6 അക്കങ്ങൾ)',
+    newPasswordPlaceholder: 'പുതിയ പാസ്‌വേഡ്',
+    resetPasswordBtn: 'പാസ്‌വേഡ് മാറ്റുക',
+    sendOtpBtn: 'OTP അയക്കുക',
+    otpSentSuccess: 'OTP വിജയകരമായി നിങ്ങളുടെ ഇമെയിലിലേക്ക് അയച്ചിട്ടുണ്ട്',
+    passwordResetSuccess: 'പാസ്‌വേഡ് വിജയകരമായി മാറ്റി!',
+    backToLogin: 'ലോഗിൻ പേജിലേക്ക് മടങ്ങുക',
 
     // Home
     sahachari: 'സഹചാരി',

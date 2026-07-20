@@ -76,10 +76,21 @@ export default function RentalDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rentals'] });
       queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
-      Alert.alert(t.successTitle || 'Success', 'Rental item deleted safely.');
+      const msg = 'Rental item deleted safely.';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.successTitle || 'Success', msg);
+      }
       router.back();
     },
-    onError: (err: any) => Alert.alert(t.failedTitle || 'Error', err.message),
+    onError: (err: any) => {
+      if (Platform.OS === 'web') {
+        alert(`${t.failedTitle || 'Error'}: ${err.message}`);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', err.message);
+      }
+    },
   });
 
   // 2. ADD OFFER MUTATION (Points to your POST rentals/:id/offer backend)
@@ -107,9 +118,20 @@ export default function RentalDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       setShowOfferModal(false);
       resetOfferForm();
-      Alert.alert(t.successTitle || 'Success', t.offerAddedSuccess || 'Offer attached successfully.');
+      const msg = t.offerAddedSuccess || 'Offer attached successfully.';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.successTitle || 'Success', msg);
+      }
     },
-    onError: (err: any) => Alert.alert(t.failedTitle || 'Error', err.message),
+    onError: (err: any) => {
+      if (Platform.OS === 'web') {
+        alert(`${t.failedTitle || 'Error'}: ${err.message}`);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', err.message);
+      }
+    },
   });
 
   // 3. REMOVE OFFER MUTATION (Points to your DELETE rentals/:id/offer backend)
@@ -127,9 +149,20 @@ export default function RentalDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['rentalDetail', id] });
       queryClient.invalidateQueries({ queryKey: ['rentals'] });
       queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
-      Alert.alert(t.successTitle || 'Cleared', t.offerDeletedSuccess || 'All promotion offers removed.');
+      const msg = t.offerDeletedSuccess || 'All promotion offers removed.';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.successTitle || 'Cleared', msg);
+      }
     },
-    onError: (err: any) => Alert.alert(t.failedTitle || 'Error', err.message),
+    onError: (err: any) => {
+      if (Platform.OS === 'web') {
+        alert(`${t.failedTitle || 'Error'}: ${err.message}`);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', err.message);
+      }
+    },
   });
 
   const resetOfferForm = () => {
@@ -142,15 +175,30 @@ export default function RentalDetailScreen() {
   const handleAddOffer = () => {
     const val = parseFloat(offerValue);
     if (!offerValue || isNaN(val) || val <= 0) {
-      Alert.alert(t.failedTitle || 'Error', t.invalidOfferValueError || 'Provide valid promotional metrics');
+      const msg = t.invalidOfferValueError || 'Provide valid promotional metrics';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', msg);
+      }
       return;
     }
     if (discountType === 'PERCENTAGE' && val > 100) {
-      Alert.alert(t.failedTitle || 'Error', t.offerExceedLimitError || 'Percentage cannot exceed 100%');
+      const msg = t.offerExceedLimitError || 'Percentage cannot exceed 100%';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', msg);
+      }
       return;
     }
     if (endDate <= startDate) {
-      Alert.alert(t.failedTitle || 'Error', t.dateOrderError || 'End date must arrive after start date');
+      const msg = t.dateOrderError || 'End date must arrive after start date';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', msg);
+      }
       return;
     }
 
@@ -164,21 +212,39 @@ export default function RentalDetailScreen() {
   };
 
   const handleDeleteOffer = () => {
-    Alert.alert(
-      t.deleteOfferTitle || 'Delete Offer',
-      t.deleteOfferConfirm || 'Are you certain you want to clear active offers?',
-      [
-        { text: t.cancel || 'Cancel', style: 'cancel' },
-        { text: t.delete || 'Delete', style: 'destructive', onPress: () => removeOfferMutation.mutate() },
-      ]
-    );
+    const title = t.deleteOfferTitle || 'Delete Offer';
+    const message = t.deleteOfferConfirm || 'Are you certain you want to clear active offers?';
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`${title}\n\n${message}`);
+      if (confirmed) removeOfferMutation.mutate();
+    } else {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: t.cancel || 'Cancel', style: 'cancel' },
+          { text: t.delete || 'Delete', style: 'destructive', onPress: () => removeOfferMutation.mutate() },
+        ]
+      );
+    }
   };
 
   const handleDeleteItem = () => {
-    Alert.alert(t.deleteProductTitle || 'Confirm Delete', 'Are you certain you want to clear this rental resource?', [
-      { text: t.cancel || 'Cancel', style: 'cancel' },
-      { text: t.delete || 'Delete', style: 'destructive', onPress: () => deleteRentalMutation.mutate() },
-    ]);
+    const title = t.deleteProductTitle || 'Confirm Delete';
+    const message = 'Are you certain you want to clear this rental resource?';
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`${title}\n\n${message}`);
+      if (confirmed) deleteRentalMutation.mutate();
+    } else {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: t.cancel || 'Cancel', style: 'cancel' },
+          { text: t.delete || 'Delete', style: 'destructive', onPress: () => deleteRentalMutation.mutate() },
+        ]
+      );
+    }
   };
 
   const handleScroll = (event: any) => {

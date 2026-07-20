@@ -47,11 +47,11 @@ interface ProductData {
 }
 
 const PRODUCT_CATEGORIES = [
-  'Food',
-  'Vegetables and Fruits',
-  'Groceries',
-  'Home Made',
-  'Fish & Meat',
+  'food',
+  'vegetables & fruits',
+  'groceries',
+  'home made',
+  'fish & meat',
   
 ];
 

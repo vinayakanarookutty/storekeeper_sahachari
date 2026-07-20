@@ -17,6 +17,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import { useLanguage } from './contexts/LanguageContext';
 import { getToken } from './services/auth';
@@ -69,10 +70,21 @@ export default function ServiceDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
-      Alert.alert(t.successTitle || 'Success', 'Professional service variant deleted safely.');
+      const msg = t.serviceDeletedSuccess || 'Professional service variant deleted safely.';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.successTitle || 'Success', msg);
+      }
       router.back();
     },
-    onError: (err: any) => Alert.alert(t.failedTitle || 'Error', err.message),
+    onError: (err: any) => {
+      if (Platform.OS === 'web') {
+        alert(`${t.failedTitle || 'Error'}: ${err.message}`);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', err.message);
+      }
+    },
   });
 
   // 2. CREATE SERVICE PROMOTION DEAL MUTATION HOOK
@@ -99,9 +111,20 @@ export default function ServiceDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
       setShowOfferModal(false);
       setOfferValue('');
-      Alert.alert(t.successTitle || 'Success', t.offerAddedSuccess || 'Operational deal successfully bound.');
+      const msg = t.offerAddedSuccess || 'Operational deal successfully bound.';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.successTitle || 'Success', msg);
+      }
     },
-    onError: (err: any) => Alert.alert(t.failedTitle || 'Error', err.message),
+    onError: (err: any) => {
+      if (Platform.OS === 'web') {
+        alert(`${t.failedTitle || 'Error'}: ${err.message}`);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', err.message);
+      }
+    },
   });
 
   // 3. WIPE PROMOTIONS MUTATION HOOK
@@ -119,19 +142,40 @@ export default function ServiceDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['serviceDetail', id] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
-      Alert.alert(t.successTitle || 'Cleaned', t.offerDeletedSuccess || 'Service listings returned to default tariffs.');
+      const msg = t.offerDeletedSuccess || 'Service listings returned to default tariffs.';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.successTitle || 'Cleaned', msg);
+      }
     },
-    onError: (err: any) => Alert.alert(t.failedTitle || 'Error', err.message),
+    onError: (err: any) => {
+      if (Platform.OS === 'web') {
+        alert(`${t.failedTitle || 'Error'}: ${err.message}`);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', err.message);
+      }
+    },
   });
 
   const handleAddOffer = () => {
     const val = parseFloat(offerValue);
     if (!offerValue || isNaN(val) || val <= 0) {
-      Alert.alert(t.failedTitle || 'Error', t.invalidOfferValueError || 'Provide realistic parameters');
+      const msg = t.invalidOfferValueError || 'Provide realistic parameters';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', msg);
+      }
       return;
     }
     if (discountType === 'PERCENTAGE' && val > 100) {
-      Alert.alert(t.failedTitle || 'Error', t.offerExceedLimitError || 'Percentage cannot exceed 100%');
+      const msg = t.offerExceedLimitError || 'Percentage cannot exceed 100%';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert(t.failedTitle || 'Error', msg);
+      }
       return;
     }
 
@@ -143,21 +187,39 @@ export default function ServiceDetailScreen() {
   };
 
   const handleDeleteOffer = () => {
-    Alert.alert(
-      t.deleteOfferTitle || 'Delete Offer',
-      t.deleteOfferConfirm || 'Are you certain you want to clear active promotional items?',
-      [
-        { text: t.cancel || 'Cancel', style: 'cancel' },
-        { text: t.delete || 'Delete', style: 'destructive', onPress: () => removeOfferMutation.mutate() },
-      ]
-    );
+    const title = t.deleteOfferTitle || 'Delete Offer';
+    const message = t.deleteOfferConfirm || 'Are you certain you want to clear active promotional items?';
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`${title}\n\n${message}`);
+      if (confirmed) removeOfferMutation.mutate();
+    } else {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: t.cancel || 'Cancel', style: 'cancel' },
+          { text: t.delete || 'Delete', style: 'destructive', onPress: () => removeOfferMutation.mutate() },
+        ]
+      );
+    }
   };
 
   const handleDeleteItem = () => {
-    Alert.alert(t.deleteProductTitle || 'Confirm Delete', 'Remove professional assistance item permanently?', [
-      { text: t.cancel || 'Cancel', style: 'cancel' },
-      { text: t.delete || 'Delete', style: 'destructive', onPress: () => deleteServiceMutation.mutate() },
-    ]);
+    const title = t.deleteServiceTitle || 'Delete Service';
+    const message = t.deleteServiceConfirm || 'Are you sure you want to delete this service? This action cannot be undone.';
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`${title}\n\n${message}`);
+      if (confirmed) deleteServiceMutation.mutate();
+    } else {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: t.cancel || 'Cancel', style: 'cancel' },
+          { text: t.delete || 'Delete', style: 'destructive', onPress: () => deleteServiceMutation.mutate() },
+        ]
+      );
+    }
   };
 
   const handleScroll = (event: any) => {

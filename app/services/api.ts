@@ -170,3 +170,19 @@ export async function createItem(data: any): Promise<any> {
     requiresAuth: true,
   });
 }
+
+export async function forgotPasswordApi(email: string): Promise<{ message: string }> {
+  return apiRequest("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+    requiresAuth: false,
+  });
+}
+
+export async function resetPasswordApi(email: string, otp: string, newPassword: string): Promise<{ message: string }> {
+  return apiRequest("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ email, otp, newPassword }),
+    requiresAuth: false,
+  });
+}
