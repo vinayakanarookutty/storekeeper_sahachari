@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { Audio } from 'expo-av';
 import { useQuery } from '@tanstack/react-query';
 import { fetchStoreBookings } from '@/app/services/bookingsApi';
 import { getToken } from '@/app/services/auth';
@@ -49,6 +50,36 @@ async function registerForPushNotificationsAsync() {
   if (finalStatus !== 'granted') {
     console.log('NotificationWatcher: Failed to get notification permission!');
     return;
+  }
+}
+
+async function playAlert() {
+  try {
+    if (Platform.OS !== 'web') {
+      // Vibrate: start immediately, vibrate 1s, pause 0.5s, vibrate 1s, pause 0.5s, vibrate 1s
+      Vibration.vibrate([0, 1000, 500, 1000, 500, 1000], false);
+
+      // Configure audio session to play sound even in silent mode if necessary
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+      });
+
+      // Load and play notification sound
+      const { sound } = await Audio.Sound.createAsync(
+        require('../assets/sounds/notification.wav')
+      );
+      await sound.playAsync();
+
+      // Automatically unload after playing
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+    }
+  } catch (error) {
+    console.warn('NotificationWatcher: Error playing alert sound/vibration:', error);
   }
 }
 
@@ -168,6 +199,7 @@ export default function NotificationWatcher() {
         seenOrderIds.current.add(order._id);
         if (order.status === 'PLACED') {
           triggerOrderNotification(order);
+          playAlert();
         }
       }
     });
