@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getToken } from '../services/auth';
 import { styles } from '../tab_style/index.style';
-import { fetchItems, fetchMyRentals, fetchMyServices } from '../services/productApi';
+import { fetchItems, fetchMyRentals, fetchMyServices, updateBulkStock } from '../services/productApi';
 
 import {
   ActivityIndicator,
@@ -62,6 +62,10 @@ export default function TabOneScreen() {
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  const [bulkStockModalOpen, setBulkStockModalOpen] = useState(false);
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
+  const [tempStocks, setTempStocks] = useState<Record<string, number>>({});
 
   // Debounce search query to keep the UI smooth during typing fast
   useEffect(() => {
@@ -158,6 +162,82 @@ export default function TabOneScreen() {
     },
     enabled: !!token,
   });
+
+  const updateBulkStockMutation = useMutation({
+    mutationFn: async (updates: { productId: string; quantity: number }[]) => {
+      return updateBulkStock(updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
+      setBulkStockModalOpen(false);
+      setModalSearchQuery('');
+      if (Platform.OS === 'web') {
+        alert('Stock updated successfully!');
+      } else {
+        Alert.alert('Success', 'Stock updated successfully!');
+      }
+    },
+    onError: (error: any) => {
+      if (Platform.OS === 'web') {
+        alert(`Failed to update stock: ${error.message}`);
+      } else {
+        Alert.alert('Error', error.message || 'Failed to update stock');
+      }
+    },
+  });
+
+  const productsOnly = useMemo(() => {
+    return combinedItems?.filter(item => item.itemType === 'product') || [];
+  }, [combinedItems]);
+
+  useEffect(() => {
+    if (bulkStockModalOpen && productsOnly.length > 0) {
+      const initialStocks: Record<string, number> = {};
+      productsOnly.forEach(p => {
+        initialStocks[p._id] = p.quantity;
+      });
+      setTempStocks(initialStocks);
+    }
+  }, [bulkStockModalOpen, productsOnly]);
+
+  const filteredModalProducts = useMemo(() => {
+    if (!modalSearchQuery.trim()) return productsOnly;
+    const query = modalSearchQuery.toLowerCase();
+    return productsOnly.filter(p =>
+      p.name?.toLowerCase().includes(query) ||
+      p.category?.toLowerCase().includes(query)
+    );
+  }, [productsOnly, modalSearchQuery]);
+
+  const handleQtyTextChange = (productId: string, text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+    const val = cleaned === '' ? 0 : parseInt(cleaned, 10);
+    setTempStocks(prev => ({
+      ...prev,
+      [productId]: val
+    }));
+  };
+
+  const handleSaveBulkStock = () => {
+    const updates: { productId: string; quantity: number }[] = [];
+    productsOnly.forEach(p => {
+      const newQty = tempStocks[p._id];
+      if (newQty !== undefined && newQty !== p.quantity) {
+        updates.push({ productId: p._id, quantity: newQty });
+      }
+    });
+
+    if (updates.length === 0) {
+      if (Platform.OS === 'web') {
+        alert('No changes to save.');
+      } else {
+        Alert.alert('No Changes', 'No changes to save.');
+      }
+      return;
+    }
+
+    updateBulkStockMutation.mutate(updates);
+  };
 
   // Processes filtering logic via reactive computed useMemo tracking debounced query strings
   const filteredItems = useMemo(() => {
@@ -485,6 +565,10 @@ export default function TabOneScreen() {
                       <Text style={styles.buttonText} numberOfLines={1}>{t.addItem || 'Add Item'}</Text>
                     </TouchableOpacity>
                   </View>
+                  <TouchableOpacity style={[styles.bulkStockButton, { marginTop: 12 }]} onPress={() => setBulkStockModalOpen(true)}>
+                    <FontAwesome name="pencil-square-o" size={16} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={styles.buttonText}>{(t as any).bulkEditStock || 'BULK EDIT STOCK'}</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             }
@@ -520,6 +604,131 @@ export default function TabOneScreen() {
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      <Modal animationType="slide" transparent={true} visible={bulkStockModalOpen} onRequestClose={() => setBulkStockModalOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{(t as any).bulkEditStock || 'Bulk Edit Stock'}</Text>
+              <TouchableOpacity onPress={() => setBulkStockModalOpen(false)} style={{ padding: 4 }}>
+                <FontAwesome name="times" size={20} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalSearchContainer}>
+              <View style={styles.modalSearchInputWrapper}>
+                <FontAwesome name="search" size={14} color="#9CA3AF" />
+                <TextInput
+                  style={styles.modalSearchInput}
+                  placeholder="Search products to edit..."
+                  placeholderTextColor="#9CA3AF"
+                  value={modalSearchQuery}
+                  onChangeText={setModalSearchQuery}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <FlatList
+              data={filteredModalProducts}
+              contentContainerStyle={styles.modalList}
+              keyExtractor={(item) => item._id}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => {
+                const currentQty = tempStocks[item._id] ?? 0;
+                return (
+                  <View style={styles.modalItemRow}>
+                    <View style={styles.modalItemLeft}>
+                      {item.images && item.images.length > 0 ? (
+                        <Image
+                          source={{ uri: item.images[0].startsWith('http') ? item.images[0] : `${S3_BASE_URL}/${item.images[0]}` }}
+                          style={styles.modalItemImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.modalItemPlaceholderImage}>
+                          <FontAwesome name="image" size={18} color="#9CA3AF" />
+                        </View>
+                      )}
+                      <View style={styles.modalItemDetails}>
+                        <Text style={styles.modalItemName} numberOfLines={1}>{item.name}</Text>
+                        <Text style={styles.modalItemUnit}>
+                          {item.price ? `${item.price.toString().split('/')[1] || 'pcs'}` : 'pcs'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.modalQtyContainer}>
+                      <TouchableOpacity
+                        style={[styles.qtyButton, currentQty <= 0 && styles.qtyButtonDisabled]}
+                        onPress={() => {
+                          if (currentQty > 0) {
+                            setTempStocks(prev => ({
+                              ...prev,
+                              [item._id]: currentQty - 1
+                            }));
+                          }
+                        }}
+                        disabled={currentQty <= 0}
+                      >
+                        <Text style={styles.qtyButtonText}>-</Text>
+                      </TouchableOpacity>
+
+                      <TextInput
+                        style={styles.qtyInput}
+                        value={String(currentQty)}
+                        onChangeText={(text) => handleQtyTextChange(item._id, text)}
+                        keyboardType="numeric"
+                        selectTextOnFocus
+                      />
+
+                      <TouchableOpacity
+                        style={styles.qtyButton}
+                        onPress={() => {
+                          setTempStocks(prev => ({
+                            ...prev,
+                            [item._id]: currentQty + 1
+                          }));
+                        }}
+                      >
+                        <Text style={styles.qtyButtonText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <FontAwesome name="folder-open-o" size={40} color="#9CA3AF" />
+                  <Text style={{ marginTop: 12, color: '#6B7280', fontSize: 15 }}>No products found</Text>
+                </View>
+              }
+            />
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setBulkStockModalOpen(false)}
+                disabled={updateBulkStockMutation.isPending}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveButton, updateBulkStockMutation.isPending && { opacity: 0.7 }]}
+                onPress={handleSaveBulkStock}
+                disabled={updateBulkStockMutation.isPending}
+              >
+                {updateBulkStockMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSaveButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );

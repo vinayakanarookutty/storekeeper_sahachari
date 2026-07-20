@@ -36,6 +36,7 @@ const translations = {
     noProducts: 'No products listed',
     createFirstProduct: 'Create your first product',
     bulkUpload: 'Bulk Upload',
+    bulkEditStock: 'Bulk Edit Stock',
 
     // Bulk Upload Specific Fields
     bulkUploadSubtitle: 'Upload Excel or CSV files to import products quickly',
@@ -250,6 +251,7 @@ const translations = {
     noProducts: 'ഉൽപ്പന്നങ്ങൾ ലഭ്യമല്ല',
     createFirstProduct: 'ആദ്യ ഉൽപ്പന്നം സൃഷ്ടിക്കുക',
     bulkUpload: 'ബൾക്ക് അപ്‌ലോഡ്',
+    bulkEditStock: 'ബൾക്ക് സ്റ്റോക്ക് എഡിറ്റ്',
 
     // Bulk Upload Specific Fields
     bulkUploadSubtitle: 'ഉൽപ്പന്നങ്ങൾ വേഗത്തിൽ ചേർക്കാൻ Excel അല്ലെങ്കിൽ CSV ഫയലുകൾ അപ്‌ലോഡ് ചെയ്യുക',
