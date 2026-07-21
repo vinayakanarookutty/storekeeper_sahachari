@@ -28,6 +28,7 @@
     },
 
     "android": {
+      "versionCode": 16,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#FFFFFF"
@@ -49,8 +50,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
 
-      "package": "com.corestoneinnovations.sahachariadmin",
-      "versionCode": 16
+      "package": "com.corestoneinnovations.sahachariadmin"
     },
 
     "web": {
