@@ -250,31 +250,63 @@ export default function BookingsScreen() {
           </View>
 
           <Text style={screenStyles.dateText}>
-            {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : 'Recent Booking'}
+            {booking.startDate
+              ? booking.bookingType === 'RENTAL' && booking.endDate
+                ? `Rental Period: ${new Date(booking.startDate).toLocaleDateString()} to ${new Date(booking.endDate).toLocaleDateString()}`
+                : `Service Date: ${new Date(booking.startDate).toLocaleDateString()}`
+              : booking.createdAt
+              ? `Created: ${new Date(booking.createdAt).toLocaleDateString()}`
+              : 'Recent Booking'}
           </Text>
 
-          {/* Customer Metadata Card */}
-          <TouchableOpacity onPress={() => toggleExpand(booking._id)} style={screenStyles.customerCard}>
+          {/* Customer Metadata & Address Details Card */}
+          <View style={screenStyles.customerCard}>
             <View style={screenStyles.customerRow}>
                 <View style={screenStyles.customerMainLeft}>
-                  <View style={screenStyles.avatarCircle}>
-                    <Text style={screenStyles.avatarText}>{booking.userId?.name?.charAt(0) || 'U'}</Text>
-                  </View>
-                  <Text style={screenStyles.customerNameMain}>
-                    {booking.userId?.name || (t.unknownUser || 'Customer Account')}
-                  </Text>
+                  {(() => {
+                    const nameToDisplay = booking.userName
+                      || (typeof booking.userId === 'object' && booking.userId?.name)
+                      || address.name
+                      || (address.phone ? `Customer (${address.phone.slice(-4)})` : (t.unknownUser || 'Customer Account'));
+                    const avatarLetter = nameToDisplay.charAt(0).toUpperCase();
+
+                    return (
+                      <>
+                        <View style={screenStyles.avatarCircle}>
+                          <Text style={screenStyles.avatarText}>{avatarLetter}</Text>
+                        </View>
+                        <View>
+                          <Text style={screenStyles.customerNameMain}>
+                            {nameToDisplay}
+                          </Text>
+                          {address.phone && (
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E40AF', marginTop: 2 }}>
+                              <FontAwesome name="phone" size={12} color="#1E40AF" /> Phone: {address.phone}
+                            </Text>
+                          )}
+                        </View>
+                      </>
+                    );
+                  })()}
                 </View>
-                <FontAwesome name={isExpanded ? "chevron-up" : "chevron-down"} size={12} color="#AAA" />
             </View>
-            {isExpanded && (
-              <View style={screenStyles.expandedDetails}>
-                {address.phone && <Text style={screenStyles.detailText}><FontAwesome name="phone" /> {address.phone}</Text>}
-                {address.street && <Text style={screenStyles.detailText}><FontAwesome name="map-marker" /> {address.street}, {address.city}, {address.place}</Text>}
-                {address.notes && <Text style={screenStyles.detailText}><FontAwesome name="info-circle" /> {address.notes}</Text>}
-                <Text style={screenStyles.detailText}><FontAwesome name="credit-card" /> Mode: {booking.paymentMethod} ({booking.paymentStatus})</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+
+            <View style={[screenStyles.expandedDetails, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' }]}>
+              {(address.street || address.city || address.place) && (
+                <Text style={{ fontSize: 13, color: '#334155', marginVertical: 2, fontWeight: '500' }}>
+                  <FontAwesome name="map-marker" size={13} color="#DC2626" /> Address: {[address.street, address.city, address.place, address.zipCode].filter(Boolean).join(', ')}
+                </Text>
+              )}
+              {address.notes && (
+                <Text style={{ fontSize: 12, color: '#64748B', fontStyle: 'italic', marginVertical: 2 }}>
+                  <FontAwesome name="info-circle" size={12} color="#0288D1" /> Notes: {address.notes}
+                </Text>
+              )}
+              <Text style={{ fontSize: 12, color: '#475569', marginVertical: 2 }}>
+                <FontAwesome name="credit-card" size={12} color="#475569" /> Payment: {booking.paymentMethod} ({booking.paymentStatus})
+              </Text>
+            </View>
+          </View>
 
           {/* Milestone Stepper Map Tracker */}
           {!['CANCELLED', 'REJECTED', 'FAILED', 'RETURNED'].includes(booking.status) && (
@@ -296,26 +328,44 @@ export default function BookingsScreen() {
             </View>
           )}
 
-          {/* Individual Snapshot Item Data Blocks */}
-          <View style={screenStyles.itemRowImproved}>
-            {itemSnapshot.images && itemSnapshot.images.length > 0 ? (
-              <Image 
-                source={{ uri: itemSnapshot.images[0].startsWith('http') ? itemSnapshot.images[0] : `${S3_BASE_URL}/${itemSnapshot.images[0]}` }} 
-                style={screenStyles.itemImageSmall} 
-              />
-            ) : (
-              <View style={[screenStyles.itemImageSmall, { backgroundColor: '#F0EFEA', justifyContent: 'center', alignItems: 'center' }]}>
-                <FontAwesome name="cube" size={16} color="#A89378" />
+          {/* Service / Rental Item Detailed Snapshot Data Block */}
+          <View style={[screenStyles.itemRowImproved, { flexDirection: 'column', alignItems: 'stretch' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {itemSnapshot.images && itemSnapshot.images.length > 0 ? (
+                <Image 
+                  source={{ uri: itemSnapshot.images[0].startsWith('http') ? itemSnapshot.images[0] : `${S3_BASE_URL}/${itemSnapshot.images[0]}` }} 
+                  style={screenStyles.itemImageSmall} 
+                />
+              ) : (
+                <View style={[screenStyles.itemImageSmall, { backgroundColor: '#F0EFEA', justifyContent: 'center', alignItems: 'center' }]}>
+                  <FontAwesome name="cube" size={16} color="#A89378" />
+                </View>
+              )}
+              <View style={[screenStyles.itemInfo, { flex: 1 }]}>
+                <Text style={screenStyles.itemNameSmall}>{itemSnapshot.itemName || 'Booking Listing'}</Text>
+                <Text style={screenStyles.itemCatSmall}>
+                  Category: {itemSnapshot.category} • Unit: {itemSnapshot.unit || 'N/A'} • Qty: {itemSnapshot.quantity}
+                </Text>
               </View>
+              <Text style={screenStyles.itemPriceSmall}>₹{itemSnapshot.price}</Text>
+            </View>
+            {itemSnapshot.description && (
+              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 6, paddingTop: 4, borderTopWidth: 0.5, borderTopColor: '#CBD5E1' }}>
+                Description: {itemSnapshot.description}
+              </Text>
             )}
-            <View style={screenStyles.itemInfo}>
-              <Text style={screenStyles.itemNameSmall} numberOfLines={1}>{itemSnapshot.itemName || 'Booking Listing'}</Text>
-              <Text style={screenStyles.itemCatSmall}>
-                {itemSnapshot.category} • {(t.qtyLabel || 'Qty')}: {itemSnapshot.quantity}
+          </View>
+
+          {booking.startDate && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3E5F5', padding: 8, borderRadius: 8, marginVertical: 6 }}>
+              <FontAwesome name="calendar" size={13} color="#7B1FA2" style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 12, fontWeight: '600', color: '#7B1FA2' }}>
+                {booking.bookingType === 'RENTAL' && booking.endDate
+                  ? `Rental Period: ${new Date(booking.startDate).toLocaleDateString()} to ${new Date(booking.endDate).toLocaleDateString()}`
+                  : `Service Date: ${new Date(booking.startDate).toLocaleDateString()}`}
               </Text>
             </View>
-            <Text style={screenStyles.itemPriceSmall}>₹{itemSnapshot.price}</Text>
-          </View>
+          )}
 
           <View style={screenStyles.totalRow}>
             <Text style={screenStyles.totalLabel}>{t.grandTotal || 'Total Value'}</Text>
