@@ -15,14 +15,14 @@ if (Platform.OS !== 'web') {
     handleNotification: async () => ({
       shouldShowAlert: true,
       shouldPlaySound: true,
-      shouldSetBadge: false,
+      shouldSetBadge: true,
       shouldShowBanner: true,
       shouldShowList: true,
     }),
   });
 }
 
-async function registerForPushNotificationsAsync() {
+async function registerForPushNotificationsAsync(authToken?: string | null) {
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
@@ -33,6 +33,13 @@ async function registerForPushNotificationsAsync() {
   }
 
   if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('orders_channel', {
+      name: 'Order Notifications',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 1000, 500, 1000],
+      lightColor: '#DAA520',
+      sound: 'default',
+    });
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
       importance: Notifications.AndroidImportance.MAX,
@@ -50,6 +57,37 @@ async function registerForPushNotificationsAsync() {
   if (finalStatus !== 'granted') {
     console.log('NotificationWatcher: Failed to get notification permission!');
     return;
+  }
+
+  // Fetch FCM / Push token and register with Sahachari Backend
+  try {
+    let tokenString: string | null = null;
+    try {
+      const deviceTokenData = await Notifications.getDevicePushTokenAsync();
+      tokenString = deviceTokenData.data;
+    } catch {
+      const expoTokenData = await Notifications.getExpoPushTokenAsync();
+      tokenString = expoTokenData.data;
+    }
+
+    if (tokenString && authToken) {
+      console.log('NotificationWatcher: Registering FCM Token with backend...', tokenString.substring(0, 15));
+      const response = await fetch(`${API_BASE_URL}/users/fcm-token`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ fcmToken: tokenString }),
+      });
+      if (response.ok) {
+        console.log('NotificationWatcher: FCM token registered successfully with backend!');
+      } else {
+        console.warn('NotificationWatcher: Failed to register FCM token. Status:', response.status);
+      }
+    }
+  } catch (tokenErr) {
+    console.warn('NotificationWatcher: Error getting device token:', tokenErr);
   }
 }
 
@@ -140,9 +178,28 @@ export default function NotificationWatcher() {
   const isFirstOrdersFetch = useRef<boolean>(true);
   const isFirstBookingsFetch = useRef<boolean>(true);
 
-  // Request permissions on mount
+  // Request permissions and sync FCM token on mount / auth token change
   useEffect(() => {
-    registerForPushNotificationsAsync();
+    registerForPushNotificationsAsync(token);
+  }, [token]);
+
+  // Listen for incoming FCM push notifications in foreground
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
+      console.log('NotificationWatcher: Push notification received:', notification.request.content.title);
+      playAlert();
+    });
+
+    const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('NotificationWatcher: User tapped notification:', response.notification.request.content.data);
+    });
+
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+    };
   }, []);
 
   // Reset tracking state if token changes/clears (logout scenario)
@@ -156,7 +213,7 @@ export default function NotificationWatcher() {
     }
   }, [token]);
 
-  // Query for orders
+  // Query for orders (Background Sync)
   const { data: orders } = useQuery<any[]>({
     queryKey: ['orders'],
     queryFn: async () => {
@@ -228,5 +285,5 @@ export default function NotificationWatcher() {
     });
   }, [bookings]);
 
-  return null; // This component registers listeners and does background polling
+  return null; // This component registers listeners and manages FCM push notifications
 }
