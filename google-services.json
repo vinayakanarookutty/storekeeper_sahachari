@@ -9,6 +9,25 @@
       "client_info": {
         "mobilesdk_app_id": "1:208738624417:android:658d4d1e4a4261431ca1e0",
         "android_client_info": {
+          "package_name": "com.corestoneinnovation.sahachariuser"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCT6QHFfDKyXfp8ke0WmzNMgjPixxnlcxM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:208738624417:android:9b7d2a56cd71c6481ca1e0",
+        "android_client_info": {
           "package_name": "com.corestoneinnovations.sahachariadmin"
         }
       },

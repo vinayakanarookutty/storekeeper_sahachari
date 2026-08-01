@@ -1,42 +1,67 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { useAuth } from "../contexts/AuthContext";
-import { getCurrentUser, loginApi, signupApi } from "../services/api";
+import { getMessaging, getToken } from "@react-native-firebase/messaging";
 
-// Login mutation
+import { useAuth } from "../contexts/AuthContext";
+import {
+  getCurrentUser,
+  loginApi,
+  signupApi,
+  removeFcmToken,
+} from "../services/api";
+
+// ======================================================
+// Login
+// ======================================================
+
 export function useLogin() {
   const { setAuthToken } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (credentials: { email: string; password: string }) => {
-      const response = await loginApi(credentials);
-      return response;
+    mutationFn: async (credentials: {
+      email: string;
+      password: string;
+    }) => {
+      return await loginApi(credentials);
     },
-    onSuccess: async (data) => {
-      // Save the accessToken
+
+    onSuccess: async data => {
       await setAuthToken(data.accessToken);
 
-      // Try to fetch and cache user data
       try {
         const userData = await getCurrentUser();
-        queryClient.setQueryData(["currentUser"], userData);
+
+        queryClient.setQueryData(
+          ["currentUser"],
+          userData,
+        );
       } catch (error) {
-        console.log("Could not fetch user data:", error);
+        console.log(
+          "Could not fetch user data:",
+          error,
+        );
       }
 
-      // Navigate to tabs
       router.replace("/(tabs)");
     },
+
     onError: (error: Error) => {
-      console.error("Login failed:", error);
+      console.error(
+        "Login failed:",
+        error,
+      );
+
       throw error;
     },
   });
 }
 
-// Signup mutation
+// ======================================================
+// Signup
+// ======================================================
+
 export function useSignup() {
   const router = useRouter();
 
@@ -51,19 +76,31 @@ export function useSignup() {
     }) => {
       return await signupApi(credentials);
     },
-    onSuccess: async (data) => {
-      console.log("Signup response:", data);
-      // Don't auto-login, redirect to login page
+
+    onSuccess: async data => {
+      console.log(
+        "Signup response:",
+        data,
+      );
+
       router.replace("/login");
     },
+
     onError: (error: Error) => {
-      console.error("Signup failed:", error);
+      console.error(
+        "Signup failed:",
+        error,
+      );
+
       throw error;
     },
   });
 }
 
-// Logout mutation
+// ======================================================
+// Logout
+// ======================================================
+
 export function useLogout() {
   const { clearAuthToken } = useAuth();
   const router = useRouter();
@@ -71,31 +108,62 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      // If you have a logout endpoint, call it here
-      // await apiRequest('/auth/logout', { method: 'POST' });
+      try {
+        const token = await getToken(
+          getMessaging(),
+        );
+
+        if (token) {
+          await removeFcmToken(token);
+        }
+      } catch (error) {
+        console.warn(
+          "Failed to remove FCM token:",
+          error,
+        );
+      }
     },
+
     onSuccess: async () => {
-      // Clear token
       await clearAuthToken();
 
-      // Clear all cached data
       queryClient.clear();
 
-      // Navigate to login
+      router.replace("/login");
+    },
+
+    onError: async error => {
+      console.error(
+        "Logout error:",
+        error,
+      );
+
+      // Still log out locally
+      await clearAuthToken();
+
+      queryClient.clear();
+
       router.replace("/login");
     },
   });
 }
 
-// Get current user query - requires token
+// ======================================================
+// Current User
+// ======================================================
+
 export function useCurrentUser() {
   const { token } = useAuth();
 
   return useQuery({
     queryKey: ["currentUser"],
+
     queryFn: getCurrentUser,
-    enabled: !!token, // Only run if token exists
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    retry: 1, // Only retry once on failure
+
+    enabled: !!token,
+
+    staleTime: 10 * 60 * 1000,
+
+    retry: 1,
   });
 }

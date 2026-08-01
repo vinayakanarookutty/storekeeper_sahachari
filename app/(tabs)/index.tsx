@@ -11,7 +11,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { getToken } from '../services/auth';
 import { styles } from '../tab_style/index.style';
 import { fetchItems, fetchMyRentals, fetchMyServices, updateBulkStock } from '../services/productApi';
-
+import { useSearch } from "../hooks/useSearch";
 import {
   ActivityIndicator,
   FlatList,
@@ -66,7 +66,10 @@ export default function TabOneScreen() {
   const [bulkStockModalOpen, setBulkStockModalOpen] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState('');
   const [tempStocks, setTempStocks] = useState<Record<string, number>>({});
-
+  const {
+  data: searchData,
+  isLoading: isSearching,
+} = useSearch(debouncedSearchQuery);
   // Debounce search query to keep the UI smooth during typing fast
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -241,24 +244,56 @@ export default function TabOneScreen() {
 
   // Processes filtering logic via reactive computed useMemo tracking debounced query strings
   const filteredItems = useMemo(() => {
-    if (!combinedItems) return [];
+  if (!combinedItems) return [];
 
-    let items = [...combinedItems];
+  // Show normal list if search is empty
+  if (debouncedSearchQuery.trim().length < 2) {
+    return [...combinedItems].sort((a, b) => {
+      const priority = {
+        product: 1,
+        rent: 2,
+        service: 3,
+      };
 
-    if (debouncedSearchQuery.trim()) {
-      const query = debouncedSearchQuery.toLowerCase();
-      items = items.filter(item =>
-        item.name?.toLowerCase().includes(query) ||
-        item.description?.toLowerCase().includes(query) ||
-        item.category?.toLowerCase().includes(query)
-      );
-    }
-
-    return items.sort((a, b) => {
-      const priority = { product: 1, rent: 2, service: 3 };
       return priority[a.itemType] - priority[b.itemType];
     });
-  }, [combinedItems, debouncedSearchQuery]);
+  }
+
+  if (!searchData) {
+    return [];
+  }
+
+  const items: DisplayItem[] = [
+    ...(searchData.products ?? []).map(item => ({
+      ...item,
+      itemType: "product",
+    })),
+
+    ...(searchData.rentals ?? []).map(item => ({
+      ...item,
+      itemType: "rent",
+    })),
+
+    ...(searchData.services ?? []).map(item => ({
+      ...item,
+      itemType: "service",
+    })),
+  ];
+
+  return items.sort((a, b) => {
+    const priority = {
+      product: 1,
+      rent: 2,
+      service: 3,
+    };
+
+    return priority[a.itemType] - priority[b.itemType];
+  });
+}, [
+  combinedItems,
+  debouncedSearchQuery,
+  searchData,
+]);
 
   const handleItemPress = (item: DisplayItem) => {
     if (item.itemType === 'product') {

@@ -1,3 +1,26 @@
+import {
+  getMessaging,
+  setBackgroundMessageHandler,
+} from '@react-native-firebase/messaging';
+
+
+// ======================================================
+// Background FCM Handler
+// App minimized / killed
+// MUST be outside React component
+// ======================================================
+
+setBackgroundMessageHandler(
+  getMessaging(),
+  async remoteMessage => {
+
+    console.log(
+      "BACKGROUND FCM MESSAGE:",
+      remoteMessage
+    );
+
+  }
+);
 import { useColorScheme } from '@/components/useColorScheme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
@@ -11,7 +34,10 @@ import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { styles } from './styles/_layout.style';
 import NotificationWatcher from '@/components/NotificationWatcher';
-
+import {  requestAppNotificationPermissions,
+  setupFCMListener,
+  setupFCMTokenRefresh,
+} from '../app/services/fcm';
 // Prevent auto-hide so we control the timing
 SplashScreen.preventAutoHideAsync();
 
@@ -31,6 +57,33 @@ export default function RootLayout() {
   });
 
   const [isReady, setIsReady] = useState(false);
+  
+  useEffect(() => {
+  async function initFCM() {
+    await requestAppNotificationPermissions();
+
+    const unsubscribeMessage =
+      setupFCMListener();
+
+    const unsubscribeRefresh =
+      setupFCMTokenRefresh();
+
+    return () => {
+      unsubscribeMessage();
+      unsubscribeRefresh();
+    };
+  }
+
+  let cleanup: (() => void) | undefined;
+
+  initFCM().then(fn => {
+    cleanup = fn;
+  });
+
+  return () => {
+    cleanup?.();
+  };
+}, []);
 
   useEffect(() => {
     async function prepare() {

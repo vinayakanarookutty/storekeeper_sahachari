@@ -18,7 +18,7 @@ import { useAuth } from './contexts/AuthContext';
 import { useLanguage } from './contexts/LanguageContext'; // Imported context hook
 import { getCurrentUser, loginApi } from './services/api';
 import { styles } from './styles/login.style';
-
+import { getFCMToken } from "./services/fcm";
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web') {
     alert(`${title}: ${message}`);
@@ -43,15 +43,26 @@ export default function LoginScreen() {
       return loginResponse;
     },
     onSuccess: async (data) => {
-      await setAuthToken(data.accessToken);
-      try {
-        const userData = await getCurrentUser();
-        queryClient.setQueryData(['currentUser'], userData);
-      } catch (error) {
-        console.log('Could not fetch user data:', error);
-      }
-      router.replace('/');
-    },
+  // Save JWT first
+  await setAuthToken(data.accessToken);
+
+  // Register this device's FCM token
+  try {
+    await getFCMToken();
+  } catch (error) {
+    console.log("Failed to register FCM token:", error);
+  }
+
+  // Fetch current user
+  try {
+    const userData = await getCurrentUser();
+    queryClient.setQueryData(["currentUser"], userData);
+  } catch (error) {
+    console.log("Could not fetch user data:", error);
+  }
+
+  router.replace("/");
+},
     onError: (error: any) => {
       showAlert(t.failedTitle || 'Login Failed', error.message || 'Invalid email or password');
     },

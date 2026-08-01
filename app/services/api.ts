@@ -185,4 +185,54 @@ export async function resetPasswordApi(email: string, otp: string, newPassword: 
     body: JSON.stringify({ email, otp, newPassword }),
     requiresAuth: false,
   });
+
+}
+// ======================================================
+// FCM Token
+// ======================================================
+// ======================================================
+// FCM Token
+// ======================================================
+
+export interface RegisterFcmTokenDto {
+  token: string;
+  appType: "STORE" | "CUSTOMER";
+  platform: "ANDROID" | "IOS" | "WEB";
+}
+
+export async function registerFcmToken(
+  data: RegisterFcmTokenDto,
+): Promise<void> {
+  await apiRequest<void>("/users/fcm-token", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+    requiresAuth: true,
+  });
+}
+
+export async function removeFcmToken(
+  token: string,
+): Promise<void> {
+  await apiRequest<void>("/users/fcm-token", {
+    method: "DELETE",
+    body: JSON.stringify({ token }),
+    requiresAuth: true,
+  });
+}
+export interface SearchResponse {
+  products: any[];
+  services: any[];
+  rentals: any[];
+}
+
+export async function searchItems(
+  query: string,
+): Promise<SearchResponse> {
+  return apiRequest<SearchResponse>(
+    `/search?query=${encodeURIComponent(query)}`,
+    {
+      method: "GET",
+      requiresAuth: true,
+    },
+  );
 }
