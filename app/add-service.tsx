@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { styles } from './styles/add-edit-common.style';
 import { getToken } from './services/auth';
+import { getCurrentUser } from './services/api';
 import { servicesApi, ServiceData } from './services/serviceApi';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -161,7 +162,7 @@ export default function AddServiceScreen() {
     }
   };
 
-  const handleCreateService = () => {
+  const handleCreateService = async () => {
     if (!name.trim() || !description.trim() || !price) {
       showAlert('Error', 'Please fill in all required fields');
       return;
@@ -174,6 +175,18 @@ export default function AddServiceScreen() {
     // Convert UI text to match backend ServiceUnit Enum structure
     const backendUnit = serviceUnit.toUpperCase() as 'HOUR' | 'DAY' | 'WEEK' | 'MONTH';
 
+    let serviceablePincodes: string[] = [];
+    try {
+      const currentUser = await getCurrentUser();
+      if (currentUser?.serviceablePincodes && Array.isArray(currentUser.serviceablePincodes)) {
+        serviceablePincodes = currentUser.serviceablePincodes.map(String);
+      } else if ((currentUser as any)?.pincode) {
+        serviceablePincodes = [String((currentUser as any).pincode)];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch storekeeper profile pincodes:', e);
+    }
+
     const serviceData: ServiceData = {
       name,
       description,
@@ -181,6 +194,7 @@ export default function AddServiceScreen() {
       unit: backendUnit,
       images: uploadedImageKeys,
       isAvailable: true,
+      serviceablePincodes,
     };
 
     createServiceMutation.mutate(serviceData);

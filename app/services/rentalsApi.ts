@@ -17,7 +17,8 @@ export interface RentalData {
   quantity: number;
   rentalPrice: number;
   unit: 'HOUR' | 'DAY' | 'WEEK' | 'MONTH';
-
+  isAvailable?: boolean;
+  serviceablePincodes?: string[];
   offers?: RentalOffer[]; // add this
 }
 

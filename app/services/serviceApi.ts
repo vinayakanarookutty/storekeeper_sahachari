@@ -9,6 +9,7 @@ export interface ServiceData {
   price: number;
   unit: 'HOUR' | 'DAY' | 'WEEK' | 'MONTH';
   isAvailable?: boolean;
+  serviceablePincodes?: string[];
 }
 
 export const servicesApi = {
