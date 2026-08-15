@@ -4,13 +4,10 @@
     "slug": "storekeeper",
     "version": "3.0.0",
     "orientation": "portrait",
-
     "icon": "./assets/images/logo.png",
-
     "scheme": "storekeeper",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.corestoneinnovations.sahachariadmin",
@@ -20,52 +17,43 @@
         "NSCameraUsageDescription": "This app needs access to your camera to take product photos."
       }
     },
-
     "splash": {
       "image": "./assets/images/splashscreen2.png",
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
-
     "android": {
       "versionCode": 18,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#FFFFFF"
       },
-
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-
       "splash": {
         "image": "./assets/images/splashscreen2.png",
         "resizeMode": "cover",
         "backgroundColor": "#FFFFFF"
       },
-
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-
       "googleServicesFile": "./google-services.json",
       "package": "com.corestoneinnovations.sahachariadmin"
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
       [
-      "expo-notifications"
+        "expo-notifications"
       ],
       "expo-router",
-
       [
         "expo-splash-screen",
         {
@@ -73,30 +61,26 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF",
-
           "dark": {
             "backgroundColor": "#FFFFFF"
           }
         }
       ],
-
       [
         "expo-image-picker",
         {
           "photosPermission": "The app needs access to your photos to upload product images.",
           "cameraPermission": "The app needs access to your camera to take product photos."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-
     "extra": {
       "router": {},
-
       "eas": {
         "projectId": "86767deb-9516-4273-a7af-bcf0b7497e57"
       }
