@@ -23,7 +23,10 @@ import { useAuth } from "./contexts/AuthContext";
 import { useLanguage } from "./contexts/LanguageContext";
 import {
   getCurrentUser,
+  getCurrentUserWithToken,
+  decodeJwtRole,
   loginApi,
+  User,
 } from "./services/api";
 import { styles } from "./styles/login.style";
 
@@ -108,7 +111,7 @@ const getLoginErrorMessage = (
 export default function LoginScreen() {
   const router = useRouter();
 
-  const { setAuthToken } = useAuth();
+  const { setAuthToken, clearAuthToken } = useAuth();
 
   const queryClient = useQueryClient();
 
@@ -146,7 +149,50 @@ export default function LoginScreen() {
       email: string;
       password: string;
     }) => {
-      return await loginApi(credentials);
+      // 1. Authenticate with backend
+      const data = await loginApi(credentials);
+      if (!data?.accessToken) {
+        throw new Error("Invalid response from server");
+      }
+
+      // 2. Decode JWT payload immediately to check role
+      const jwtRole = decodeJwtRole(data.accessToken);
+      if (jwtRole && jwtRole.toUpperCase() !== "ADMIN") {
+        console.warn(`[Login] Rejected login for role: ${jwtRole}`);
+        throw new Error(
+          t.adminOnlyAccess ||
+            "Access restricted. Only users with the ADMIN role can use the Storekeeper portal."
+        );
+      }
+
+      // 3. Fetch server profile with the newly issued token
+      let userData: User | null = null;
+      try {
+        userData = await getCurrentUserWithToken(data.accessToken);
+      } catch (err) {
+        console.warn("[Login] Could not fetch user profile with token:", err);
+      }
+
+      if (userData) {
+        const userRole = (userData.role || "").toUpperCase();
+        if (userRole !== "ADMIN") {
+          console.warn(`[Login] User profile has non-ADMIN role: ${userRole}`);
+          throw new Error(
+            t.adminOnlyAccess ||
+              "Access restricted. Only users with the ADMIN role can use the Storekeeper portal."
+          );
+        }
+      } else if (!jwtRole) {
+        // If neither JWT nor /auth/me gave us an ADMIN role, reject
+        throw new Error(
+          "Could not verify administrator privileges. Please try again."
+        );
+      }
+
+      return {
+        accessToken: data.accessToken,
+        user: userData,
+      };
     },
 
     // -------------------------------------------------------
@@ -155,25 +201,10 @@ export default function LoginScreen() {
 
     onSuccess: async (data) => {
       try {
-        // Save access token
-        await setAuthToken(
-          data.accessToken
-        );
-
-        // Fetch current user
-        try {
-          const userData =
-            await getCurrentUser();
-
-          queryClient.setQueryData(
-            ["currentUser"],
-            userData
-          );
-        } catch (error) {
-          console.log(
-            "Could not fetch user data:",
-            error
-          );
+        // Save verified ADMIN token & profile
+        await setAuthToken(data.accessToken, data.user);
+        if (data.user) {
+          queryClient.setQueryData(["currentUser"], data.user);
         }
 
         // Navigate to home
@@ -202,7 +233,7 @@ export default function LoginScreen() {
       );
 
       showAlert(
-        t.failedTitle || "Login Failed",
+        t.accessDenied || "Access Denied",
         getLoginErrorMessage(error)
       );
     },

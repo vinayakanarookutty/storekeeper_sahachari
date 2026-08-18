@@ -36,7 +36,7 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
-  const { token } = useAuth();
+  const { token, isAuthenticated } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -52,10 +52,10 @@ export default function TabLayout() {
   };
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !isAuthenticated) {
       router.replace('./login');
     }
-  }, [token]);
+  }, [token, isAuthenticated]);
 
   return (
     <Tabs

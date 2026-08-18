@@ -50,3 +50,32 @@ export async function removeToken(): Promise<void> {
     throw error;
   }
 }
+
+const USER_KEY = "auth_user_data";
+
+export async function saveUser(user: any): Promise<void> {
+  try {
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch (error) {
+    console.error("AsyncStorage: Error saving user:", error);
+  }
+}
+
+export async function getUser(): Promise<any | null> {
+  try {
+    const data = await AsyncStorage.getItem(USER_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.error("AsyncStorage: Error getting user:", error);
+    return null;
+  }
+}
+
+export async function removeUser(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(USER_KEY);
+  } catch (error) {
+    console.error("AsyncStorage: Error removing user:", error);
+  }
+}
+

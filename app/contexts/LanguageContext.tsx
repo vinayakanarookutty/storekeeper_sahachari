@@ -26,6 +26,8 @@ const translations = {
     otpSentSuccess: 'OTP has been sent to your email successfully',
     passwordResetSuccess: 'Password reset successfully!',
     backToLogin: 'Back to Login',
+    accessDenied: 'Access Denied',
+    adminOnlyAccess: 'Access restricted. Only users with the ADMIN role can use the Storekeeper portal.',
 
     // Home
     sahachari: 'Sahachari',
@@ -220,7 +222,16 @@ const translations = {
       'week': 'Week',
       'month': 'Month',
       'service': 'Service'
-    }
+    },
+
+    // Network / Connectivity Status
+    noInternet: 'No Internet Connection',
+    noInternetDesc: 'Please check your network settings. Some features may not work.',
+    backOnline: 'Back Online',
+    backOnlineDesc: 'Internet connection restored.',
+    retry: 'Retry',
+    checkingConnection: 'Checking...',
+    offlineModeActive: 'Offline Mode Active'
   },
   ml: {
     // Auth / Login Screen Keys
@@ -241,6 +252,8 @@ const translations = {
     otpSentSuccess: 'OTP വിജയകരമായി നിങ്ങളുടെ ഇമെയിലിലേക്ക് അയച്ചിട്ടുണ്ട്',
     passwordResetSuccess: 'പാസ്‌വേഡ് വിജയകരമായി മാറ്റി!',
     backToLogin: 'ലോഗിൻ പേജിലേക്ക് മടങ്ങുക',
+    accessDenied: 'പ്രവേശനം നിരസിച്ചു',
+    adminOnlyAccess: 'പ്രവേശന അനുമതിയില്ല. ADMIN റോൾ ഉള്ള ഉപയോക്താക്കൾക്ക് മാത്രമേ സ്റ്റോർകീപ്പർ പോർട്ടൽ ഉപയോഗിക്കാൻ സാധിക്കൂ.',
 
     // Home
     sahachari: 'സഹചാരി',
@@ -435,7 +448,16 @@ const translations = {
       'week': 'ആഴ്ച',
       'month': 'മാസം',
       'service': 'സേവനം'
-    }
+    },
+
+    // Network / Connectivity Status
+    noInternet: 'ഇന്റർനെറ്റ് കണക്ഷൻ ലഭ്യമല്ല',
+    noInternetDesc: 'ദയവായി നിങ്ങളുടെ നെറ്റ്വർക്ക് ക്രമീകരണങ്ങൾ പരിശോധിക്കുക.',
+    backOnline: 'ഇന്റർനെറ്റ് ലഭ്യമായി',
+    backOnlineDesc: 'ഇന്റർനെറ്റ് കണക്ഷൻ വിജയകരമായി പുനഃസ്ഥാപിച്ചു.',
+    retry: 'വീണ്ടും ശ്രമിക്കുക',
+    checkingConnection: 'പരിശോധിക്കുന്നു...',
+    offlineModeActive: 'ഓഫ്‌ലൈൻ മോഡ്'
   },
 };
 

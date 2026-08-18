@@ -11,6 +11,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { styles } from './styles/_layout.style';
 import NotificationWatcher from '@/components/NotificationWatcher';
+import OfflineNotification from '@/components/OfflineNotification';
 
 // Prevent auto-hide so we control the timing
 SplashScreen.preventAutoHideAsync();
@@ -78,6 +79,7 @@ export default function RootLayout() {
     <LanguageProvider>
       <QueryClientProvider client={queryClient}>
         <NotificationWatcher />
+        <OfflineNotification />
         <RootLayoutNav />
       </QueryClientProvider>
     </LanguageProvider>

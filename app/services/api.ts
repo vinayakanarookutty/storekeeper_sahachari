@@ -137,6 +137,52 @@ export async function getCurrentUser(): Promise<User> {
   });
 }
 
+export async function getCurrentUserWithToken(accessToken: string): Promise<User> {
+  return apiRequest("/auth/me", {
+    method: "GET",
+    requiresAuth: false,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+}
+
+export function decodeJwtRole(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    let jsonStr = '';
+    if (typeof atob === 'function') {
+      jsonStr = atob(base64);
+    } else {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+      let str = '';
+      for (let i = 0; i < base64.length;) {
+        const enc1 = chars.indexOf(base64.charAt(i++));
+        const enc2 = chars.indexOf(base64.charAt(i++));
+        const enc3 = chars.indexOf(base64.charAt(i++));
+        const enc4 = chars.indexOf(base64.charAt(i++));
+        const chr1 = (enc1 << 2) | (enc2 >> 4);
+        const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+        const chr3 = ((enc3 & 3) << 6) | enc4;
+        str += String.fromCharCode(chr1);
+        if (enc3 !== 64 && enc3 !== -1) str += String.fromCharCode(chr2);
+        if (enc4 !== 64 && enc4 !== -1) str += String.fromCharCode(chr3);
+      }
+      jsonStr = str;
+    }
+    const payload = JSON.parse(jsonStr);
+    return payload?.role || payload?.user?.role || null;
+  } catch (e) {
+    console.warn('decodeJwtRole failed:', e);
+    return null;
+  }
+}
+
 // --- User Profile Endpoints ---
 
 export async function fetchUserProfile(userId: string): Promise<User> {

@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useAuth } from "../contexts/AuthContext";
-import { getCurrentUser, loginApi, signupApi } from "../services/api";
+import {
+  getCurrentUser,
+  getCurrentUserWithToken,
+  decodeJwtRole,
+  loginApi,
+  signupApi,
+  User,
+} from "../services/api";
 
 // Login mutation
 export function useLogin() {
@@ -11,19 +18,43 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
-      const response = await loginApi(credentials);
-      return response;
+      const data = await loginApi(credentials);
+      if (!data?.accessToken) {
+        throw new Error("Invalid response from login server");
+      }
+
+      // Check JWT payload role
+      const jwtRole = decodeJwtRole(data.accessToken);
+      if (jwtRole && jwtRole.toUpperCase() !== "ADMIN") {
+        throw new Error("Access restricted. Only users with the ADMIN role can use the Storekeeper portal.");
+      }
+
+      // Check fresh backend profile
+      let userData: User | null = null;
+      try {
+        userData = await getCurrentUserWithToken(data.accessToken);
+      } catch (err) {
+        console.warn("Could not fetch user profile with token:", err);
+      }
+
+      if (userData) {
+        const userRole = (userData.role || "").toUpperCase();
+        if (userRole !== "ADMIN") {
+          throw new Error("Access restricted. Only users with the ADMIN role can use the Storekeeper portal.");
+        }
+      } else if (!jwtRole) {
+        throw new Error("Could not verify administrator privileges.");
+      }
+
+      return {
+        accessToken: data.accessToken,
+        user: userData,
+      };
     },
     onSuccess: async (data) => {
-      // Save the accessToken
-      await setAuthToken(data.accessToken);
-
-      // Try to fetch and cache user data
-      try {
-        const userData = await getCurrentUser();
-        queryClient.setQueryData(["currentUser"], userData);
-      } catch (error) {
-        console.log("Could not fetch user data:", error);
+      await setAuthToken(data.accessToken, data.user);
+      if (data.user) {
+        queryClient.setQueryData(["currentUser"], data.user);
       }
 
       // Navigate to tabs

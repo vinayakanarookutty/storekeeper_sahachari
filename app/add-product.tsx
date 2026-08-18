@@ -52,7 +52,6 @@ const PRODUCT_CATEGORIES = [
   'groceries',
   'home made',
   'fish & meat',
-  
 ];
 
 const UNITS = ['kg', 'grams', 'liters', 'ml', 'pcs', 'packet', 'box'];
