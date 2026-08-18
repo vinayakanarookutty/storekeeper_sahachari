@@ -2,7 +2,11 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import React, { useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useMemo,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -279,6 +283,9 @@ export default function OrdersScreen() {
      ALERT
   ======================================================= */
 
+
+const [refreshing, setRefreshing] =
+  useState(false);
   const showConfirmation = (
     title: string,
     message: string,
@@ -369,7 +376,39 @@ export default function OrdersScreen() {
 
     refetchInterval: 30000,
   });
+/* =======================================================
+   MANUAL ORDER REFRESH
+======================================================= */
 
+const refreshOrders = useCallback(
+  async () => {
+    if (refreshing) {
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+
+      console.log(
+        'Refreshing orders...'
+      );
+
+      await refetch();
+
+      console.log(
+        'Orders refreshed successfully'
+      );
+    } catch (error) {
+      console.log(
+        'Orders refresh error:',
+        error
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  },
+  [refetch, refreshing]
+);
   /* =======================================================
      DATE HELPERS
   ======================================================= */
@@ -1659,7 +1698,121 @@ export default function OrdersScreen() {
       <StatusBar
         barStyle="dark-content"
       />
+ {/* ===================================================
+    ORDERS HEADER
+=================================================== */}
 
+<View
+  style={{
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+
+    backgroundColor: '#FFFDF7',
+
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFE7D8',
+  }}
+>
+  {/* LEFT */}
+
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    }}
+  >
+    <View
+      style={{
+        width: 40,
+        height: 40,
+
+        borderRadius: 12,
+
+        backgroundColor: '#FFF4D6',
+
+        alignItems: 'center',
+        justifyContent: 'center',
+
+        marginRight: 10,
+      }}
+    >
+      <FontAwesome
+        name="shopping-bag"
+        size={18}
+        color="#DAA520"
+      />
+    </View>
+
+    <View>
+      <Text
+        style={{
+          fontSize: 18,
+          fontWeight: '800',
+          color: '#3B3021',
+        }}
+      >
+       Orders
+      </Text>
+
+      <Text
+        style={{
+          marginTop: 2,
+          fontSize: 11,
+          color: '#8A7A63',
+        }}
+      >
+        {filteredOrders.length}{' '}
+        {filteredOrders.length === 1
+          ? 'order'
+          : 'orders'}
+      </Text>
+    </View>
+  </View>
+
+  {/* REFRESH */}
+
+  <TouchableOpacity
+    onPress={refreshOrders}
+    disabled={refreshing}
+    activeOpacity={0.7}
+    style={{
+      width: 42,
+      height: 42,
+
+      borderRadius: 13,
+
+      backgroundColor: '#FFF4D6',
+
+      alignItems: 'center',
+      justifyContent: 'center',
+
+      borderWidth: 1,
+      borderColor: '#E8D8B5',
+
+      opacity: refreshing
+        ? 0.65
+        : 1,
+    }}
+  >
+    {refreshing ? (
+      <ActivityIndicator
+        size="small"
+        color="#DAA520"
+      />
+    ) : (
+      <FontAwesome
+        name="refresh"
+        size={17}
+        color="#3B3021"
+      />
+    )}
+  </TouchableOpacity>
+</View>
       {/* ===================================================
           DATE FILTER
       ==================================================== */}
@@ -2173,17 +2326,15 @@ export default function OrdersScreen() {
           paddingBottom:
             40,
         }}
-        refreshControl={
-          <RefreshControl
-            refreshing={
-              isLoading
-            }
-            onRefresh={
-              refetch
-            }
-            tintColor="#DAA520"
-          />
-        }
+       refreshControl={
+  <RefreshControl
+    refreshing={refreshing}
+    onRefresh={refreshOrders}
+    tintColor="#DAA520"
+    colors={['#DAA520']}
+    progressBackgroundColor="#FFFFFF"
+  />
+}
         ListEmptyComponent={
           <View
             style={

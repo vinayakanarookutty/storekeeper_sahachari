@@ -233,18 +233,19 @@ export default function BookingsScreen() {
   // =======================================================
 
   const {
-    data: bookings = [],
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ['storeBookingsList'],
+  data: bookings = [],
+  isLoading,
+  isFetching,
+  refetch,
+} = useQuery({
+  queryKey: ['storeBookingsList'],
 
-    queryFn: async () => {
-      return await fetchStoreBookings();
-    },
+  queryFn: async () => {
+    return await fetchStoreBookings();
+  },
 
-    refetchInterval: 30000,
-  });
+  refetchInterval: 30000,
+});
 
   // =======================================================
   // DATE HELPERS
@@ -1704,9 +1705,123 @@ export default function BookingsScreen() {
         screenStyles.container
       }
     >
-      <StatusBar
-        barStyle="dark-content"
-      />
+      <StatusBar barStyle="dark-content" />
+
+{/* ===================================================
+    BOOKINGS HEADER
+==================================================== */}
+
+<View
+  style={{
+    backgroundColor: '#FFFDF7',
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFE7D8',
+  }}
+>
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    }}
+  >
+    {/* LEFT SIDE */}
+
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+      }}
+    >
+      <View
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 13,
+          backgroundColor: '#FFF3D6',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 11,
+        }}
+      >
+        <FontAwesome
+          name="calendar-check-o"
+          size={19}
+          color="#DAA520"
+        />
+      </View>
+
+      <View>
+        <Text
+          style={{
+            fontSize: 19,
+            fontWeight: '800',
+            color: '#3B3021',
+          }}
+        >
+          {language === 'ml'
+            ? 'ബുക്കിംഗുകൾ'
+            : 'Bookings'}
+        </Text>
+
+        <Text
+          style={{
+            marginTop: 2,
+            fontSize: 12,
+            color: '#8A7A63',
+            fontWeight: '500',
+          }}
+        >
+          {filteredBookings.length}{' '}
+          {language === 'ml'
+            ? 'ബുക്കിംഗുകൾ'
+            : filteredBookings.length === 1
+            ? 'booking'
+            : 'bookings'}
+        </Text>
+      </View>
+    </View>
+
+    {/* REFRESH BUTTON */}
+
+    <TouchableOpacity
+      activeOpacity={0.75}
+      disabled={isFetching}
+      onPress={() => refetch()}
+      style={{
+        width: 43,
+        height: 43,
+        borderRadius: 13,
+        backgroundColor: isFetching
+          ? '#F5E9C8'
+          : '#FFF4D6',
+        borderWidth: 1,
+        borderColor: '#E8D5A8',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {isFetching ? (
+        <ActivityIndicator
+          size="small"
+          color="#DAA520"
+        />
+      ) : (
+        <FontAwesome
+          name="refresh"
+          size={17}
+          color="#B8860B"
+        />
+      )}
+    </TouchableOpacity>
+  </View>
+</View>
+
+
 
       {/* ===================================================
           DATE FILTER
@@ -2200,17 +2315,15 @@ export default function BookingsScreen() {
           padding: 15,
           paddingBottom: 40,
         }}
-        refreshControl={
-          <RefreshControl
-            refreshing={
-              isLoading
-            }
-            onRefresh={
-              refetch
-            }
-            tintColor="#DAA520"
-          />
-        }
+       refreshControl={
+  <RefreshControl
+    refreshing={isFetching}
+    onRefresh={() => refetch()}
+    tintColor="#DAA520"
+    colors={['#DAA520']}
+    progressBackgroundColor="#FFFDF7"
+  />
+}
         ListEmptyComponent={
           <View
             style={
