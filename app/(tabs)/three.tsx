@@ -201,6 +201,27 @@ type DateFilter =
 ========================================================= */
 
 /**
+ * Safely parse any date representation (Date, Mongo {$date: ...}, ISO string, timestamp number)
+ */
+const parseOrderDate = (dateVal: any): Date | null => {
+  if (!dateVal) {
+    return null;
+  }
+  if (dateVal instanceof Date) {
+    return Number.isNaN(dateVal.getTime()) ? null : dateVal;
+  }
+  if (typeof dateVal === 'object' && dateVal.$date) {
+    const d = new Date(dateVal.$date);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof dateVal === 'string' || typeof dateVal === 'number') {
+    const d = new Date(dateVal);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+};
+
+/**
  * Convert Date -> YYYY-MM-DD
  * Used by browser <input type="date">
  */
@@ -214,10 +235,6 @@ const dateToInputValue = (date: Date): string => {
 
 /**
  * Convert YYYY-MM-DD -> local Date
- *
- * IMPORTANT:
- * new Date("2026-08-15") can be interpreted as UTC.
- * This function creates the date in local time.
  */
 const inputValueToDate = (value: string): Date | null => {
   if (!value) {
@@ -259,6 +276,8 @@ export default function OrdersScreen() {
   const { t } = useLanguage();
 
   const queryClient = useQueryClient();
+
+  const dateInputRef = React.useRef<any>(null);
 
   /* =======================================================
      STATE
@@ -560,20 +579,16 @@ const refreshOrders = useCallback(
          DATE
       --------------------------------------------------- */
 
-      const orderDate = new Date(
-        order.createdAt
+      const orderDate = parseOrderDate(
+        order.createdAt || order.orderDate || order.updatedAt
       );
 
-      const validDate =
-        !Number.isNaN(
-          orderDate.getTime()
-        );
+      const validDate = orderDate !== null;
 
       const dateMatches =
-        validDate &&
-        isOrderInDateFilter(
-          orderDate
-        );
+        selectedDateFilter === 'ALL'
+          ? true
+          : validDate && isOrderInDateFilter(orderDate);
 
       return (
         statusMatches &&
@@ -588,14 +603,14 @@ const refreshOrders = useCallback(
     return [...result].sort(
       (a: any, b: any) => {
         const dateA =
-          new Date(
-            a.createdAt
-          ).getTime();
+          parseOrderDate(
+            a.createdAt || a.orderDate || a.updatedAt
+          )?.getTime() || 0;
 
         const dateB =
-          new Date(
-            b.createdAt
-          ).getTime();
+          parseOrderDate(
+            b.createdAt || b.orderDate || b.updatedAt
+          )?.getTime() || 0;
 
         return dateB - dateA;
       }
@@ -660,7 +675,17 @@ const refreshOrders = useCallback(
 
   const openCustomDatePicker = () => {
     if (Platform.OS === 'web') {
-      // Browser input is rendered directly in the UI.
+      if (dateInputRef.current) {
+        if (typeof dateInputRef.current.showPicker === 'function') {
+          try {
+            dateInputRef.current.showPicker();
+          } catch {
+            dateInputRef.current.focus();
+          }
+        } else {
+          dateInputRef.current.focus();
+        }
+      }
       return;
     }
 
@@ -1095,10 +1120,9 @@ const refreshOrders = useCallback(
       order.status ===
         'CANCELLED';
 
-    const orderDate =
-      new Date(
-        order.createdAt
-      );
+    const orderDate = parseOrderDate(
+      order.createdAt || order.orderDate || order.updatedAt
+    );
 
     return (
       <View
@@ -1222,18 +1246,14 @@ const refreshOrders = useCallback(
                 },
               ]}
             >
-              {!Number.isNaN(
-                orderDate.getTime()
-              )
+              {orderDate
                 ? formatDate(
                     orderDate
                   )
                 : 'Unknown date'}
             </Text>
 
-            {!Number.isNaN(
-              orderDate.getTime()
-            ) && (
+            {orderDate && (
               <Text
                 style={{
                   color: '#999',
@@ -1639,27 +1659,27 @@ const refreshOrders = useCallback(
   ) => {
     switch (filter) {
       case 'TODAY':
-        return 'Today';
+        return t.today || 'Today';
 
       case 'YESTERDAY':
-        return 'Yesterday';
+        return t.yesterday || 'Yesterday';
 
       case 'LAST_7_DAYS':
-        return 'Last 7 Days';
+        return t.last7Days || 'Last 7 Days';
 
       case 'LAST_30_DAYS':
-        return 'Last 30 Days';
+        return t.last30Days || 'Last 30 Days';
 
       case 'CUSTOM':
         return customDate
           ? formatDate(
               customDate
             )
-          : 'Choose Date';
+          : (t.customDate || 'Custom Date');
 
       case 'ALL':
       default:
-        return 'All Dates';
+        return t.allDates || 'All Dates';
     }
   };
 
@@ -1817,230 +1837,276 @@ const refreshOrders = useCallback(
           DATE FILTER
       ==================================================== */}
 
-      <View
-        style={{
-          backgroundColor:
-            '#FFFDF7',
-          paddingTop: 10,
-          paddingBottom: 8,
-          borderBottomWidth: 1,
-          borderBottomColor:
-            '#EFE7D8',
-        }}
-      >
-        {/* DATE TITLE */}
+      <View style={screenStyles.dateFilterCard}>
+        {/* DATE HEADER */}
+        <View style={screenStyles.dateFilterHeader}>
+          <View style={screenStyles.dateFilterHeaderLeft}>
+            <View style={screenStyles.dateFilterIconWrap}>
+              <FontAwesome
+                name="calendar"
+                size={14}
+                color="#DAA520"
+              />
+            </View>
 
-        <View
-          style={{
-            flexDirection:
-              'row',
-            alignItems:
-              'center',
-            paddingHorizontal: 15,
-            marginBottom: 8,
-          }}
-        >
-          <FontAwesome
-            name="calendar"
-            size={15}
-            color="#DAA520"
-          />
+            <View>
+              <Text style={screenStyles.dateFilterTitle}>
+                {t.filterByDate || 'Order Timeline'}
+              </Text>
+              <Text style={screenStyles.dateFilterSubtitle}>
+                {selectedDateFilter === 'ALL'
+                  ? (t.allDates || 'Showing all dates')
+                  : `${getDateFilterLabel(selectedDateFilter)}`}
+              </Text>
+            </View>
+          </View>
 
-          <Text
-            style={{
-              marginLeft: 7,
-              fontSize: 14,
-              fontWeight:
-                '700',
-              color:
-                '#3B3021',
-            }}
-          >
-            Order Date
-          </Text>
+          {selectedDateFilter !== 'ALL' && (
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedDateFilter('ALL');
+                setCustomDate(null);
+                setShowDatePicker(false);
+              }}
+              activeOpacity={0.7}
+              style={screenStyles.dateFilterResetBtn}
+            >
+              <FontAwesome
+                name="times-circle"
+                size={12}
+                color="#DAA520"
+              />
+              <Text style={screenStyles.dateFilterResetText}>
+                {t.clearFilter || 'Clear'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* -----------------------------------------------
-            WEB DATE INPUT
-        ----------------------------------------------- */}
-
-        {Platform.OS ===
-          'web' && (
-          <View
-            style={{
-              paddingHorizontal: 15,
-              marginBottom: 10,
-            }}
-          >
-            {React.createElement(
-              'input',
-              {
-                type: 'date',
-
-                value:
-                  customDate
-                    ? dateToInputValue(
-                        customDate
-                      )
-                    : '',
-
-                max:
-                  dateToInputValue(
-                    new Date()
-                  ),
-
-                onChange: (
-                  event: any
-                ) => {
-                  handleWebDateChange(
-                    event.target
-                      .value
-                  );
-                },
-
-                style: {
-                  width:
-                    '100%',
-                  maxWidth:
-                    320,
-                  height:
-                    42,
-                  padding:
-                    '0 12px',
-                  borderRadius:
-                    10,
-                  border:
-                    '1px solid #E6DCCD',
-                  backgroundColor:
-                    '#F5F0E7',
-                  color:
-                    '#3B3021',
-                  fontSize:
-                    14,
-                  fontWeight:
-                    600,
-                  outline:
-                    'none',
-                  boxSizing:
-                    'border-box',
-                  cursor:
-                    'pointer',
-                },
-              }
-            )}
-          </View>
-        )}
-
-        {/* -----------------------------------------------
-            QUICK DATE FILTERS
-        ----------------------------------------------- */}
-
+        {/* QUICK DATE FILTERS */}
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={
-            false
-          }
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={{
             paddingHorizontal: 15,
             gap: 8,
+            alignItems: 'center',
           }}
         >
-          {(
-            [
-              'ALL',
-              'TODAY',
-              'YESTERDAY',
-              'LAST_7_DAYS',
-              'LAST_30_DAYS',
-              'CUSTOM',
-            ] as DateFilter[]
-          ).map(
-            filter => {
-              const selected =
-                selectedDateFilter ===
-                filter;
+          {([
+            { key: 'ALL', icon: 'th-large', label: t.allDates || 'All Dates' },
+            { key: 'TODAY', icon: 'sun-o', label: t.today || 'Today' },
+            { key: 'YESTERDAY', icon: 'history', label: t.yesterday || 'Yesterday' },
+            { key: 'LAST_7_DAYS', icon: 'calendar-check-o', label: t.last7Days || '7 Days' },
+            { key: 'LAST_30_DAYS', icon: 'calendar', label: t.last30Days || '30 Days' },
+            {
+              key: 'CUSTOM',
+              icon: 'calendar-plus-o',
+              label: customDate
+                ? formatDate(customDate)
+                : (t.customDate || 'Custom Date'),
+            },
+          ] as {
+            key: DateFilter;
+            icon: React.ComponentProps<typeof FontAwesome>['name'];
+            label: string;
+          }[]).map(({ key, icon, label }) => {
+            const isSelected = selectedDateFilter === key;
 
-              return (
-                <TouchableOpacity
-                  key={
-                    filter
-                  }
-                  onPress={() => {
-                    if (
-                      filter ===
-                      'CUSTOM'
-                    ) {
-                      openCustomDatePicker();
-                    } else {
-                      setSelectedDateFilter(
-                        filter
-                      );
+            return (
+              <TouchableOpacity
+                key={key}
+                onPress={() => {
+                  if (key === 'CUSTOM') {
+                    setSelectedDateFilter('CUSTOM');
+                    if (!customDate) {
+                      setCustomDate(new Date());
                     }
-                  }}
-                  activeOpacity={
-                    0.8
+                    openCustomDatePicker();
+                  } else {
+                    setSelectedDateFilter(key);
+                    setCustomDate(null);
+                    setShowDatePicker(false);
                   }
-                  style={{
-                    flexDirection:
-                      'row',
-                    alignItems:
-                      'center',
-                    paddingHorizontal:
-                      14,
-                    paddingVertical:
-                      9,
-                    borderRadius:
-                      20,
-                    backgroundColor:
-                      selected
-                        ? '#DAA520'
-                        : '#F5F0E7',
-                    borderWidth:
-                      1,
-                    borderColor:
-                      selected
-                        ? '#DAA520'
-                        : '#E6DCCD',
-                  }}
-                >
-                  {filter ===
-                    'CUSTOM' && (
-                    <FontAwesome
-                      name="calendar"
-                      size={12}
-                      color={
-                        selected
-                          ? '#fff'
-                          : '#A89378'
+                }}
+                activeOpacity={0.8}
+                style={{
+                  borderRadius: 22,
+                  overflow: 'hidden',
+                  ...(isSelected
+                    ? {
+                        shadowColor: '#DAA520',
+                        shadowOpacity: 0.35,
+                        shadowRadius: 5,
+                        shadowOffset: { width: 0, height: 2 },
+                        elevation: 3,
                       }
-                      style={{
-                        marginRight:
-                          6,
-                      }}
-                    />
-                  )}
-
-                  <Text
+                    : {}),
+                }}
+              >
+                {isSelected ? (
+                  <LinearGradient
+                    colors={['#E5AC25', '#C69214']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
                     style={{
-                      fontSize:
-                        12,
-                      fontWeight:
-                        '600',
-                      color:
-                        selected
-                          ? '#fff'
-                          : '#6D6254',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 22,
+                      gap: 6,
                     }}
                   >
-                    {getDateFilterLabel(
-                      filter
-                    )}
+                    <FontAwesome
+                      name={icon}
+                      size={12}
+                      color="#FFFFFF"
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: '#FFFFFF',
+                        letterSpacing: 0.2,
+                      }}
+                    >
+                      {label}
+                    </Text>
+                    <View
+                      style={{
+                        width: 5,
+                        height: 5,
+                        borderRadius: 3,
+                        backgroundColor: '#FFF',
+                        marginLeft: 2,
+                        opacity: 0.9,
+                      }}
+                    />
+                  </LinearGradient>
+                ) : (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 13,
+                      paddingVertical: 8,
+                      borderRadius: 22,
+                      backgroundColor: '#F7F3EB',
+                      borderWidth: 1,
+                      borderColor: '#E5DAC7',
+                      gap: 6,
+                    }}
+                  >
+                    <FontAwesome
+                      name={icon}
+                      size={12}
+                      color="#9A8973"
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '600',
+                        color: '#5A4D3B',
+                      }}
+                    >
+                      {label}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* CUSTOM DATE BANNER (WHEN CUSTOM IS ACTIVE) */}
+        {selectedDateFilter === 'CUSTOM' && (
+          <View style={screenStyles.customDateBanner}>
+            <View style={screenStyles.customDateBannerLeft}>
+              <View style={screenStyles.customDateBannerIcon}>
+                <FontAwesome
+                  name="calendar"
+                  size={15}
+                  color="#FFF"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={screenStyles.customDateBannerTitle}>
+                  {t.customDate || 'Selected Custom Date'}
+                </Text>
+                <Text style={screenStyles.customDateBannerDate}>
+                  {customDate ? formatDate(customDate) : (t.pickDate || 'Choose a date')}
+                </Text>
+              </View>
+            </View>
+
+            {Platform.OS === 'web' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {React.createElement('input', {
+                  ref: dateInputRef,
+                  type: 'date',
+                  value: customDate ? dateToInputValue(customDate) : dateToInputValue(new Date()),
+                  max: dateToInputValue(new Date()),
+                  onChange: (event: any) => {
+                    if (event?.target?.value) {
+                      handleWebDateChange(event.target.value);
+                    }
+                  },
+                  style: {
+                    height: 36,
+                    padding: '4px 10px',
+                    borderRadius: 8,
+                    border: '1.5px solid #DAA520',
+                    backgroundColor: '#FFFFFF',
+                    color: '#3B3021',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    outline: 'none',
+                    cursor: 'pointer',
+                  },
+                })}
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedDateFilter('ALL');
+                    setCustomDate(null);
+                  }}
+                  activeOpacity={0.7}
+                  style={{ padding: 4 }}
+                >
+                  <FontAwesome name="times-circle" size={18} color="#A89378" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity
+                  onPress={openCustomDatePicker}
+                  activeOpacity={0.7}
+                  style={screenStyles.customDateActionBtn}
+                >
+                  <FontAwesome
+                    name="calendar-plus-o"
+                    size={13}
+                    color="#DAA520"
+                  />
+                  <Text style={screenStyles.customDateActionText}>
+                    {customDate ? (t.changeDate || 'Change Date') : (t.pickDate || 'Pick Date')}
                   </Text>
                 </TouchableOpacity>
-              );
-            }
-          )}
-        </ScrollView>
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedDateFilter('ALL');
+                    setCustomDate(null);
+                    setShowDatePicker(false);
+                  }}
+                  activeOpacity={0.7}
+                  style={{ padding: 4 }}
+                >
+                  <FontAwesome name="times-circle" size={18} color="#A89378" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
       </View>
 
       {/* ===================================================
@@ -2179,25 +2245,18 @@ const refreshOrders = useCallback(
                       filter
                     )
                   }
+                  activeOpacity={0.75}
                   style={[
                     screenStyles.filterTabButton,
                     selectedFilter ===
-                      filter && {
-                      backgroundColor:
-                        '#DAA520',
-                    },
+                      filter && screenStyles.filterTabButtonActive,
                   ]}
                 >
                   <Text
                     style={[
                       screenStyles.filterTabText,
-                      {
-                        color:
-                          selectedFilter ===
-                          filter
-                            ? '#fff'
-                            : '#666',
-                      },
+                      selectedFilter ===
+                        filter && screenStyles.filterTabTextActive,
                     ]}
                   >
                     {

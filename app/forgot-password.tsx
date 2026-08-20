@@ -134,6 +134,17 @@ export default function ForgotPasswordScreen() {
                   editable={!forgotPasswordMutation.isPending}
                 />
 
+                
+                <View style={styles.spamBox}>
+                  <FontAwesome name="info-circle" size={14} color="#D97706" style={{ marginTop: 2, marginRight: 8 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.spamBoxTitle}>Verification Email Notice</Text>
+                    <Text style={styles.spamBoxText}>
+                      Verification emails may sometimes land in your Spam / Junk folder. Please check there if you don't see it in your inbox.
+                    </Text>
+                  </View>
+                </View>
+    
                 <TouchableOpacity
                   style={[styles.button, forgotPasswordMutation.isPending && styles.buttonDisabled]}
                   onPress={handleSendOtp}
@@ -191,6 +202,17 @@ export default function ForgotPasswordScreen() {
                   editable={!resetPasswordMutation.isPending}
                 />
 
+                
+                <View style={styles.spamBox}>
+                  <FontAwesome name="info-circle" size={14} color="#D97706" style={{ marginTop: 2, marginRight: 8 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.spamBoxTitle}>Verification Email Notice</Text>
+                    <Text style={styles.spamBoxText}>
+                      Verification emails may sometimes land in your Spam / Junk folder. Please check there if you don't see it in your inbox.
+                    </Text>
+                  </View>
+                </View>
+    
                 <TouchableOpacity
                   style={[styles.button, resetPasswordMutation.isPending && styles.buttonDisabled]}
                   onPress={handleResetPassword}

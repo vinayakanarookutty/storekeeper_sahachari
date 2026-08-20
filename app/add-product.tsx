@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -62,6 +62,68 @@ export default function AddProductScreen() {
   const { t } = useLanguage();
   
   const [category, setCategory] = useState('');
+  const [categoriesList, setCategoriesList] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function loadStorekeeperCategories() {
+      try {
+        const token = await getToken();
+        const baseUrls = [
+          API_BASE_URL,
+          'http://localhost:5000',
+          'http://10.0.2.2:5000',
+          'http://192.168.0.190:5000',
+        ].filter(Boolean);
+
+        const mergeCategories = (fetchedNames: string[]) => {
+          const merged = [...PRODUCT_CATEGORIES];
+          for (const name of fetchedNames) {
+            if (name && !merged.some((m) => m.toLowerCase().trim() === name.toLowerCase().trim())) {
+              merged.push(name.trim());
+            }
+          }
+          return merged;
+        };
+
+        for (const base of baseUrls) {
+          try {
+            // 1. Try storekeeper authenticated categories
+            if (token) {
+              const res = await fetch(`${base}/storekeeper/categories`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                  const names = data.map((c: any) => c.name).filter(Boolean);
+                  setCategoriesList(mergeCategories(names));
+                  return;
+                }
+              }
+            }
+
+            // 2. Fallback to public categories
+            const publicRes = await fetch(`${base}/categories`);
+            if (publicRes.ok) {
+              const data = await publicRes.json();
+              if (Array.isArray(data) && data.length > 0) {
+                const names = data.map((c: any) => c.name).filter(Boolean);
+                setCategoriesList(mergeCategories(names));
+                return;
+              }
+            }
+          } catch (e) {
+            // continue next url
+          }
+        }
+        setCategoriesList(PRODUCT_CATEGORIES);
+      } catch (err) {
+        setCategoriesList(PRODUCT_CATEGORIES);
+      }
+    }
+
+    loadStorekeeperCategories();
+  }, []);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -409,7 +471,7 @@ export default function AddProductScreen() {
       {/* MODALS */}
       <SelectionModal 
         visible={showCategoryModal}
-        data={PRODUCT_CATEGORIES}
+        data={categoriesList.length > 0 ? categoriesList : PRODUCT_CATEGORIES}
         title={t.selectCategory || "Select Category"}
         onSelect={handleSelectCategory}
         onClose={() => setShowCategoryModal(false)}
