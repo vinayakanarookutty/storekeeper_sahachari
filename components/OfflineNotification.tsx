@@ -1,348 +1,656 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  TouchableOpacity,
   ActivityIndicator,
+  Animated,
   Platform,
-  Vibration,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
-import * as Notifications from 'expo-notifications';
-import { WifiOff, Wifi, RefreshCw, X, AlertCircle } from 'lucide-react-native';
-import { useLanguage } from '@/app/contexts/LanguageContext';
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import NetInfo from "@react-native-community/netinfo";
+import {
+  Wifi,
+  WifiOff,
+  RefreshCw,
+} from "lucide-react-native";
+
+const API_URL =
+  "https://d12kkdtchca0yi.cloudfront.net";
+
+type NetworkStatus = "online" | "offline";
 
 export default function OfflineNotification() {
-  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
 
-  const [isOffline, setIsOffline] = useState(false);
-  const [showRestored, setShowRestored] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
+  const [status, setStatus] =
+    useState<NetworkStatus | null>(null);
 
-  const prevIsOfflineRef = useRef<boolean | null>(null);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const slideAnim = useRef(new Animated.Value(-150)).current;
+  const [checking, setChecking] =
+    useState(false);
 
-  // Send a system / in-app notification for offline / online state
-  const notifyNetworkChange = async (offline: boolean) => {
-    try {
-      const title = offline
-        ? (t.noInternet || 'No Internet Connection ⚠️')
-        : (t.backOnline || 'Back Online ✅');
-      const body = offline
-        ? (t.noInternetDesc || 'You are currently offline. Please check your internet connection.')
-        : (t.backOnlineDesc || 'Your internet connection has been restored.');
+  const previousStatus =
+    useRef<NetworkStatus | null>(null);
 
-      if (Platform.OS === 'web') {
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification(title, { body });
+  const initialized =
+    useRef(false);
+
+  const timerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const translateY =
+    useRef(new Animated.Value(-120)).current;
+
+  const opacity =
+    useRef(new Animated.Value(0)).current;
+
+  // ==================================================
+  // HIDE
+  // ==================================================
+
+  const hideAlert = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -120,
+        duration: 250,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+    ]).start(() => {
+      setStatus(null);
+    });
+  }, [opacity, translateY]);
+
+  // ==================================================
+  // SHOW
+  // ==================================================
+
+  const showAlert = useCallback(
+    (newStatus: NetworkStatus) => {
+      console.log(
+        "[OfflineNotification] SHOW:",
+        newStatus
+      );
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      setStatus(newStatus);
+
+      translateY.setValue(-120);
+      opacity.setValue(0);
+
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 0,
+          tension: 70,
+          friction: 9,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ]).start();
+
+      timerRef.current = setTimeout(() => {
+        hideAlert();
+      }, 3000);
+    },
+    [hideAlert, opacity, translateY]
+  );
+
+  // ==================================================
+  // CHECK ACTUAL INTERNET
+  // ==================================================
+
+  const checkConnection =
+    useCallback(async (): Promise<boolean> => {
+      try {
+        // --------------------------------------------
+        // FIRST: DEVICE/BROWSER NETWORK
+        // --------------------------------------------
+
+        if (Platform.OS === "web") {
+          if (
+            typeof navigator !== "undefined" &&
+            !navigator.onLine
+          ) {
+            console.log(
+              "[OfflineNotification] Browser offline"
+            );
+
+            return false;
+          }
+        } else {
+          const netState =
+            await NetInfo.fetch();
+
+          if (
+            netState.isConnected === false
+          ) {
+            console.log(
+              "[OfflineNotification] Device offline"
+            );
+
+            return false;
+          }
         }
-      } else {
-        // Haptic feedback
+
+        // --------------------------------------------
+        // SECOND: ACTUAL API CHECK
+        // --------------------------------------------
+
+        const controller =
+          new AbortController();
+
+        const timeout = setTimeout(() => {
+          controller.abort();
+        }, 5000);
+
         try {
-          Vibration.vibrate(offline ? [0, 200, 100, 200] : 150);
-        } catch {
-          // ignore vibration failure
+          const response = await fetch(
+            `${API_URL}/`,
+            {
+              method: "GET",
+              signal: controller.signal,
+              cache: "no-store",
+            }
+          );
+
+          clearTimeout(timeout);
+
+          console.log(
+            "[OfflineNotification] API status:",
+            response.status
+          );
+
+          // Any HTTP response means network works.
+          // Even 401/404 means internet is working.
+          return true;
+        } catch (error) {
+          clearTimeout(timeout);
+
+          console.log(
+            "[OfflineNotification] API unreachable"
+          );
+
+          return false;
         }
+      } catch (error) {
+        console.log(
+          "[OfflineNotification] Connection check error:",
+          error
+        );
 
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title,
-            body,
-            data: { type: 'network_status', isOffline: offline },
-          },
-          trigger: null, // immediate
-        });
+        return false;
       }
-    } catch (e) {
-      console.warn('OfflineNotification: Failed to schedule local notification:', e);
-    }
-  };
+    }, []);
 
-  const handleStateChange = (state: NetInfoState) => {
-    // Determine offline status:
-    // If isConnected is explicitly false OR isInternetReachable is explicitly false
-    const currentlyOffline =
-      state.isConnected === false || state.isInternetReachable === false;
+  // ==================================================
+  // PROCESS STATUS
+  // ==================================================
 
-    if (prevIsOfflineRef.current === null) {
-      // Initial check on mount
-      prevIsOfflineRef.current = currentlyOffline;
-      setIsOffline(currentlyOffline);
-      if (currentlyOffline) {
-        setIsDismissed(false);
-        animateIn();
+  const processStatus = useCallback(
+    (online: boolean) => {
+      const newStatus: NetworkStatus =
+        online ? "online" : "offline";
+
+      console.log(
+        "[OfflineNotification] STATUS:",
+        newStatus
+      );
+
+      // --------------------------------------------
+      // FIRST CHECK
+      // --------------------------------------------
+
+      if (!initialized.current) {
+        initialized.current = true;
+
+        previousStatus.current =
+          newStatus;
+
+        // Show initial status
+        showAlert(newStatus);
+
+        return;
       }
-      return;
-    }
 
-    if (prevIsOfflineRef.current !== currentlyOffline) {
-      if (currentlyOffline) {
-        // Went offline
-        setIsOffline(true);
-        setShowRestored(false);
-        setIsDismissed(false);
-        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-        animateIn();
-        notifyNetworkChange(true);
-      } else {
-        // Came back online
-        setIsOffline(false);
-        setShowRestored(true);
-        setIsDismissed(false);
-        animateIn();
-        notifyNetworkChange(false);
+      // --------------------------------------------
+      // STATUS CHANGED
+      // --------------------------------------------
 
-        // Auto dismiss green restored banner after 3.5 seconds
-        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = setTimeout(() => {
-          animateOut(() => {
-            setShowRestored(false);
-          });
-        }, 3500);
+      if (
+        previousStatus.current !==
+        newStatus
+      ) {
+        previousStatus.current =
+          newStatus;
+
+        showAlert(newStatus);
       }
-      prevIsOfflineRef.current = currentlyOffline;
-    }
-  };
+    },
+    [showAlert]
+  );
+
+  // ==================================================
+  // INITIAL CHECK
+  // ==================================================
 
   useEffect(() => {
-    // Initial fetch
-    NetInfo.fetch().then((state) => {
-      handleStateChange(state);
-    });
+    let mounted = true;
 
-    // Event listener
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      handleStateChange(state);
-    });
+    const initialCheck = async () => {
+      const online =
+        await checkConnection();
+
+      if (!mounted) return;
+
+      processStatus(online);
+    };
+
+    initialCheck();
 
     return () => {
-      unsubscribe();
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      mounted = false;
     };
-  }, []);
+  }, [
+    checkConnection,
+    processStatus,
+  ]);
 
-  const animateIn = () => {
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 65,
-      friction: 10,
-    }).start();
-  };
+  // ==================================================
+  // CONTINUOUS MONITOR
+  // ==================================================
 
-  const animateOut = (onComplete?: () => void) => {
-    Animated.timing(slideAnim, {
-      toValue: -150,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(onComplete);
-  };
+  useEffect(() => {
+    let mounted = true;
 
-  const handleManualRetry = async () => {
-    setIsChecking(true);
+    let interval:
+      | ReturnType<typeof setInterval>
+      | null = null;
+
+    const check = async () => {
+      if (!mounted) return;
+
+      const online =
+        await checkConnection();
+
+      if (!mounted) return;
+
+      processStatus(online);
+    };
+
+    // Check every 5 seconds
+    interval = setInterval(
+      check,
+      5000
+    );
+
+    // --------------------------------------------
+    // WEB EVENTS
+    // --------------------------------------------
+
+    const handleOnline = () => {
+      console.log(
+        "[OfflineNotification] Browser ONLINE"
+      );
+
+      check();
+    };
+
+    const handleOffline = () => {
+      console.log(
+        "[OfflineNotification] Browser OFFLINE"
+      );
+
+      processStatus(false);
+    };
+
+    if (
+      Platform.OS === "web" &&
+      typeof window !== "undefined"
+    ) {
+      window.addEventListener(
+        "online",
+        handleOnline
+      );
+
+      window.addEventListener(
+        "offline",
+        handleOffline
+      );
+    }
+
+    // --------------------------------------------
+    // MOBILE NETINFO
+    // --------------------------------------------
+
+    const unsubscribe =
+      NetInfo.addEventListener(
+        async (state) => {
+          if (!mounted) return;
+
+          if (
+            state.isConnected === false
+          ) {
+            processStatus(false);
+            return;
+          }
+
+          // Verify actual connection
+          const online =
+            await checkConnection();
+
+          if (!mounted) return;
+
+          processStatus(online);
+        }
+      );
+
+    return () => {
+      mounted = false;
+
+      if (interval) {
+        clearInterval(interval);
+      }
+
+      unsubscribe();
+
+      if (
+        Platform.OS === "web" &&
+        typeof window !== "undefined"
+      ) {
+        window.removeEventListener(
+          "online",
+          handleOnline
+        );
+
+        window.removeEventListener(
+          "offline",
+          handleOffline
+        );
+      }
+
+      if (timerRef.current) {
+        clearTimeout(
+          timerRef.current
+        );
+      }
+    };
+  }, [
+    checkConnection,
+    processStatus,
+  ]);
+
+  // ==================================================
+  // RETRY
+  // ==================================================
+
+  const handleRetry = async () => {
+    if (checking) return;
+
+    setChecking(true);
+
     try {
-      const state = await NetInfo.refresh();
-      handleStateChange(state);
-    } catch (e) {
-      console.warn('Network refresh error:', e);
+      const online =
+        await checkConnection();
+
+      processStatus(online);
+    } catch (error) {
+      console.log(
+        "[OfflineNotification] Retry error:",
+        error
+      );
     } finally {
       setTimeout(() => {
-        setIsChecking(false);
+        setChecking(false);
       }, 500);
     }
   };
 
-  const handleDismiss = () => {
-    setIsDismissed(true);
-    animateOut();
-  };
+  // ==================================================
+  // NOTHING TO DISPLAY
+  // ==================================================
 
-  if ((!isOffline && !showRestored) || isDismissed) {
+  if (!status) {
     return null;
   }
 
-  const isRestored = showRestored && !isOffline;
+  const isOnline =
+    status === "online";
+
+  const topPosition =
+    Platform.OS === "ios"
+      ? Math.max(insets.top, 20)
+      : Math.max(
+          insets.top + 8,
+          16
+        );
+
+  // ==================================================
+  // UI
+  // ==================================================
 
   return (
     <Animated.View
+      pointerEvents="box-none"
       style={[
         styles.wrapper,
         {
-          paddingTop: Math.max(insets.top, 12) + 6,
-          transform: [{ translateY: slideAnim }],
+          top: topPosition,
+
+          transform: [
+            {
+              translateY,
+            },
+          ],
+
+          opacity,
         },
       ]}
-      pointerEvents="box-none"
     >
       <View
         style={[
-          styles.container,
-          isRestored ? styles.containerOnline : styles.containerOffline,
+          styles.alert,
+          isOnline
+            ? styles.online
+            : styles.offline,
         ]}
       >
-        {/* Left Status Icon */}
-        <View
-          style={[
-            styles.iconContainer,
-            isRestored ? styles.iconContainerOnline : styles.iconContainerOffline,
-          ]}
-        >
-          {isRestored ? (
-            <Wifi size={20} color="#FFFFFF" />
+        {/* ICON */}
+
+        <View style={styles.icon}>
+          {isOnline ? (
+            <Wifi
+              size={22}
+              color="#FFFFFF"
+              strokeWidth={2.5}
+            />
           ) : (
-            <WifiOff size={20} color="#FFFFFF" />
+            <WifiOff
+              size={22}
+              color="#FFFFFF"
+              strokeWidth={2.5}
+            />
           )}
         </View>
 
-        {/* Text Content */}
-        <View style={styles.textContainer}>
-          <Text style={styles.titleText}>
-            {isRestored
-              ? (t.backOnline || 'Back Online')
-              : (t.noInternet || 'No Internet Connection')}
+        {/* TEXT */}
+
+        <View style={styles.content}>
+          <Text style={styles.title}>
+            {isOnline
+              ? "Internet Connected"
+              : "No Internet Connection"}
           </Text>
-          <Text style={styles.subtitleText} numberOfLines={2}>
-            {isRestored
-              ? (t.backOnlineDesc || 'Internet connection restored.')
-              : (t.noInternetDesc || 'Please check your connection.')}
+
+          <Text style={styles.message}>
+            {isOnline
+              ? "Your internet connection is active"
+              : "Please check your internet connection"}
           </Text>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionsContainer}>
-          {!isRestored && (
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={handleManualRetry}
-              disabled={isChecking}
-              activeOpacity={0.8}
-            >
-              {isChecking ? (
-                <ActivityIndicator size="small" color="#DC2626" />
-              ) : (
-                <>
-                  <RefreshCw size={13} color="#DC2626" style={styles.retryIcon} />
-                  <Text style={styles.retryText}>{t.retry || 'Retry'}</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
+        {/* RETRY */}
 
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={handleDismiss}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        {!isOnline && (
+          <Pressable
+            onPress={handleRetry}
+            disabled={checking}
+            style={({ pressed }) => [
+              styles.retry,
+              {
+                opacity: pressed
+                  ? 0.7
+                  : 1,
+              },
+            ]}
           >
-            <X size={16} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+            {checking ? (
+              <ActivityIndicator
+                size="small"
+                color="#FFFFFF"
+              />
+            ) : (
+              <>
+                <RefreshCw
+                  size={14}
+                  color="#FFFFFF"
+                  style={{
+                    marginRight: 5,
+                  }}
+                />
+
+                <Text
+                  style={styles.retryText}
+                >
+                  Retry
+                </Text>
+              </>
+            )}
+          </Pressable>
+        )}
       </View>
     </Animated.View>
   );
 }
 
+// ==================================================
+// STYLES
+// ==================================================
+
 const styles = StyleSheet.create({
   wrapper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 99999,
-    elevation: 99999,
-    paddingHorizontal: 14,
-    paddingBottom: 8,
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 999999,
+    elevation: 999999,
   },
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
+
+  alert: {
+    minHeight: 66,
+
+    borderRadius: 16,
+
+    paddingVertical: 11,
     paddingHorizontal: 14,
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    borderWidth: 1,
+
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+
     shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 10,
+
+    elevation: 10,
   },
-  containerOffline: {
-    backgroundColor: '#DC2626', // Vibrant crimson red
-    borderWidth: 1,
-    borderColor: '#B91C1C',
+
+  online: {
+    backgroundColor: "#059669",
+    borderColor: "#047857",
+    shadowColor: "#059669",
   },
-  containerOnline: {
-    backgroundColor: '#059669', // Vibrant emerald green
-    borderWidth: 1,
-    borderColor: '#047857',
+
+  offline: {
+    backgroundColor: "#DC2626",
+    borderColor: "#B91C1C",
+    shadowColor: "#DC2626",
   },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+
+  icon: {
+    width: 40,
+    height: 40,
+
+    borderRadius: 12,
+
+    backgroundColor:
+      "rgba(255,255,255,0.20)",
+
+    justifyContent: "center",
+    alignItems: "center",
+
+    marginRight: 11,
   },
-  iconContainerOffline: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  iconContainerOnline: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  textContainer: {
+
+  content: {
     flex: 1,
     marginRight: 8,
   },
-  titleText: {
-    color: '#FFFFFF',
+
+  title: {
+    color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontWeight: "700",
   },
-  subtitleText: {
-    color: 'rgba(255, 255, 255, 0.9)',
+
+  message: {
+    color: "rgba(255,255,255,0.9)",
     fontSize: 11.5,
     marginTop: 2,
-    lineHeight: 15,
   },
-  actionsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+
+  retry: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+
+    minWidth: 68,
+
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
+    paddingVertical: 7,
+
+    borderRadius: 9,
+
+    backgroundColor:
+      "rgba(255,255,255,0.20)",
+
+    borderWidth: 1,
+    borderColor:
+      "rgba(255,255,255,0.3)",
   },
-  retryIcon: {
-    marginRight: 4,
-  },
+
   retryText: {
-    color: '#DC2626',
+    color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: '700',
-  },
-  closeButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontWeight: "700",
   },
 });
