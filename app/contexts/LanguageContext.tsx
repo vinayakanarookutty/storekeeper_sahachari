@@ -39,6 +39,16 @@ const translations = {
     createFirstProduct: 'Create your first product',
     bulkUpload: 'Bulk Upload',
     bulkEditStock: 'Bulk Edit Stock',
+    bulkDelete: 'Bulk Delete',
+    bulkDeleteProducts: 'Bulk Delete Products',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
+    deleteSelected: 'Delete Selected',
+    selectedCount: 'selected',
+    confirmBulkDeleteTitle: 'Delete Selected Products',
+    confirmBulkDeleteMsg: 'Are you sure you want to delete the selected product(s)? This action cannot be undone.',
+    bulkDeleteSuccess: 'Selected products deleted successfully',
+    noProductsSelected: 'Please select at least one product to delete',
 
     // Bulk Upload Specific Fields
     bulkUploadSubtitle: 'Upload Excel or CSV files to import products quickly',
@@ -273,6 +283,16 @@ const translations = {
     createFirstProduct: 'ആദ്യ ഉൽപ്പന്നം സൃഷ്ടിക്കുക',
     bulkUpload: 'ബൾക്ക് അപ്‌ലോഡ്',
     bulkEditStock: 'ബൾക്ക് സ്റ്റോക്ക് എഡിറ്റ്',
+    bulkDelete: 'ബൾക്ക് ഡിലീറ്റ്',
+    bulkDeleteProducts: 'ബൾക്ക് ഡിലീറ്റ് ഉൽപ്പന്നങ്ങൾ',
+    selectAll: 'എല്ലാം തിരഞ്ഞെടുക്കുക',
+    deselectAll: 'തിരഞ്ഞെടുക്കൽ മാറ്റുക',
+    deleteSelected: 'തിരഞ്ഞെടുത്തവ നീക്കം ചെയ്യുക',
+    selectedCount: 'തിരഞ്ഞെടുത്തു',
+    confirmBulkDeleteTitle: 'ഉൽപ്പന്നങ്ങൾ നീക്കം ചെയ്യുക',
+    confirmBulkDeleteMsg: 'തിരഞ്ഞെടുത്ത ഉൽപ്പന്നങ്ങൾ സ്ഥിരമായി നീക്കം ചെയ്യാൻ നിങ്ങൾ തീർച്ചയായും ആഗ്രഹിക്കുന്നുണ്ടോ? ഇത് പഴയപടിയാക്കാൻ കഴിയില്ല.',
+    bulkDeleteSuccess: 'തിരഞ്ഞെടുത്ത ഉൽപ്പന്നങ്ങൾ വിജയകരമായി നീക്കം ചെയ്തു',
+    noProductsSelected: 'ദയവായി കുറഞ്ഞത് ഒരു ഉൽപ്പന്നമെങ്കിലും തിരഞ്ഞെടുക്കുക',
 
     // Bulk Upload Specific Fields
     bulkUploadSubtitle: 'ഉൽപ്പന്നങ്ങൾ വേഗത്തിൽ ചേർക്കാൻ Excel അല്ലെങ്കിൽ CSV ഫയലുകൾ അപ്‌ലോഡ് ചെയ്യുക',

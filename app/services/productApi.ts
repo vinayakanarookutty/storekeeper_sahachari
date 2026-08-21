@@ -45,3 +45,20 @@ export async function updateBulkStock(updates: { productId: string; quantity: nu
   }
   return response.json();
 }
+
+export async function bulkDeleteProducts(productIds: string[]): Promise<any> {
+  const authToken = await getToken();
+  const response = await fetch(`${API_BASE_URL}/storekeeper/products/bulk-delete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ productIds }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || 'Failed to bulk delete products');
+  }
+  return response.json();
+}

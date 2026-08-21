@@ -250,14 +250,18 @@ export default function ProductDetailScreen() {
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] }),
+        queryClient.invalidateQueries({ queryKey: ['items'] }),
+        queryClient.invalidateQueries({ queryKey: ['productDetail'] }),
+      ]);
       const successMsg = isService ? t.serviceDeletedSuccess : t.productDeletedSuccess;
       Alert.alert(t.successTitle, successMsg, [
         {
           text: t.ok,
           onPress: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
             router.back();
           },
         },

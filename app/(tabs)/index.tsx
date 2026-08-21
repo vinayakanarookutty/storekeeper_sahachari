@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getToken } from '../services/auth';
 import { styles } from '../tab_style/index.style';
-import { fetchItems, fetchMyRentals, fetchMyServices, updateBulkStock } from '../services/productApi';
+import { fetchItems, fetchMyRentals, fetchMyServices, updateBulkStock, bulkDeleteProducts } from '../services/productApi';
 
 import {
   ActivityIndicator,
@@ -66,6 +66,10 @@ export default function TabOneScreen() {
   const [bulkStockModalOpen, setBulkStockModalOpen] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState('');
   const [tempStocks, setTempStocks] = useState<Record<string, number>>({});
+
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
+  const [deleteModalSearchQuery, setDeleteModalSearchQuery] = useState('');
+  const [selectedDeleteIds, setSelectedDeleteIds] = useState<string[]>([]);
 
   // Debounce search query to keep the UI smooth during typing fast
   useEffect(() => {
@@ -167,8 +171,14 @@ export default function TabOneScreen() {
     mutationFn: async (updates: { productId: string; quantity: number }[]) => {
       return updateBulkStock(updates);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] }),
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['items'] }),
+        queryClient.invalidateQueries({ queryKey: ['productDetail'] }),
+      ]);
+      await refetch();
       setBulkStockModalOpen(false);
       setModalSearchQuery('');
       if (Platform.OS === 'web') {
@@ -237,6 +247,83 @@ export default function TabOneScreen() {
     }
 
     updateBulkStockMutation.mutate(updates);
+  };
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (productIds: string[]) => {
+      return bulkDeleteProducts(productIds);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['homeDashboardItems'] }),
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['items'] }),
+        queryClient.invalidateQueries({ queryKey: ['productDetail'] }),
+      ]);
+      await refetch();
+      setBulkDeleteModalOpen(false);
+      setSelectedDeleteIds([]);
+      setDeleteModalSearchQuery('');
+      const successMsg = (t as any).bulkDeleteSuccess || 'Selected products deleted successfully';
+      if (Platform.OS === 'web') {
+        alert(successMsg);
+      } else {
+        Alert.alert('Success', successMsg);
+      }
+    },
+    onError: (error: any) => {
+      if (Platform.OS === 'web') {
+        alert(`Failed to delete products: ${error.message}`);
+      } else {
+        Alert.alert('Error', error.message || 'Failed to delete products');
+      }
+    },
+  });
+
+  const filteredDeleteProducts = useMemo(() => {
+    if (!deleteModalSearchQuery.trim()) return productsOnly;
+    const query = deleteModalSearchQuery.toLowerCase();
+    return productsOnly.filter(p =>
+      p.name?.toLowerCase().includes(query) ||
+      p.category?.toLowerCase().includes(query)
+    );
+  }, [productsOnly, deleteModalSearchQuery]);
+
+  const toggleSelectProduct = (productId: string) => {
+    setSelectedDeleteIds(prev =>
+      prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
+    );
+  };
+
+  const toggleSelectAllDelete = () => {
+    const visibleIds = filteredDeleteProducts.map(p => p._id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedDeleteIds.includes(id));
+
+    if (allVisibleSelected) {
+      setSelectedDeleteIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedDeleteIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleConfirmBulkDelete = () => {
+    if (selectedDeleteIds.length === 0) {
+      const msg = (t as any).noProductsSelected || 'Please select at least one product to delete.';
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert('No Selection', msg);
+      }
+      return;
+    }
+
+    const title = (t as any).confirmBulkDeleteTitle || 'Delete Products';
+    const rawMsg = (t as any).confirmBulkDeleteMsg || 'Are you sure you want to delete the selected product(s)? This action cannot be undone.';
+    const msg = rawMsg.includes('{count}') ? rawMsg.replace('{count}', String(selectedDeleteIds.length)) : `${rawMsg} (${selectedDeleteIds.length} items)`;
+
+    showStatusConfirm(title, msg, () => {
+      bulkDeleteMutation.mutate(selectedDeleteIds);
+    });
   };
 
   // Processes filtering logic via reactive computed useMemo tracking debounced query strings
@@ -565,10 +652,17 @@ export default function TabOneScreen() {
                       <Text style={styles.buttonText} numberOfLines={1}>{t.addItem || 'Add Item'}</Text>
                     </TouchableOpacity>
                   </View>
-                  <TouchableOpacity style={[styles.bulkStockButton, { marginTop: 12 }]} onPress={() => setBulkStockModalOpen(true)}>
-                    <FontAwesome name="pencil-square-o" size={16} color="#fff" style={{ marginRight: 6 }} />
-                    <Text style={styles.buttonText}>{(t as any).bulkEditStock || 'BULK EDIT STOCK'}</Text>
-                  </TouchableOpacity>
+                  <View style={styles.bulkActionsRow}>
+                    <TouchableOpacity style={styles.bulkStockButtonFlex} onPress={() => setBulkStockModalOpen(true)}>
+                      <FontAwesome name="pencil-square-o" size={15} color="#fff" style={{ marginRight: 6 }} />
+                      <Text style={styles.buttonText} numberOfLines={1}>{(t as any).bulkEditStock || 'BULK EDIT'}</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.bulkDeleteButton} onPress={() => { setSelectedDeleteIds([]); setDeleteModalSearchQuery(''); setBulkDeleteModalOpen(true); }}>
+                      <FontAwesome name="trash-o" size={15} color="#fff" style={{ marginRight: 6 }} />
+                      <Text style={styles.buttonText} numberOfLines={1}>{(t as any).bulkDelete || 'BULK DELETE'}</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             }
@@ -724,6 +818,141 @@ export default function TabOneScreen() {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={styles.modalSaveButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal animationType="slide" transparent={true} visible={bulkDeleteModalOpen} onRequestClose={() => setBulkDeleteModalOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <FontAwesome name="trash" size={18} color="#DC2626" />
+                <Text style={styles.modalTitle}>{(t as any).bulkDeleteProducts || 'Bulk Delete Products'}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setBulkDeleteModalOpen(false)} style={{ padding: 4 }}>
+                <FontAwesome name="times" size={20} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalSearchContainer}>
+              <View style={styles.modalSearchInputWrapper}>
+                <FontAwesome name="search" size={14} color="#9CA3AF" />
+                <TextInput
+                  style={styles.modalSearchInput}
+                  placeholder="Search products to delete..."
+                  placeholderTextColor="#9CA3AF"
+                  value={deleteModalSearchQuery}
+                  onChangeText={setDeleteModalSearchQuery}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            {/* Select All bar */}
+            <View style={styles.bulkDeleteSelectBar}>
+              <TouchableOpacity
+                style={styles.bulkDeleteSelectBtn}
+                onPress={toggleSelectAllDelete}
+              >
+                <FontAwesome
+                  name={
+                    filteredDeleteProducts.length > 0 &&
+                    filteredDeleteProducts.every(p => selectedDeleteIds.includes(p._id))
+                      ? 'check-square'
+                      : 'square-o'
+                  }
+                  size={16}
+                  color="#DC2626"
+                />
+                <Text style={styles.bulkDeleteSelectBtnText}>
+                  {filteredDeleteProducts.length > 0 &&
+                  filteredDeleteProducts.every(p => selectedDeleteIds.includes(p._id))
+                    ? (t as any).deselectAll || 'Deselect All'
+                    : (t as any).selectAll || 'Select All'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.bulkDeleteCountBadge}>
+                <Text style={styles.bulkDeleteCountText}>
+                  {selectedDeleteIds.length} {(t as any).selectedCount || 'selected'}
+                </Text>
+              </View>
+            </View>
+
+            <FlatList
+              data={filteredDeleteProducts}
+              contentContainerStyle={styles.modalList}
+              keyExtractor={(item) => item._id}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => {
+                const isSelected = selectedDeleteIds.includes(item._id);
+                return (
+                  <TouchableOpacity
+                    style={[styles.modalItemRow, isSelected && { backgroundColor: '#FEF2F2', borderRadius: 8, paddingHorizontal: 6 }]}
+                    onPress={() => toggleSelectProduct(item._id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.modalItemLeft}>
+                      <View style={[styles.checkboxContainer, isSelected && styles.checkboxSelected]}>
+                        {isSelected && <FontAwesome name="check" size={12} color="#FFFFFF" />}
+                      </View>
+
+                      {item.images && item.images.length > 0 ? (
+                        <Image
+                          source={{ uri: item.images[0].startsWith('http') ? item.images[0] : `${S3_BASE_URL}/${item.images[0]}` }}
+                          style={styles.modalItemImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.modalItemPlaceholderImage}>
+                          <FontAwesome name="image" size={18} color="#9CA3AF" />
+                        </View>
+                      )}
+                      <View style={styles.modalItemDetails}>
+                        <Text style={styles.modalItemName} numberOfLines={1}>{item.name}</Text>
+                        <Text style={styles.modalItemUnit}>
+                          Qty: {item.quantity} {item.unit ? `• ${item.unit}` : ''} {item.price ? `• ₹${item.price}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <FontAwesome name="folder-open-o" size={40} color="#9CA3AF" />
+                  <Text style={{ marginTop: 12, color: '#6B7280', fontSize: 15 }}>No products found</Text>
+                </View>
+              }
+            />
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setBulkDeleteModalOpen(false)}
+                disabled={bulkDeleteMutation.isPending}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalDeleteButton, (selectedDeleteIds.length === 0 || bulkDeleteMutation.isPending) && { opacity: 0.6 }]}
+                onPress={handleConfirmBulkDelete}
+                disabled={selectedDeleteIds.length === 0 || bulkDeleteMutation.isPending}
+              >
+                {bulkDeleteMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <FontAwesome name="trash" size={16} color="#FFFFFF" />
+                    <Text style={styles.modalDeleteButtonText}>
+                      {((t as any).deleteSelected || 'Delete Selected')} {selectedDeleteIds.length > 0 ? `(${selectedDeleteIds.length})` : ''}
+                    </Text>
+                  </>
                 )}
               </TouchableOpacity>
             </View>
