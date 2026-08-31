@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sahachari Storekeeper",
     "slug": "storekeeper",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "scheme": "storekeeper",
@@ -11,10 +11,18 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.corestoneinnovations.sahachariadmin",
-      "buildNumber": "17",
+      "buildNumber": "18",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload product images.",
-        "NSCameraUsageDescription": "This app needs access to your camera to take product photos."
+        "UIRequiredDeviceCapabilities": [
+          "arm64"
+        ],
+        "UIRequiresFullScreen": true,
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select and upload product, service, and rental images.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs access to save downloaded files and product images to your photo library.",
+        "NSCameraUsageDescription": "This app needs access to your camera to take photos of products, services, and rental items.",
+        "NSMicrophoneUsageDescription": "This app plays audio notifications for incoming orders and bookings.",
+        "CFBundleAllowMixedLocalizations": true
       }
     },
     "splash": {
@@ -23,7 +31,7 @@
       "backgroundColor": "#FFFFFF"
     },
     "android": {
-      "versionCode": 19,
+      "versionCode": 20,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#FFFFFF"
@@ -69,8 +77,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app needs access to your photos to upload product images.",
-          "cameraPermission": "The app needs access to your camera to take product photos."
+          "photosPermission": "The app needs access to your photos to upload product, service, and rental images.",
+          "cameraPermission": "The app needs access to your camera to take photos of products, services, and rental items."
         }
       ],
       "@react-native-community/datetimepicker",
@@ -82,6 +90,9 @@
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
             "buildToolsVersion": "35.0.0"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
           }
         }
       ],
