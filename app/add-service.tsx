@@ -1,5 +1,5 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -20,6 +20,7 @@ import {
 import { getCurrentUser } from "./services/api";
 import { getToken } from "./services/auth";
 import { ServiceData, servicesApi } from "./services/serviceApi";
+import { DEFAULT_SERVICE_UNITS, unitsApi } from "./services/unitsApi";
 import { styles } from "./styles/add-edit-common.style";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
@@ -42,12 +43,20 @@ interface PresignedUrlResponse {
   key: string;
 }
 
-// Display units available for Services
-const SERVICE_DISPLAY_UNITS = ["Hour", "Day", "pcs"];
-
 export default function AddServiceScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
+
+  const { data: unitsConfig } = useQuery({
+    queryKey: ["storekeeperUnits"],
+    queryFn: unitsApi.getUnits,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const serviceDisplayUnits =
+    unitsConfig?.serviceUnits && unitsConfig.serviceUnits.length > 0
+      ? unitsConfig.serviceUnits
+      : DEFAULT_SERVICE_UNITS;
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -192,13 +201,6 @@ export default function AddServiceScreen() {
       return;
     }
 
-    // Convert UI text to match backend ServiceUnit Enum structure
-    const backendUnit = serviceUnit.toUpperCase() as
-      | "HOUR"
-      | "DAY"
-      | "WEEK"
-      | "MONTH";
-
     let serviceablePincodes: string[] = [];
     try {
       const currentUser = await getCurrentUser();
@@ -218,7 +220,7 @@ export default function AddServiceScreen() {
       name,
       description,
       price: parseFloat(price),
-      unit: backendUnit,
+      unit: serviceUnit.trim(),
       images: uploadedImageKeys,
       isAvailable: true,
       serviceablePincodes,
@@ -354,7 +356,7 @@ export default function AddServiceScreen() {
                 </TouchableOpacity>
               </View>
               <FlatList
-                data={SERVICE_DISPLAY_UNITS}
+                data={serviceDisplayUnits}
                 keyExtractor={(item) => item}
                 renderItem={({ item }) => (
                   <TouchableOpacity

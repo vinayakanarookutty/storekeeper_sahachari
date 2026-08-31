@@ -7,7 +7,7 @@ export interface ServiceData {
   description?: string;
   images?: string[];
   price: number;
-  unit: 'HOUR' | 'DAY' | 'WEEK' | 'MONTH';
+  unit: string;
   isAvailable?: boolean;
   serviceablePincodes?: string[];
 }

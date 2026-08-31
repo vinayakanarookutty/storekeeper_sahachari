@@ -158,7 +158,7 @@ export default function ProductDetailScreen() {
     if (!product?.offers || product.offers.length === 0) return null;
     
     const now = new Date();
-    return product.offers.find(offer => {
+    return product.offers.find((offer: any) => {
       const start = new Date(offer.startDate);
       const end = new Date(offer.endDate);
       return now >= start && now <= end;
@@ -427,7 +427,7 @@ export default function ProductDetailScreen() {
             scrollEventThrottle={16}
           >
             {product.images && product.images.length > 0 ? (
-              product.images.map((imageKey, index) => (
+              product.images.map((imageKey: string, index: number) => (
                 <View key={index} style={styles.imageContainer}>
                   <Image
                     source={{ uri: imageKey.startsWith('http') ? imageKey 
@@ -464,7 +464,7 @@ export default function ProductDetailScreen() {
 
           {product.images && product.images.length > 1 && (
             <View style={styles.dotsContainer}>
-              {product.images.map((_, index) => (
+              {product.images.map((_: string, index: number) => (
                 <View
                   key={index}
                   style={[
@@ -551,7 +551,7 @@ export default function ProductDetailScreen() {
                   <Text style={styles.sectionTitle}>{String(t.activeOffers || 'Active Offers')}</Text>
                 </View>
               </View>
-              {product.offers.map((offer, index) => {
+              {product.offers.map((offer: any, index: number) => {
                 const isOfferActive = () => {
                   const now = new Date();
                   const start = new Date(offer.startDate);
@@ -611,7 +611,11 @@ export default function ProductDetailScreen() {
               <FontAwesome name="align-left" size={18} color="#4A90E2" />
               <Text style={styles.sectionTitle}>{String(t.description || 'Description')}</Text>
             </View>
-            <Text style={styles.productDescription}>{product.description}</Text>
+            <Text style={styles.productDescription}>
+              {product.description && product.description.trim().length > 0
+                ? product.description
+                : String((t as any).noDescriptionAvailable || (t as any).noDescription || 'No description available')}
+            </Text>
           </View>
 
           {/* Product Stats Container */}
