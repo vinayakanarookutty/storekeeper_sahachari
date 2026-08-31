@@ -14,7 +14,8 @@
       "buildNumber": "17",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload product images.",
-        "NSCameraUsageDescription": "This app needs access to your camera to take product photos."
+        "NSCameraUsageDescription": "This app needs access to your camera to take product photos.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "splash": {
@@ -94,7 +95,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "86767deb-9516-4273-a7af-bcf0b7497e57"
+        "projectId": "2f0ee2ac-8299-455d-9c8e-94f4651c5264"
       }
     }
   }
