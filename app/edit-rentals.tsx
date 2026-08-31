@@ -1,6 +1,6 @@
 // D:\storekeeper_sahachari\app\edit-rental.tsx
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -21,11 +21,10 @@ import {
 import { styles } from './styles/add-edit-common.style';
 import { getToken } from './services/auth';
 import { rentalsApi, RentalData } from './services/rentalsApi';
+import { DEFAULT_RENT_UNITS, unitsApi } from './services/unitsApi';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || 'https://sahachari-uploads.s3.ap-south-1.amazonaws.com';
-
-const RENT_DISPLAY_UNITS = ['Hour', 'Day', 'Week', 'Month'];
 
 const showAlert = (title: string, message: string, onConfirm?: () => void) => {
   if (Platform.OS === 'web') {
@@ -41,11 +40,26 @@ export default function EditRentalScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  const { data: unitsConfig } = useQuery({
+    queryKey: ['storekeeperUnits'],
+    queryFn: unitsApi.getUnits,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const rentDisplayUnits =
+    unitsConfig?.rentUnits && unitsConfig.rentUnits.length > 0
+      ? unitsConfig.rentUnits
+      : DEFAULT_RENT_UNITS;
+
   // Exact same architecture as your edit-product model 
   const rental = params.rental ? JSON.parse(params.rental as string) : null;
 
   const parseUnitData = () => {
     if (!rental?.unit) return 'Day';
+    const match = rentDisplayUnits.find(
+      (u: string) => u.toLowerCase() === rental.unit.toLowerCase()
+    );
+    if (match) return match;
     const rawUnit = rental.unit.toLowerCase();
     return rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1);
   };
@@ -158,7 +172,6 @@ export default function EditRentalScreen() {
       return;
     }
 
-    const backendUnit = rentUnit.toUpperCase() as 'HOUR' | 'DAY' | 'WEEK' | 'MONTH';
     const currentId = rental?._id;
 
     if (!currentId) {
@@ -170,7 +183,7 @@ export default function EditRentalScreen() {
       description,
       rentalPrice: parseFloat(price),
       quantity: parseInt(quantity, 10),
-      unit: backendUnit,
+      unit: rentUnit.trim(),
       images: finalImages,
     };
 
@@ -270,7 +283,7 @@ export default function EditRentalScreen() {
                 </TouchableOpacity>
               </View>
               <FlatList
-                data={RENT_DISPLAY_UNITS}
+                data={rentDisplayUnits}
                 keyExtractor={(item) => item}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={styles.modalItem} onPress={() => { setRentUnit(item); setShowUnitModal(false); }}>

@@ -321,9 +321,26 @@ export default function TabOneScreen() {
     const rawMsg = (t as any).confirmBulkDeleteMsg || 'Are you sure you want to delete the selected product(s)? This action cannot be undone.';
     const msg = rawMsg.includes('{count}') ? rawMsg.replace('{count}', String(selectedDeleteIds.length)) : `${rawMsg} (${selectedDeleteIds.length} items)`;
 
-    showStatusConfirm(title, msg, () => {
-      bulkDeleteMutation.mutate(selectedDeleteIds);
-    });
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`${title}\n\n${msg}`);
+      if (confirmed) {
+        bulkDeleteMutation.mutate(selectedDeleteIds);
+      }
+    } else {
+      Alert.alert(
+        title,
+        msg,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => bulkDeleteMutation.mutate(selectedDeleteIds),
+          },
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
   // Processes filtering logic via reactive computed useMemo tracking debounced query strings

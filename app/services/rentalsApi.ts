@@ -16,7 +16,7 @@ export interface RentalData {
   images?: string[];
   quantity: number;
   rentalPrice: number;
-  unit: 'HOUR' | 'DAY' | 'WEEK' | 'MONTH';
+  unit: string;
   isAvailable?: boolean;
   serviceablePincodes?: string[];
   offers?: RentalOffer[]; // add this

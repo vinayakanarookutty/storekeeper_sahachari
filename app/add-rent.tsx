@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -21,6 +21,7 @@ import { styles } from './styles/add-edit-common.style';
 import { getToken } from './services/auth';
 import { getCurrentUser } from './services/api';
 import { rentalsApi, RentalData } from './services/rentalsApi';
+import { DEFAULT_RENT_UNITS, unitsApi } from './services/unitsApi';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -38,12 +39,20 @@ interface PresignedUrlResponse {
   key: string;
 }
 
-// Display options for the user interface
-const RENT_DISPLAY_UNITS = ['Hour', 'Day', 'Week', 'Month'];
-
 export default function AddRentScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
+
+  const { data: unitsConfig } = useQuery({
+    queryKey: ['storekeeperUnits'],
+    queryFn: unitsApi.getUnits,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const rentDisplayUnits =
+    unitsConfig?.rentUnits && unitsConfig.rentUnits.length > 0
+      ? unitsConfig.rentUnits
+      : DEFAULT_RENT_UNITS;
   
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -173,9 +182,6 @@ export default function AddRentScreen() {
       return;
     }
 
-    // Convert UI display units (e.g. 'Day') to backend uppercase enums ('DAY')
-    const backendUnit = rentUnit.toUpperCase() as 'HOUR' | 'DAY' | 'WEEK' | 'MONTH';
-
     let serviceablePincodes: string[] = [];
     try {
       const currentUser = await getCurrentUser();
@@ -193,7 +199,7 @@ export default function AddRentScreen() {
       description,
       rentalPrice: parseFloat(price),
       quantity: parseInt(quantity),
-      unit: backendUnit,
+      unit: rentUnit.trim(),
       images: uploadedImageKeys,
       isAvailable: true,
       serviceablePincodes,
@@ -281,7 +287,7 @@ export default function AddRentScreen() {
                 </TouchableOpacity>
               </View>
               <FlatList
-                data={RENT_DISPLAY_UNITS}
+                data={rentDisplayUnits}
                 keyExtractor={(item) => item}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={styles.modalItem} onPress={() => { setRentUnit(item); setShowUnitModal(false); }}>

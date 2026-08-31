@@ -110,4 +110,28 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+
+  spamBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+
+  spamBoxTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+
+  spamBoxText: {
+    fontSize: 12,
+    color: '#B45309',
+    lineHeight: 16,
+  },
 });

@@ -48,6 +48,9 @@ export async function updateBulkStock(updates: { productId: string; quantity: nu
 
 export async function bulkDeleteProducts(productIds: string[]): Promise<any> {
   const authToken = await getToken();
+  if (!authToken) {
+    throw new Error('Authentication token not found. Please log in again.');
+  }
   const response = await fetch(`${API_BASE_URL}/storekeeper/products/bulk-delete`, {
     method: 'POST',
     headers: {
@@ -57,8 +60,19 @@ export async function bulkDeleteProducts(productIds: string[]): Promise<any> {
     body: JSON.stringify({ productIds }),
   });
   if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Failed to bulk delete products');
+    let errorMessage = 'Failed to bulk delete products';
+    try {
+      const errorData = await response.json();
+      if (errorData?.message) {
+        errorMessage = Array.isArray(errorData.message)
+          ? errorData.message.join(', ')
+          : errorData.message;
+      }
+    } catch {
+      const text = await response.text().catch(() => '');
+      if (text) errorMessage = text;
+    }
+    throw new Error(errorMessage);
   }
   return response.json();
 }

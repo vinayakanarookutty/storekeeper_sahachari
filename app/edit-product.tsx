@@ -79,9 +79,6 @@ export default function EditProductScreen() {
         const token = await getToken();
         const baseUrls = [
           API_BASE_URL,
-          'http://localhost:5000',
-          'http://10.0.2.2:5000',
-          'http://192.168.0.190:5000',
         ].filter(Boolean);
 
         const mergeCategories = (fetchedNames: string[]) => {
