@@ -9,13 +9,16 @@
     "web": "expo start --web",
     "build:web": "expo export --platform web",
     "build:android:apk": "cd android && .\\gradlew assembleRelease",
-    "build:android:bundle": "cd android && .\\gradlew bundleRelease"
+    "build:android:bundle": "cd android && .\\gradlew bundleRelease",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-community/netinfo": "11.4.1",
+    "@react-native-firebase/app": "^26.3.2",
+    "@react-native-firebase/messaging": "^26.3.2",
     "@react-navigation/native": "^7.1.8",
     "@tanstack/react-query": "^5.90.20",
     "axios": "^1.16.1",
@@ -57,6 +60,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "patch-package": "^8.0.1",
     "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"
   },

@@ -12,9 +12,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.corestoneinnovations.sahachariadmin",
       "buildNumber": "18",
+      "appleTeamId": "C6Z3P6492T",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "UIRequiredDeviceCapabilities": [
-          "arm64"
+        "UIBackgroundModes": [
+          "remote-notification"
         ],
         "UIRequiresFullScreen": true,
         "ITSAppUsesNonExemptEncryption": false,
@@ -59,6 +61,15 @@
     },
     "plugins": [
       [
+        "@react-native-firebase/app/app.plugin.js",
+        {
+          "ios": {
+            "disableSPM": true
+          }
+        }
+      ],
+      "@react-native-firebase/messaging/app.plugin.js",
+      [
         "expo-notifications"
       ],
       "expo-router",
@@ -92,6 +103,7 @@
             "buildToolsVersion": "35.0.0"
           },
           "ios": {
+            "useFrameworks": "static",
             "deploymentTarget": "15.1"
           }
         }
@@ -105,8 +117,8 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "86767deb-9516-4273-a7af-bcf0b7497e57"
+        "projectId": "2f0ee2ac-8299-455d-9c8e-94f4651c5264"
       }
     }
   }
-}
+}

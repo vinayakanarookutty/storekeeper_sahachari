@@ -92,38 +92,105 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+          animation: 'default',
+        }}
+      >
         {/* Initial index route - handles auth routing */}
         <Stack.Screen name="index" />
-        
+
         {/* Auth screens */}
         <Stack.Screen name="login" />
-        
+        <Stack.Screen
+          name="forgot-password"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
+        />
+
         {/* Main app */}
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        
+
         {/* Product screens */}
-        <Stack.Screen 
-          name="add-product" 
-          options={{ 
-            presentation: 'modal',
-          }} 
+        <Stack.Screen
+          name="add-product"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
+        />
+        <Stack.Screen
+          name="bulk-upload"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+            title: 'Bulk Upload',
+          }}
+        />
+        <Stack.Screen
+          name="edit-product"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
+        />
+        <Stack.Screen
+          name="product-detail"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
         />
 
-<Stack.Screen 
-  name="bulk-upload" 
-  options={{ 
-    presentation: 'modal',
-    title: 'Bulk Upload',
-  }} />
-        <Stack.Screen 
-          name="edit-product" 
-          options={{ 
-            presentation: 'modal',
-          }} 
+        {/* Rental & Service screens */}
+        <Stack.Screen
+          name="add-rent"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
         />
-        <Stack.Screen name="product-detail" />
+        <Stack.Screen
+          name="edit-rentals"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
+        />
+        <Stack.Screen
+          name="rental-detail"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
+        />
+        <Stack.Screen
+          name="add-service"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
+        />
+        <Stack.Screen
+          name="edit-services"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
+        />
+        <Stack.Screen
+          name="service-detail"
+          options={{
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

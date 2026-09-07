@@ -1,7 +1,16 @@
 {
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "json.schemas": [
+    {
+      "fileMatch": ["app.json"],
+      "url": "https://json.schemastore.org/expo-52.0.0.json"
+    }
+  ]
 }

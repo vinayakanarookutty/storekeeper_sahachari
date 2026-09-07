@@ -2,6 +2,17 @@ import React, { useEffect, useRef } from 'react';
 import { Platform, Vibration } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
+import {
+  getMessaging,
+  getToken as getFcmToken,
+  registerDeviceForRemoteMessages,
+  isDeviceRegisteredForRemoteMessages,
+  onMessage,
+  onTokenRefresh,
+  onNotificationOpenedApp,
+  getInitialNotification,
+  RemoteMessage,
+} from '@react-native-firebase/messaging';
 import { useQuery } from '@tanstack/react-query';
 import { fetchStoreBookings } from '@/app/services/bookingsApi';
 import { getToken } from '@/app/services/auth';
@@ -22,16 +33,50 @@ if (Platform.OS !== 'web') {
   });
 }
 
-async function registerForPushNotificationsAsync(authToken?: string | null) {
+async function sendTokenToBackend(tokenString: string, authToken?: string | null) {
+  if (!tokenString || !authToken) return;
+
+  const platform = Platform.OS === 'ios' ? 'IOS' : Platform.OS === 'android' ? 'ANDROID' : 'WEB';
+  
+  try {
+    console.log(`NotificationWatcher: Registering FCM Token (${platform}) with backend...`, tokenString.substring(0, 15));
+    const response = await fetch(`${API_BASE_URL}/users/fcm-token`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        token: tokenString,
+        fcmToken: tokenString,
+        appType: 'STORE',
+        platform: platform,
+      }),
+    });
+
+    if (response.ok) {
+      console.log('NotificationWatcher: FCM token registered successfully with backend!');
+    } else {
+      console.warn('NotificationWatcher: Failed to register FCM token. Status:', response.status);
+    }
+  } catch (err) {
+    console.warn('NotificationWatcher: Error registering FCM token with backend:', err);
+  }
+}
+
+async function registerForPushNotificationsAsync(authToken?: string | null): Promise<string | null> {
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
         await Notification.requestPermission();
       }
     }
-    return;
+    return null;
   }
 
+  let tokenString: string | null = null;
+
+  // 1. Android Notification Channels
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('orders_channel', {
       name: 'Order Notifications',
@@ -48,6 +93,7 @@ async function registerForPushNotificationsAsync(authToken?: string | null) {
     });
   }
 
+  // 2. Request Permissions via expo-notifications (standard for Expo iOS/Android)
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   if (existingStatus !== 'granted') {
@@ -55,40 +101,43 @@ async function registerForPushNotificationsAsync(authToken?: string | null) {
     finalStatus = status;
   }
   if (finalStatus !== 'granted') {
-    console.log('NotificationWatcher: Failed to get notification permission!');
-    return;
+    console.log('NotificationWatcher: Notification permission not granted.');
   }
 
-  // Fetch FCM / Push token and register with Sahachari Backend
+  // 3. Obtain Firebase Cloud Messaging (FCM) Token using modular API
   try {
-    let tokenString: string | null = null;
-    try {
-      const deviceTokenData = await Notifications.getDevicePushTokenAsync();
-      tokenString = deviceTokenData.data;
-    } catch {
-      const expoTokenData = await Notifications.getExpoPushTokenAsync();
-      tokenString = expoTokenData.data;
-    }
-
-    if (tokenString && authToken) {
-      console.log('NotificationWatcher: Registering FCM Token with backend...', tokenString.substring(0, 15));
-      const response = await fetch(`${API_BASE_URL}/users/fcm-token`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ fcmToken: tokenString }),
-      });
-      if (response.ok) {
-        console.log('NotificationWatcher: FCM token registered successfully with backend!');
-      } else {
-        console.warn('NotificationWatcher: Failed to register FCM token. Status:', response.status);
+    const messagingInstance = getMessaging();
+    if (Platform.OS === 'ios') {
+      if (!isDeviceRegisteredForRemoteMessages(messagingInstance)) {
+        await registerDeviceForRemoteMessages(messagingInstance);
       }
     }
-  } catch (tokenErr) {
-    console.warn('NotificationWatcher: Error getting device token:', tokenErr);
+    tokenString = await getFcmToken(messagingInstance);
+  } catch (firebaseErr) {
+    console.warn('NotificationWatcher: Firebase messaging getToken error (falling back to device push token):', firebaseErr);
   }
+
+  // 4. Fallback if Firebase Messaging token was not obtained (e.g. Expo Go / local dev)
+  if (!tokenString) {
+    try {
+      const deviceTokenData = await Notifications.getDevicePushTokenAsync();
+      tokenString = typeof deviceTokenData.data === 'string' ? deviceTokenData.data : JSON.stringify(deviceTokenData.data);
+    } catch {
+      try {
+        const expoTokenData = await Notifications.getExpoPushTokenAsync();
+        tokenString = expoTokenData.data;
+      } catch (err) {
+        console.warn('NotificationWatcher: Failed to obtain push token:', err);
+      }
+    }
+  }
+
+  // 5. Send Token to Backend
+  if (tokenString && authToken) {
+    await sendTokenToBackend(tokenString, authToken);
+  }
+
+  return tokenString;
 }
 
 async function playAlert() {
@@ -183,24 +232,58 @@ export default function NotificationWatcher() {
     registerForPushNotificationsAsync(token);
   }, [token]);
 
-  // Listen for incoming FCM push notifications in foreground
+  // Listen for incoming FCM & Expo push notifications in foreground and token refresh
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
+    // 1. Expo Notification foreground listener
     const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
-      console.log('NotificationWatcher: Push notification received:', notification.request.content.title);
+      console.log('NotificationWatcher: Expo notification received:', notification.request.content.title);
       playAlert();
     });
 
     const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log('NotificationWatcher: User tapped notification:', response.notification.request.content.data);
+      console.log('NotificationWatcher: User tapped Expo notification:', response.notification.request.content.data);
     });
+
+    // 2. Firebase Messaging foreground listener
+    let unsubscribeFcmMessage: (() => void) | undefined;
+    let unsubscribeTokenRefresh: (() => void) | undefined;
+    let unsubscribeFcmOpened: (() => void) | undefined;
+
+    try {
+      const messagingInstance = getMessaging();
+      unsubscribeFcmMessage = onMessage(messagingInstance, async (remoteMessage: RemoteMessage) => {
+        console.log('NotificationWatcher: Firebase FCM foreground message received:', remoteMessage.notification?.title);
+        playAlert();
+      });
+
+      unsubscribeTokenRefresh = onTokenRefresh(messagingInstance, async (refreshedToken: string) => {
+        console.log('NotificationWatcher: FCM Token refreshed:', refreshedToken.substring(0, 15));
+        await sendTokenToBackend(refreshedToken, token);
+      });
+
+      unsubscribeFcmOpened = onNotificationOpenedApp(messagingInstance, (remoteMessage: RemoteMessage) => {
+        console.log('NotificationWatcher: App opened from background via FCM:', remoteMessage.data);
+      });
+
+      getInitialNotification(messagingInstance).then((remoteMessage: RemoteMessage | null) => {
+        if (remoteMessage) {
+          console.log('NotificationWatcher: App opened from quit state via FCM:', remoteMessage.data);
+        }
+      });
+    } catch (err) {
+      console.warn('NotificationWatcher: Failed to attach FCM listeners:', err);
+    }
 
     return () => {
       notificationListener.remove();
       responseListener.remove();
+      if (unsubscribeFcmMessage) unsubscribeFcmMessage();
+      if (unsubscribeTokenRefresh) unsubscribeTokenRefresh();
+      if (unsubscribeFcmOpened) unsubscribeFcmOpened();
     };
-  }, []);
+  }, [token]);
 
   // Reset tracking state if token changes/clears (logout scenario)
   useEffect(() => {
